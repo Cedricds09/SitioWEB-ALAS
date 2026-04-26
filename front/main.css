@@ -642,6 +642,23 @@ img { max-width: 100%; display: block; }
     color: var(--color-silver-2);
     text-align: center;
 }
+.notes-results.error .notes-empty {
+    border: 2px solid #e63946;
+    background: rgba(230, 57, 70, 0.08);
+    color: #ffb4bb;
+    font-weight: 600;
+}
+.notes-results.flash {
+    animation: notesFlash 900ms ease-out;
+}
+@keyframes notesFlash {
+    0%   { box-shadow: 0 0 0 0 rgba(230, 57, 70, 0.55); transform: translateY(-4px); }
+    40%  { box-shadow: 0 0 0 10px rgba(230, 57, 70, 0.25); }
+    100% { box-shadow: 0 0 0 0 rgba(230, 57, 70, 0); transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .notes-results.flash { animation: none; }
+}
 .notes-list {
     list-style: none;
     display: grid;

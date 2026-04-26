@@ -1,65 +1,6 @@
 (() => {
-    const STORAGE_KEY = "alas_notes";
-
-    const SEED = [
-        {
-            id: "ALAS-0001",
-            date: "15/04/2026",
-            name: "María García",
-            phone: "5551234567",
-            service: "Plomería",
-            message: "Cambio de mezcladora en baño principal y revisión de fugas.",
-            items: [
-                { concept: "Mano de obra", amount: 850 },
-                { concept: "Mezcladora monomando", amount: 1250 }
-            ]
-        },
-        {
-            id: "ALAS-0002",
-            date: "18/04/2026",
-            name: "Carlos Ruiz",
-            phone: "5559876543",
-            service: "Gas LP / Natural",
-            message: "Detección y reparación de fuga en conexión principal.",
-            items: [
-                { concept: "Diagnóstico de fuga", amount: 450 },
-                { concept: "Cambio de conexión", amount: 680 }
-            ]
-        }
-    ];
-
-    function load() {
-        try {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            if (!raw) {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED));
-                return SEED.slice();
-            }
-            const parsed = JSON.parse(raw);
-            return Array.isArray(parsed) ? parsed : [];
-        } catch {
-            return [];
-        }
-    }
-
-    function normalizePhone(s) {
-        return (s || "").replace(/\D+/g, "");
-    }
-
-    function search(customer, key) {
-        const notes = load();
-        const c = normalizePhone(customer);
-        const kRaw = (key || "").trim();
-        const kPhone = normalizePhone(kRaw);
-        const kId = kRaw.toUpperCase();
-        if (!c || !kRaw) return [];
-        return notes.filter(n => {
-            const np = normalizePhone(n.phone);
-            const customerMatch = np === c;
-            const keyMatch = (kPhone && np === kPhone) || (n.id || "").toUpperCase() === kId;
-            return customerMatch && keyMatch;
-        });
-    }
+    // Ajusta si el backend corre en otro host/puerto
+    const API_BASE = "http://localhost:3000";
 
     function escape(s) {
         return String(s ?? "").replace(/[&<>"']/g, c => ({
@@ -67,44 +8,180 @@
         }[c]));
     }
 
-    function totalOf(note) {
-        return (note.items || []).reduce((s, it) => s + (Number(it.amount) || 0), 0);
+    function money(n) {
+        return "$" + (Number(n) || 0).toLocaleString("es-MX", {
+            minimumFractionDigits: 2, maximumFractionDigits: 2
+        });
     }
 
-    function render(list) {
+    function formatClienteId(c) {
+        const s = String(c ?? "").trim();
+        if (!s) return "—";
+        return s.startsWith("CL-") ? s : `CL-${s}`;
+    }
+
+    function formatNotaId(id) {
+        const n = parseInt(id, 10);
+        if (!Number.isFinite(n)) return "NT-0000";
+        return `NT-${String(n).padStart(4, "0")}`;
+    }
+
+    function formatPdfFileId(id) {
+        const n = parseInt(id, 10);
+        if (!Number.isFinite(n)) return "ALAS-0000";
+        return `ALAS-${String(n).padStart(4, "0")}`;
+    }
+
+    // Privacidad: censurar teléfono, visibles solo últimos 3 dígitos
+    function maskTelefono(raw) {
+        if (!raw) return "";
+        const digits = String(raw).replace(/\D+/g, "");
+        if (!digits) return "";
+        if (digits.length <= 3) return digits;
+        const visibles = digits.slice(-3);
+        const ocultos = "*".repeat(digits.length - 3);
+        return `${ocultos}${visibles}`;
+    }
+
+    // Privacidad: solo primer nombre + primer apellido
+    function sanitizarNombre(raw) {
+        if (!raw) return "";
+        const partes = String(raw).trim().split(/\s+/).filter(Boolean);
+        if (partes.length === 0) return "";
+        if (partes.length === 1) return partes[0];
+        return `${partes[0]} ${partes[1]}`;
+    }
+
+    function formatFecha(f) {
+        if (!f) return "—";
+        const d = new Date(f);
+        if (isNaN(d.getTime())) return String(f);
+        return d.toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" });
+    }
+
+    // Normaliza "conceptos" a array de { concept, amount } para pdf.js
+    function parseConceptos(raw, total) {
+        if (Array.isArray(raw)) {
+            return raw.map(r => ({
+                concept: String(r.concept ?? r.descripcion ?? r.nombre ?? r),
+                amount: Number(r.amount ?? r.costo ?? r.precio ?? 0)
+            }));
+        }
+        if (typeof raw === "string") {
+            try {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) return parseConceptos(parsed, total);
+            } catch { /* no es JSON, tratar como texto */ }
+            const parts = raw.split(/\r?\n|;|,/).map(s => s.trim()).filter(Boolean);
+            if (parts.length > 1) {
+                return parts.map(p => ({ concept: p, amount: 0 }));
+            }
+            return [{ concept: raw, amount: Number(total) || 0 }];
+        }
+        return [{ concept: "Servicio", amount: Number(total) || 0 }];
+    }
+
+    function toPdfNote(data, cliente, validacion) {
+        const nombreSafe = sanitizarNombre(data.nombre) || formatClienteId(data.cliente ?? cliente);
+        const telMasked = maskTelefono(data.telefono) || "—";
+        return {
+            id: formatNotaId(data.id),
+            filename: `${formatPdfFileId(data.id)}.pdf`,
+            customerId: formatClienteId(data.cliente ?? cliente),
+            date: formatFecha(data.fecha),
+            name: nombreSafe,
+            phone: telMasked,
+            service: "Nota de servicio",
+            message: typeof data.conceptos === "string" ? data.conceptos : "",
+            items: parseConceptos(data.conceptos, data.total)
+        };
+    }
+
+    function flashAndScroll(root) {
+        root.scrollIntoView({ behavior: "smooth", block: "center" });
+        root.classList.remove("flash");
+        // reinicia animación
+        void root.offsetWidth;
+        root.classList.add("flash");
+    }
+
+    function renderError(msg, opts = {}) {
+        const root = document.getElementById("notesResults");
+        if (!root) return;
+        root.classList.toggle("error", !!opts.notFound);
+        root.innerHTML = `<p class="notes-empty">${escape(msg)}</p>`;
+        flashAndScroll(root);
+    }
+
+    function renderNotFound() {
+        renderError("No se encontró ninguna nota con los datos proporcionados", { notFound: true });
+    }
+
+    function renderNota(data, pdfNote) {
         const root = document.getElementById("notesResults");
         if (!root) return;
 
-        if (!list.length) {
-            root.innerHTML = '<p class="notes-empty">No se encontraron notas con esos datos. Verifica tu número de cliente y clave.</p>';
-            return;
-        }
+        root.classList.remove("error");
+        const estadoClase = String(data.estado || "").toLowerCase() === "pagado" ? "paid" : "pending";
+        const conceptosTxt = Array.isArray(pdfNote.items)
+            ? pdfNote.items.map(i => i.concept).join(" · ")
+            : String(data.conceptos ?? "—");
 
         root.innerHTML = `
-            <p class="notes-count">${list.length} nota${list.length === 1 ? "" : "s"} encontrada${list.length === 1 ? "" : "s"}</p>
+            <p class="notes-count">1 nota encontrada</p>
             <ul class="notes-list">
-                ${list.map(n => `
-                    <li class="note-item">
-                        <div class="note-meta">
-                            <span class="note-id">${escape(n.id)}</span>
-                            <span class="note-date">${escape(n.date)}</span>
-                        </div>
-                        <div class="note-info">
-                            <p class="note-service">${escape(n.service)}</p>
-                            <p class="note-total">Total: $${totalOf(n).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                        </div>
-                        <button type="button" class="btn btn-primary note-dl" data-id="${escape(n.id)}">Descargar PDF</button>
-                    </li>
-                `).join("")}
+                <li class="note-item">
+                    <div class="note-meta">
+                        <span class="note-id">${escape(formatNotaId(data.id))}</span>
+                        <span class="note-id">Cliente: ${escape(formatClienteId(data.cliente))}</span>
+                        <span class="note-date">${escape(formatFecha(data.fecha))}</span>
+                    </div>
+                    <div class="note-info">
+                        <p class="note-service">${escape(conceptosTxt)}</p>
+                        <p class="note-total">Total: ${escape(money(data.total))}</p>
+                        <p class="note-status ${estadoClase}">Estado: ${escape(data.estado)}</p>
+                    </div>
+                    <button type="button" class="btn btn-primary note-dl">Descargar PDF</button>
+                </li>
             </ul>
         `;
 
-        root.querySelectorAll(".note-dl").forEach(btn => {
+        const btn = root.querySelector(".note-dl");
+        if (btn) {
             btn.addEventListener("click", () => {
-                const note = list.find(n => n.id === btn.dataset.id);
-                if (note && window.AlasPDF) window.AlasPDF.generate(note);
+                if (window.AlasPDF) window.AlasPDF.generate(pdfNote);
+                else alert("Generador de PDF no disponible.");
             });
-        });
+        }
+    }
+
+    async function buscarNota(cliente, validacion) {
+        const root = document.getElementById("notesResults");
+        if (root) root.innerHTML = '<p class="notes-count">Buscando…</p>';
+
+        const url = `${API_BASE}/api/notas/${encodeURIComponent(cliente)}?validacion=${encodeURIComponent(validacion)}`;
+        console.log("[FRONT] GET", url);
+
+        try {
+            const res = await fetch(url, { method: "GET" });
+            const body = await res.json().catch(() => ({}));
+
+            if (res.status === 404) {
+                renderNotFound();
+                return;
+            }
+            if (!res.ok || !body.ok) {
+                renderError(body.error || `Error del servidor (${res.status}).`);
+                return;
+            }
+
+            const pdfNote = toPdfNote(body.data, cliente, validacion);
+            renderNota(body.data, pdfNote);
+            flashAndScroll(root);
+        } catch (err) {
+            console.error("[FRONT] Error fetch:", err);
+            renderError("No se pudo conectar al servidor. Verifica que el backend esté corriendo.");
+        }
     }
 
     const form = document.getElementById("notesForm");
@@ -112,22 +189,15 @@
         form.addEventListener("submit", (e) => {
             e.preventDefault();
             const data = new FormData(form);
-            const results = search(data.get("customer"), data.get("key"));
-            render(results);
+            const cliente = String(data.get("customer") || "").trim();
+            const validacion = String(data.get("key") || "").trim();
+            if (!cliente || !validacion) {
+                renderError("Captura número de cliente y validación.");
+                return;
+            }
+            buscarNota(cliente, validacion);
         });
     }
 
-    // Seed on first load
-    load();
-
-    // Public helper for adding notes from console
-    window.AlasNotes = {
-        add(note) {
-            const all = load();
-            all.push(note);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
-        },
-        list: load,
-        clear() { localStorage.removeItem(STORAGE_KEY); }
-    };
+    window.AlasNotes = { buscar: buscarNota };
 })();

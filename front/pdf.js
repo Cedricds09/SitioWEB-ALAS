@@ -2,6 +2,41 @@
     const BUSINESS_NAME = "Servicios Integrales ALAS";
     const BUSINESS_TAG  = "Mantenimiento Habitacional";
     const BUSINESS_INFO = "Ciudad de México  ·  Tel. +52 55 3167 5824";
+    const LOGO_URL = "imagenes/logoprincipal.png";
+
+    let logoDataUrl = null;
+    let logoPromise = null;
+
+    function loadLogo() {
+        if (logoDataUrl) return Promise.resolve(logoDataUrl);
+        if (logoPromise) return logoPromise;
+        logoPromise = new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => {
+                try {
+                    const canvas = document.createElement("canvas");
+                    canvas.width = img.naturalWidth;
+                    canvas.height = img.naturalHeight;
+                    canvas.getContext("2d").drawImage(img, 0, 0);
+                    logoDataUrl = canvas.toDataURL("image/png");
+                    resolve(logoDataUrl);
+                } catch (err) {
+                    console.warn("[PDF] No se pudo convertir logo a dataURL:", err);
+                    resolve(null);
+                }
+            };
+            img.onerror = () => {
+                console.warn("[PDF] Falló carga de logo:", LOGO_URL);
+                resolve(null);
+            };
+            img.src = LOGO_URL;
+        });
+        return logoPromise;
+    }
+
+    // Precalentar logo
+    loadLogo();
 
     function money(n) {
         return "$" + (n || 0).toLocaleString("es-MX", {
@@ -22,12 +57,13 @@
         return qr.toDataURL();
     }
 
-    function generate(note) {
+    async function generate(note) {
         if (!window.jspdf || !window.jspdf.jsPDF) {
             alert("No se pudo cargar jsPDF. Revisa tu conexión a internet.");
             return;
         }
         const { jsPDF } = window.jspdf;
+        const logo = await loadLogo();
 
         const id      = note.id      || "ALAS-0000";
         const date    = note.date    || "—";
@@ -45,12 +81,20 @@
         doc.setFillColor(10, 18, 48);
         doc.rect(0, 0, W, 32, "F");
 
-        doc.setDrawColor(255, 255, 255);
-        doc.setLineWidth(0.5);
-        doc.rect(M, 8, 16, 16);
-        doc.setFontSize(7);
-        doc.setTextColor(200, 210, 230);
-        doc.text("LOGO", M + 8, 17, { align: "center" });
+        if (logo) {
+            try {
+                doc.addImage(logo, "PNG", M, 6, 20, 20);
+            } catch (err) {
+                console.warn("[PDF] addImage logo falló:", err);
+            }
+        } else {
+            doc.setDrawColor(255, 255, 255);
+            doc.setLineWidth(0.5);
+            doc.rect(M, 8, 16, 16);
+            doc.setFontSize(7);
+            doc.setTextColor(200, 210, 230);
+            doc.text("LOGO", M + 8, 17, { align: "center" });
+        }
 
         doc.setFont("helvetica", "bold");
         doc.setFontSize(15);
@@ -183,7 +227,8 @@
         doc.setTextColor(130, 130, 130);
         doc.text("Gracias por su confianza — Servicios Integrales ALAS", W / 2, H - 8, { align: "center" });
 
-        doc.save(`${id}.pdf`);
+        const filename = note.filename || `${id}.pdf`;
+        doc.save(filename);
     }
 
     window.AlasPDF = { generate };
