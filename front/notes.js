@@ -9,8 +9,10 @@
     }
 
     function money(n) {
-        return "$" + (Number(n) || 0).toLocaleString("es-MX", {
-            minimumFractionDigits: 2, maximumFractionDigits: 2
+        const num = Number(n) || 0;
+        const isWhole = Math.abs(num - Math.round(num)) < 0.005;
+        return "$" + num.toLocaleString("es-MX", {
+            minimumFractionDigits: isWhole ? 0 : 2, maximumFractionDigits: 2
         });
     }
 
