@@ -32,7 +32,7 @@
         </div>
     </header>
 
-    <section class="hero" id="hero">
+    <section class="hero public-only" id="hero">
         <div class="hero-grid">
             <div class="hero-text">
                 <p class="eyebrow">19 años de experiencia en la CDMX</p>
@@ -57,7 +57,7 @@
         </div>
     </section>
 
-    <section class="stats" id="stats">
+    <section class="stats public-only" id="stats">
         <div class="container">
             <div class="stats-grid">
                 <div class="stat">
@@ -80,7 +80,7 @@
         </div>
     </section>
 
-    <section class="section about" id="about">
+    <section class="section about public-only" id="about">
         <div class="container">
             <p class="eyebrow">Sobre nosotros</p>
             <h2 class="section-title">Una empresa familiar que cuida tu hogar como propio</h2>
@@ -107,7 +107,7 @@
         </div>
     </section>
 
-    <section class="section services" id="services">
+    <section class="section services public-only" id="services">
         <div class="container">
             <p class="eyebrow">Servicios</p>
             <h2 class="section-title">Una sola llamada para todo tu hogar</h2>
@@ -121,7 +121,7 @@
                         </svg>
                     </div>
                     <h3>Gas LP / Natural</h3>
-                    <p>Instalación, detección de fugas y mantenimiento seguro de líneas de gas.</p>
+                    <p>Instalación, detección de fugas y mantenimiento seguro de líneas de gas, aditamentos y tanques estacionarios.</p>
                 </article>
 
                 <article class="card">
@@ -167,7 +167,7 @@
         </div>
     </section>
 
-    <section class="section quote" id="quote">
+    <section class="section quote public-only" id="quote">
         <div class="container narrow">
             <p class="eyebrow">Presupuesto</p>
             <h2 class="section-title">Pide tu cotización en minutos</h2>
@@ -199,6 +199,13 @@
                 </label>
 
                 <label>
+                    <span>Dirección</span>
+                    <input type="text" name="address" id="quoteAddress" maxlength="255" autocomplete="off" placeholder="Calle, número, colonia, alcaldía">
+                    <input type="hidden" name="lat" id="quoteLat">
+                    <input type="hidden" name="lng" id="quoteLng">
+                </label>
+
+                <label>
                     <span>Descripción</span>
                     <textarea name="message" rows="4" required placeholder="Describe brevemente el trabajo"></textarea>
                 </label>
@@ -210,7 +217,7 @@
         </div>
     </section>
 
-    <section class="section gallery" id="gallery">
+    <section class="section gallery public-only" id="gallery">
         <div class="container">
             <p class="eyebrow">Trabajos realizados</p>
             <h2 class="section-title">Proyectos que hablan por nosotros</h2>
@@ -274,7 +281,7 @@
         </div>
     </section>
 
-    <section class="section testimonials" id="testimonials">
+    <section class="section testimonials public-only" id="testimonials">
         <div class="container">
             <p class="eyebrow">Testimonios</p>
             <h2 class="section-title">Lo que dicen nuestros clientes</h2>
@@ -319,21 +326,21 @@
         </div>
     </section>
 
-    <section class="section notes" id="notes">
+    <section class="section notes public-only" id="notes">
         <div class="notes-hero">
             <div class="container narrow">
                 <p class="eyebrow">Notas de servicio</p>
                 <h2 class="section-title">Consulta tus notas de servicio</h2>
-                <p class="section-text">Ingresa tu número de cliente y teléfono o clave para ver y descargar tus notas.</p>
+                <p class="section-text">Ingresa tu número de cliente y teléfono o número de nota para ver y descargar tus comprbantes.</p>
 
                 <form class="form notes-form" id="notesForm">
                     <div class="form-row">
                         <label>
                             <span>Número de cliente</span>
-                            <input type="text" name="customer" required placeholder="Ej. 55 0000 0000">
+                            <input type="text" name="customer" required placeholder="Ej. CL-0000">
                         </label>
                         <label>
-                            <span>Teléfono o clave</span>
+                            <span>Teléfono o Número de nota</span>
                             <input type="text" name="key" required placeholder="Teléfono o ID de nota">
                         </label>
                     </div>
@@ -349,7 +356,7 @@
         </div>
     </section>
 
-    <footer class="footer" id="contact">
+    <footer class="footer public-only" id="contact">
         <div class="container footer-grid">
             <div>
                 <div class="brand brand-footer">
@@ -375,7 +382,366 @@
         </div>
     </footer>
 
-    <a class="wa-float" id="waFloat" href="#" target="_blank" rel="noopener" aria-label="Contactar por WhatsApp">
+    <!-- ============ PANEL ADMIN (visible solo en /admin) ============ -->
+    <main class="admin-only" id="adminApp">
+
+        <!-- LOGIN -->
+        <section class="section admin-login" id="adminLogin">
+            <div class="container narrow">
+                <div class="card admin-login-card">
+                    <p class="eyebrow">Acceso restringido</p>
+                    <h2 class="section-title">Panel técnico ALAS</h2>
+                    <p class="section-text">Ingresa la contraseña para acceder al panel de gestión de servicios.</p>
+
+                    <form class="form" id="loginForm" novalidate>
+                        <label>
+                            <span>Usuario</span>
+                            <input type="text" name="usuario" id="loginUser" required autocomplete="username" placeholder="admin" />
+                        </label>
+                        <label>
+                            <span>Contraseña</span>
+                            <input type="password" name="password" id="loginPass" required autocomplete="current-password" placeholder="••••••••" />
+                        </label>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="loginSubmit">Entrar</button>
+                        </div>
+                        <p class="login-error" id="loginError" role="alert"></p>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- DASHBOARD -->
+        <section class="section admin-dash" id="adminDash" hidden>
+            <div class="container">
+
+                <div class="dash-topbar">
+                    <div class="dash-title-wrap">
+                        <p class="eyebrow">Panel técnico</p>
+                        <h2 class="section-title" style="margin-bottom: 0.5rem;">Gestión de servicios</h2>
+                        <p class="section-text" style="margin-bottom: 0;">Crea trabajos, monitorea estado y finaliza para generar la nota.</p>
+                    </div>
+                    <div class="dash-topbar-right">
+                        <span class="user-pill" id="userPill" hidden>
+                            <span class="user-pill-name" id="userPillName"></span>
+                            <span class="user-pill-rol" id="userPillRol"></span>
+                        </span>
+                        <span class="dash-status">Sesión activa</span>
+                        <button type="button" class="btn-icon" id="logoutBtn" title="Cerrar sesión">Cerrar sesión</button>
+                    </div>
+                </div>
+
+                <div class="dash-grid">
+
+                    <!-- Form -->
+                    <article class="card dash-card">
+                        <header class="dash-card-head">
+                            <h3>Nuevo servicio</h3>
+                            <span class="dash-card-sub">Registra un trabajo en segundos</span>
+                        </header>
+                        <div class="dash-card-body">
+                            <form class="form" id="svcForm" novalidate>
+                                <label>
+                                    <span>Nombre del cliente</span>
+                                    <input type="text" name="nombre_cliente" required autocomplete="off" placeholder="Nombre Apellido" />
+                                </label>
+                                <p class="form-hint">El número de cliente se genera automáticamente al guardar (formato <code>CL-0001</code>).</p>
+                                <label>
+                                    <span>Teléfono</span>
+                                    <input type="tel" name="telefono" placeholder="55 0000 0000" autocomplete="off" />
+                                </label>
+                                <label>
+                                    <span>Dirección del servicio</span>
+                                    <input type="text" name="direccion" id="direccionInput" autocomplete="off" placeholder="Calle, número, colonia, alcaldía" maxlength="255" />
+                                    <input type="hidden" name="lat" id="latInput" />
+                                    <input type="hidden" name="lng" id="lngInput" />
+                                </label>
+                                <label>
+                                    <span>Descripción del trabajo</span>
+                                    <textarea name="conceptos" rows="4" required placeholder="Detalle del servicio…"></textarea>
+                                </label>
+                                <label>
+                                    <span>Total (MXN)</span>
+                                    <input type="number" name="total" id="totalInput" min="0" step="0.01" required placeholder="0.00" />
+                                    <span class="money-preview" id="totalPreview">$0</span>
+                                </label>
+                                <div class="form-actions">
+                                    <button type="reset" class="btn btn-ghost">Limpiar</button>
+                                    <button type="submit" class="btn btn-primary" id="svcSubmit">Crear servicio</button>
+                                </div>
+                            </form>
+                        </div>
+                    </article>
+
+                    <!-- Lista + búsqueda -->
+                    <article class="card dash-card">
+                        <header class="dash-card-head">
+                            <div class="dash-tabs" role="tablist">
+                                <button type="button" class="dash-tab is-active" data-tab="active" role="tab" aria-selected="true">Activos</button>
+                                <button type="button" class="dash-tab" data-tab="search" role="tab" aria-selected="false">Buscar cliente</button>
+                            </div>
+                            <button type="button" class="btn-icon" id="svcRefresh" title="Recargar lista">↻ Recargar</button>
+                        </header>
+
+                        <!-- Tab: Activos -->
+                        <div class="dash-card-body" id="tabActive" role="tabpanel">
+                            <div class="filter-row" id="filterRow">
+                                <span class="filter-label">Estado:</span>
+                                <button type="button" class="filter-btn is-active" data-estado="ACTIVOS">Activos</button>
+                                <button type="button" class="filter-btn" data-estado="TERMINADO">Finalizados</button>
+                                <span class="filter-sep" id="scopeWrap" hidden>
+                                    <span class="filter-label">Ver:</span>
+                                    <button type="button" class="filter-btn is-active" data-scope="all">Todos</button>
+                                    <button type="button" class="filter-btn" data-scope="mine">Mis servicios</button>
+                                </span>
+                            </div>
+                            <div id="svcList"></div>
+                        </div>
+
+                        <!-- Tab: Buscar cliente -->
+                        <div class="dash-card-body" id="tabSearch" role="tabpanel" hidden>
+                            <label class="search-field">
+                                <span class="visually-hidden">Buscar cliente</span>
+                                <input type="search" id="clientSearch" placeholder="Buscar por nombre, número o teléfono…" autocomplete="off" />
+                            </label>
+
+                            <div id="clientResults" class="client-results"></div>
+
+                            <div id="clientHistory" class="client-history" hidden>
+                                <div class="history-head">
+                                    <button type="button" class="btn-icon" id="historyBack">← Volver</button>
+                                    <div class="history-meta">
+                                        <span class="history-name" id="historyName"></span>
+                                        <span class="history-sub" id="historySub"></span>
+                                    </div>
+                                </div>
+                                <div id="historyList"></div>
+                            </div>
+                        </div>
+                    </article>
+
+                </div>
+
+                <!-- ============ GESTIÓN DE USUARIOS (solo admin) ============ -->
+                <section class="usuarios-section" id="usuariosSection" hidden>
+                    <article class="card dash-card">
+                        <header class="dash-card-head">
+                            <div>
+                                <h3>Gestión de usuarios</h3>
+                                <span class="dash-card-sub">Crear, activar y administrar accesos al panel</span>
+                            </div>
+                            <button type="button" class="btn-icon" id="usuariosRefresh" title="Recargar">↻ Recargar</button>
+                        </header>
+                        <div class="dash-card-body usuarios-grid">
+
+                            <!-- Form crear -->
+                            <div class="usuarios-form-wrap">
+                                <h4 class="form-section-title">Nuevo usuario</h4>
+                                <form class="form" id="userForm" novalidate>
+                                    <label>
+                                        <span>Usuario</span>
+                                        <input type="text" name="usuario" id="userNew" required autocomplete="off" placeholder="ej. juan.perez" maxlength="50" />
+                                    </label>
+                                    <label>
+                                        <span>Contraseña <small>(mín. 6 caracteres)</small></span>
+                                        <input type="password" name="password" id="passNew" required autocomplete="new-password" placeholder="••••••••" minlength="6" />
+                                    </label>
+                                    <label>
+                                        <span>Rol</span>
+                                        <select name="rol" id="rolNew" required>
+                                            <option value="admin">Admin</option>
+                                            <option value="tecnico" selected>Técnico</option>
+                                        </select>
+                                    </label>
+                                    <label>
+                                        <span>WhatsApp <small>(10 dígitos sin lada)</small></span>
+                                        <input type="tel" name="telefono" id="telNew" autocomplete="off" placeholder="5531675824" maxlength="20" />
+                                    </label>
+                                    <div class="form-actions">
+                                        <button type="submit" class="btn btn-primary" id="userSubmit">Crear usuario</button>
+                                    </div>
+                                    <p class="login-error" id="userError" role="alert"></p>
+                                </form>
+                            </div>
+
+                            <!-- Lista -->
+                            <div class="usuarios-list-wrap">
+                                <h4 class="form-section-title">Usuarios registrados</h4>
+                                <div id="userList"></div>
+                            </div>
+
+                        </div>
+                    </article>
+                </section>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Toast -->
+    <div id="toast" class="toast" role="status" aria-live="polite">
+        <div class="toast-msg"></div>
+    </div>
+
+    <!-- Modal ajuste -->
+    <div id="ajusteBack" class="modal-back" role="dialog" aria-modal="true" aria-labelledby="ajusteTitle">
+        <div class="modal">
+            <h3 id="ajusteTitle">Agregar ajuste</h3>
+            <p>Registra un comentario adicional sin modificar los datos originales del servicio (garantía, descuento, observación, etc.).</p>
+            <form id="ajusteForm" class="form" novalidate>
+                <label>
+                    <span>Ajuste</span>
+                    <textarea id="ajusteText" rows="4" required placeholder="Ej. Garantía aplicada sin costo."></textarea>
+                </label>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-ghost" id="ajusteCancel">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="ajusteSave">Guardar ajuste</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal finalizar servicio -->
+    <div id="finalizeBack" class="modal-back" role="dialog" aria-modal="true" aria-labelledby="finalizeTitle">
+        <div class="modal">
+            <h3 id="finalizeTitle">Finalizar servicio</h3>
+            <p>Captura la resolución del servicio. Es obligatoria y quedará registrada en la nota generada.</p>
+            <form id="finalizeForm" class="form" novalidate>
+                <input type="hidden" id="finalizeSvcId" />
+                <label>
+                    <span>Resolución del servicio</span>
+                    <textarea id="finalizeResolucion" rows="5" required placeholder="Describe el trabajo realizado, refacciones usadas, observaciones."></textarea>
+                </label>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-ghost" id="finalizeCancel">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="finalizeSubmit">Finalizar y generar nota</button>
+                </div>
+                <p class="login-error" id="finalizeError" role="alert"></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal ver nota -->
+    <div id="notaBack" class="modal-back" role="dialog" aria-modal="true" aria-labelledby="notaTitle">
+        <div class="modal modal-wide">
+            <h3 id="notaTitle">Nota de servicio</h3>
+            <div id="notaBody" class="nota-view"></div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-ghost" id="notaClose">Cerrar</button>
+                <button type="button" class="btn btn-primary" id="notaDownload">Descargar PDF</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal editar servicio -->
+    <div id="editSvcBack" class="modal-back" role="dialog" aria-modal="true" aria-labelledby="editSvcTitle">
+        <div class="modal modal-wide">
+            <h3 id="editSvcTitle">Editar servicio</h3>
+            <form id="editSvcForm" class="form" novalidate>
+                <input type="hidden" id="editSvcId" />
+                <label>
+                    <span>Nombre del cliente</span>
+                    <input type="text" id="editNombre" required maxlength="100" />
+                </label>
+                <label>
+                    <span>Teléfono</span>
+                    <input type="tel" id="editTelefono" maxlength="20" />
+                </label>
+                <label>
+                    <span>Dirección</span>
+                    <input type="text" id="editDireccion" maxlength="255" />
+                    <input type="hidden" id="editLat" />
+                    <input type="hidden" id="editLng" />
+                </label>
+                <label>
+                    <span>Descripción del trabajo</span>
+                    <textarea id="editConceptos" rows="4" required></textarea>
+                </label>
+                <label>
+                    <span>Total (MXN)</span>
+                    <input type="number" id="editTotal" min="0" step="0.01" required />
+                    <span class="money-preview" id="editTotalPreview">$0</span>
+                </label>
+                <label>
+                    <span>Técnico asignado</span>
+                    <select id="editTecnico"></select>
+                </label>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-ghost" id="editSvcCancel">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="editSvcSave">Guardar cambios</button>
+                </div>
+                <p class="login-error" id="editSvcError" role="alert"></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal editar usuario -->
+    <div id="editUserBack" class="modal-back" role="dialog" aria-modal="true" aria-labelledby="editUserTitle">
+        <div class="modal">
+            <h3 id="editUserTitle">Editar usuario</h3>
+            <form id="editUserForm" class="form" novalidate>
+                <input type="hidden" id="editUserId" />
+                <label>
+                    <span>Usuario</span>
+                    <input type="text" id="editUserName" required maxlength="50" />
+                </label>
+                <label>
+                    <span>Rol</span>
+                    <select id="editUserRol">
+                        <option value="admin">Admin</option>
+                        <option value="tecnico">Técnico</option>
+                    </select>
+                </label>
+                <label>
+                    <span>Teléfono WhatsApp</span>
+                    <input type="tel" id="editUserTel" maxlength="20" />
+                </label>
+                <label class="check-label">
+                    <input type="checkbox" id="editUserActivo" />
+                    <span>Usuario activo</span>
+                </label>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-ghost" id="editUserCancel">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="editUserSave">Guardar cambios</button>
+                </div>
+                <p class="login-error" id="editUserError" role="alert"></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal cambiar contraseña -->
+    <div id="passBack" class="modal-back" role="dialog" aria-modal="true" aria-labelledby="passTitle">
+        <div class="modal">
+            <h3 id="passTitle">Cambiar contraseña</h3>
+            <p id="passSubtitle">Establece una nueva contraseña para el usuario seleccionado.</p>
+            <form id="passForm" class="form" novalidate>
+                <label>
+                    <span>Nueva contraseña <small>(mín. 6 caracteres)</small></span>
+                    <input type="password" id="passInput" required minlength="6" autocomplete="new-password" placeholder="••••••••" />
+                </label>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-ghost" id="passCancel">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="passSave">Guardar</button>
+                </div>
+                <p class="login-error" id="passError" role="alert"></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal confirm -->
+    <div id="confirmBack" class="modal-back" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+        <div class="modal">
+            <h3 id="confirmTitle">Finalizar servicio</h3>
+            <p id="confirmMsg">¿Finalizar trabajo y generar nota?</p>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-ghost" id="confirmCancel">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmOk">Finalizar</button>
+            </div>
+        </div>
+    </div>
+
+    <a class="wa-float public-only" id="waFloat" href="#" target="_blank" rel="noopener" aria-label="Contactar por WhatsApp">
         <svg viewBox="0 0 32 32" fill="currentColor" aria-hidden="true">
             <path d="M16 3C9 3 3.4 8.6 3.4 15.6c0 2.5.7 4.9 2 7L3 29l6.6-2.3c2 1.1 4.2 1.7 6.4 1.7 7 0 12.6-5.6 12.6-12.6S23 3 16 3zm0 22.9c-1.9 0-3.8-.5-5.4-1.5l-.4-.2-3.9 1.4 1.4-3.8-.3-.4c-1.1-1.7-1.7-3.7-1.7-5.8 0-5.8 4.7-10.4 10.5-10.4 2.8 0 5.4 1.1 7.4 3.1 2 2 3.1 4.6 3.1 7.4-.1 5.6-4.8 10.2-10.7 10.2zm5.7-7.8c-.3-.2-1.8-.9-2.1-1s-.5-.2-.7.2-.8 1-1 1.2-.4.2-.7.1c-.3-.2-1.3-.5-2.5-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6.1-.1.3-.3.4-.5.1-.2.2-.3.3-.5.1-.2.1-.4 0-.5-.1-.2-.7-1.7-1-2.3-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1.1 1-1.1 2.5s1.1 2.9 1.3 3.1c.2.2 2.2 3.3 5.3 4.7.7.3 1.3.5 1.8.6.7.2 1.4.2 1.9.1.6-.1 1.8-.7 2-1.4.2-.7.2-1.3.2-1.4-.1-.1-.3-.2-.6-.3z"/>
         </svg>
