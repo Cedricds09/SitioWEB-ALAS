@@ -9,16 +9,15 @@ const path = require('path');
 
 const { getPool } = require('./shared/db/pool');
 const errorMiddleware = require('./shared/middleware/error.middleware');
+const { requireAuth } = require('./shared/middleware/auth.middleware');
 
-// Router del módulo migrado
+// Routers de módulos migrados
+const authRouter = require('./modules/auth/auth.routes');
+const configRouter = require('./modules/config/config.routes');
+const notasRouter = require('./modules/notas/notas.routes');
+const clientesRouter = require('./modules/clientes/clientes.routes');
+const usuariosRouter = require('./modules/usuarios/usuarios.routes');
 const serviciosRouter = require('./modules/servicios/servicios.routes');
-
-// Routers de módulos NO migrados (siguen viviendo en back/routes/*)
-const notasRouter = require('../routes/notas');
-const clientesRouter = require('../routes/clientes');
-const usuariosRouter = require('../routes/usuarios');
-const configRouter = require('../routes/config');
-const { router: authRouter, requireAuth } = require('../routes/auth');
 
 const app = express();
 const PORT = env.PORT;
@@ -56,7 +55,7 @@ app.use('/api/admin/usuarios', requireAuth, usuariosRouter);
 // Notas públicas (consulta cliente)
 app.use('/api/notas', notasRouter);
 
-// Servicios (módulo refactorizado) y clientes — protegidos por sesión admin
+// Servicios y clientes — protegidos por sesión admin
 app.use('/api/servicios', requireAuth, serviciosRouter);
 app.use('/api/clientes', requireAuth, clientesRouter);
 

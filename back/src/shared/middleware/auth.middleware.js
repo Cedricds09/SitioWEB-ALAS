@@ -1,10 +1,17 @@
 // Middleware de auth.
-// requireAuth se mantiene en back/routes/auth.js (puebla req.session).
-// Aquí re-exportamos requireAuth y agregamos requireAdmin / requireRole tipados con AppError.
+// requireAuth puebla req.session a partir del token de cookie.
+// requireAdmin/requireRole validan rol del usuario ya autenticado.
 
-const { ForbiddenError } = require('../errors/AppError');
+const { UnauthorizedError, ForbiddenError } = require('../errors/AppError');
 const ROL = require('../constants/roles');
-const { requireAuth } = require('../../../routes/auth');
+const { getSession } = require('../auth/session');
+
+function requireAuth(req, _res, next) {
+  const sess = getSession(req);
+  if (!sess) return next(new UnauthorizedError('No autorizado'));
+  req.session = sess;
+  next();
+}
 
 function requireAdmin(req, _res, next) {
   if (!req.session || req.session.rol !== ROL.ADMIN) {
