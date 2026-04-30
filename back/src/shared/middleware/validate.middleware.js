@@ -14,6 +14,18 @@ function formatZodIssues(issues) {
     .join('; ');
 }
 
+// Express 5 hace `req.query` getter-only — `req.query = ...` falla silenciosamente.
+// Object.defineProperty redefine la propiedad como writable. body/params siguen
+// siendo writable en Express 5, pero usar defineProperty también para consistencia.
+function replaceReqProp(req, key, value) {
+  Object.defineProperty(req, key, {
+    value,
+    writable: true,
+    configurable: true,
+    enumerable: true,
+  });
+}
+
 function validate(schemas) {
   return function (req, _res, next) {
     try {
@@ -24,7 +36,7 @@ function validate(schemas) {
             new ValidationError(formatZodIssues(parsed.error.issues), parsed.error.issues),
           );
         }
-        req.body = parsed.data;
+        replaceReqProp(req, 'body', parsed.data);
       }
       if (schemas.params) {
         const parsed = schemas.params.safeParse(req.params);
@@ -33,7 +45,7 @@ function validate(schemas) {
             new ValidationError(formatZodIssues(parsed.error.issues), parsed.error.issues),
           );
         }
-        req.params = parsed.data;
+        replaceReqProp(req, 'params', parsed.data);
       }
       if (schemas.query) {
         const parsed = schemas.query.safeParse(req.query);
@@ -42,7 +54,7 @@ function validate(schemas) {
             new ValidationError(formatZodIssues(parsed.error.issues), parsed.error.issues),
           );
         }
-        req.query = parsed.data;
+        replaceReqProp(req, 'query', parsed.data);
       }
       next();
     } catch (err) {
