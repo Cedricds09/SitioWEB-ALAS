@@ -2,24 +2,26 @@
 
 const { z } = require('zod');
 
-// q opcional. null/'' → '' (sin filtro). Trim si llega.
-const optionalQ = z.preprocess(
+// q opcional. null/'' → ''. Trim. Máx 100 chars.
+// '' o solo espacios = sin filtro (el repository hace `if (q)`).
+const qString = z.preprocess(
   (v) => (v == null ? '' : String(v).trim()),
-  z.string().default(''),
+  z.string().max(100, 'q máx 100 caracteres.'),
 );
 
-// limit clamp [1, 200]. Default 50. Replica `Math.min(parseInt(...) || 50, 200)`.
+// limit int [1, 100]. Default 20 si falta o viene vacío.
+// Valor no parseable → NaN → z.number().int() lanza ValidationError 400.
 const limitNumber = z.preprocess(
   (v) => {
-    if (v == null || v === '') return 50;
-    const n = parseInt(v, 10);
-    return Number.isInteger(n) && n > 0 ? Math.min(n, 200) : 50;
+    if (v === undefined || v === null || v === '') return 20;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : NaN;
   },
-  z.number().int().min(1).max(200),
+  z.number().int().min(1).max(100),
 );
 
 const buscarQuerySchema = z.object({
-  q: optionalQ,
+  q: qString,
   limit: limitNumber,
 });
 
