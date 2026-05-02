@@ -1,0 +1,330 @@
+### ============================================================
+### Runbook E2E — Módulo presupuestos (Fase 1)
+### ============================================================
+### Uso: VS Code + extensión "REST Client" (humao.rest-client).
+### Cookies se mantienen entre requests del mismo archivo.
+### Ejecuta los requests en orden (click "Send Request" sobre cada uno).
+###
+### IMPORTANTE: edita @adminUser / @adminPass abajo con creds reales.
+### ============================================================
+
+@baseUrl   = http://localhost:3000
+@adminUser = TU_USUARIO_ADMIN
+@adminPass = TU_PASSWORD_ADMIN
+
+
+### Login (auth real está en /api/admin/login en este repo)
+# @name login
+POST {{baseUrl}}/api/admin/login
+Content-Type: application/json
+
+{
+  "usuario": "{{adminUser}}",
+  "password": "{{adminPass}}"
+}
+
+
+### Health check — esperado 200 { ok: true, db: 'up' }
+GET {{baseUrl}}/api/health
+
+
+### ============================================================
+### CASO 1 — Patrón A (presupuesto simple, apartado_cerrado)
+### ============================================================
+### Esperado: 201
+###   data.numero_presupuesto = "PR-XXXX"
+###   data.estado             = "borrador"
+###   data.total_general      = 11800
+###   data.bloques.length     = 1
+###   data.bloques[0].tipo    = "apartado_cerrado"
+###   data.bloques[0].subtotal = 11800
+# @name caso1Create
+POST {{baseUrl}}/api/presupuestos
+Content-Type: application/json
+
+{
+  "cliente_nombre": "Sra. Cándida López",
+  "cliente_telefono": "5551234567",
+  "cliente_direccion": "Nicolás San Juan 123, Col. Del Valle, Benito Juárez, CDMX",
+  "ciudad": "CDMX",
+  "introduccion": "A continuación se presenta el presupuesto para la instalación de tubería conduit.",
+  "vigencia_dias": 7,
+  "adelanto_porcentaje": 50,
+  "moneda": "MXN",
+  "bloques": [
+    {
+      "tipo": "apartado_cerrado",
+      "titulo": "Instalación de tubería conduit",
+      "contenido_texto": "Suministro y colocación de tubería conduit galvanizada de 3/4\" en tramo aproximado de 12 metros, incluyendo cajas de registro, conexiones y mano de obra especializada. Trabajo a ejecutarse en una jornada laboral.",
+      "subtotal": 11800
+    }
+  ]
+}
+
+
+### Captura del id (para los requests siguientes)
+@caso1Id = {{caso1Create.response.body.data.id}}
+
+
+### CASO 1 — GET por id (verificar shape completo)
+GET {{baseUrl}}/api/presupuestos/{{caso1Id}}
+
+
+### ============================================================
+### CASO 2 — Patrón B (multi-sección con items + opcional)
+### ============================================================
+### Esperado: 201
+###   total_general = 1500 + 2200 + (2*800=1600) + 950   (Sección 1, sin opcional)
+###                 + 1800 + 950                          (Sección 2)
+###                 = 9000
+###   bloques.length = 5
+# @name caso2Create
+POST {{baseUrl}}/api/presupuestos
+Content-Type: application/json
+
+{
+  "cliente_nombre": "Administración Edificio Bretaña",
+  "cliente_destinatario": "Para Administración",
+  "cliente_direccion": "Bretaña 45, Col. Zacahuitzco, Benito Juárez, CDMX",
+  "ciudad": "CDMX",
+  "introduccion": "Mantenimiento integral de instalación de gas en edificio multifamiliar.",
+  "vigencia_dias": 15,
+  "adelanto_porcentaje": 30,
+  "bloques": [
+    {
+      "tipo": "texto",
+      "contenido_texto": "El presente presupuesto cubre el mantenimiento de la instalación de gas LP en las áreas comunes del edificio y revisión por departamento."
+    },
+    {
+      "tipo": "lista_vinetas",
+      "vinetas": [
+        "Revisión completa de líneas de distribución de gas LP.",
+        "Pruebas de hermeticidad con manómetro calibrado.",
+        "Reemplazo de conexiones flexibles vencidas."
+      ]
+    },
+    {
+      "tipo": "garantias",
+      "garantias": [
+        "Garantía de 6 meses sobre mano de obra.",
+        "Garantía de 1 año sobre conexiones y refacciones nuevas instaladas."
+      ]
+    },
+    {
+      "tipo": "seccion_items",
+      "titulo": "Departamento 1",
+      "items": [
+        { "descripcion": "Revisión y prueba de hermeticidad",   "cantidad": 1, "precio_unitario": 1500 },
+        { "descripcion": "Cambio de conexión flexible 1/2\"",   "cantidad": 1, "precio_unitario": 2200 },
+        { "descripcion": "Reemplazo de llave de paso",          "cantidad": 2, "precio_unitario": 800 },
+        { "descripcion": "Sellado de uniones",                  "cantidad": 1, "precio_unitario": 950 },
+        { "descripcion": "Reemplazo de regulador de baja",      "cantidad": 1, "precio_unitario": 3000, "es_opcional": true }
+      ]
+    },
+    {
+      "tipo": "seccion_items",
+      "titulo": "Departamento 2",
+      "items": [
+        { "descripcion": "Revisión y prueba de hermeticidad",   "cantidad": 1, "precio_unitario": 1800 },
+        { "descripcion": "Sellado de uniones",                  "cantidad": 1, "precio_unitario": 950 }
+      ]
+    }
+  ]
+}
+
+
+@caso2Id = {{caso2Create.response.body.data.id}}
+
+
+### CASO 2 — GET por id (verificar estructura anidada)
+GET {{baseUrl}}/api/presupuestos/{{caso2Id}}
+
+
+### ============================================================
+### CASO 3 — Validaciones (todos deben dar 400)
+### ============================================================
+
+### 3a) subtotal negativo en apartado_cerrado → 400
+POST {{baseUrl}}/api/presupuestos
+Content-Type: application/json
+
+{
+  "cliente_nombre": "Cliente Test 3a",
+  "bloques": [
+    {
+      "tipo": "apartado_cerrado",
+      "titulo": "Trabajo X",
+      "contenido_texto": "Descripción.",
+      "subtotal": -10
+    }
+  ]
+}
+
+
+### 3b) cantidad 0 en item de seccion_items → 400
+POST {{baseUrl}}/api/presupuestos
+Content-Type: application/json
+
+{
+  "cliente_nombre": "Cliente Test 3b",
+  "bloques": [
+    {
+      "tipo": "seccion_items",
+      "titulo": "Sección X",
+      "items": [
+        { "descripcion": "Item con cantidad inválida", "cantidad": 0, "precio_unitario": 100 }
+      ]
+    }
+  ]
+}
+
+
+### 3c) tipo de bloque inválido → 400
+POST {{baseUrl}}/api/presupuestos
+Content-Type: application/json
+
+{
+  "cliente_nombre": "Cliente Test 3c",
+  "bloques": [
+    { "tipo": "invalido", "contenido_texto": "..." }
+  ]
+}
+
+
+### 3d) sin cliente_nombre → 400
+POST {{baseUrl}}/api/presupuestos
+Content-Type: application/json
+
+{
+  "bloques": []
+}
+
+
+### ============================================================
+### CASO 4 — Workflow del presupuesto del Caso 1
+### ============================================================
+
+### 4a) borrador → enviado (200)
+PUT {{baseUrl}}/api/presupuestos/{{caso1Id}}/estado
+Content-Type: application/json
+
+{ "estado": "enviado" }
+
+
+### 4b) intentar editar el header estando 'enviado' → 409
+PUT {{baseUrl}}/api/presupuestos/{{caso1Id}}
+Content-Type: application/json
+
+{ "cliente_telefono": "5559999999" }
+
+
+### 4c) enviado → aprobado (200, requiere admin)
+PUT {{baseUrl}}/api/presupuestos/{{caso1Id}}/estado
+Content-Type: application/json
+
+{ "estado": "aprobado" }
+
+
+### 4d) convertir (200, mensaje stub Fase 4)
+POST {{baseUrl}}/api/presupuestos/{{caso1Id}}/convertir
+
+
+### 4e) intento de transición desde 'convertido' → 409 (terminal)
+PUT {{baseUrl}}/api/presupuestos/{{caso1Id}}/estado
+Content-Type: application/json
+
+{ "estado": "enviado" }
+
+
+### ============================================================
+### CASO 5 — Permisos (TODO manual, requiere segundo usuario)
+### ============================================================
+### Este caso NO se automatiza aquí porque REST Client mantiene una sola
+### sesión por archivo. Para validarlo:
+###
+### Pre-requisitos:
+###   1. Tener dos usuarios en la BD: tecnicoA (rol técnico) y tecnicoB (rol técnico).
+###   2. Que tecnicoA NO sea admin.
+###
+### Pasos manuales (con un cliente HTTP que permita cambiar de sesión, ej. Insomnia/Postman/dos archivos .http):
+###
+###   1. Login como tecnicoA → POST /api/admin/login
+###   2. Crear presupuesto como tecnicoA → POST /api/presupuestos
+###      Capturar @permId del response.
+###   3. Cerrar sesión: POST /api/admin/logout
+###   4. Login como tecnicoB → POST /api/admin/login
+###   5. GET /api/presupuestos/{{permId}}        → esperado 403 (no es suyo)
+###   6. PUT /api/presupuestos/{{permId}}        → esperado 403
+###   7. DELETE /api/presupuestos/{{permId}}     → esperado 403
+###   8. Cerrar sesión: POST /api/admin/logout
+###   9. Login como admin → POST /api/admin/login
+###   10. GET /api/presupuestos/{{permId}}       → esperado 200 (admin ve todo)
+###
+### Resultado esperado: técnico ajeno recibe 403; admin recibe 200.
+
+
+### ============================================================
+### CASO 6 — Items opcionales (no suman al total general)
+### ============================================================
+### Esperado al crear: total_general = 100 + 200 = 300 (item C es opcional)
+# @name caso6Create
+POST {{baseUrl}}/api/presupuestos
+Content-Type: application/json
+
+{
+  "cliente_nombre": "Cliente Test Opcionales",
+  "introduccion": "Prueba de items opcionales.",
+  "bloques": [
+    {
+      "tipo": "seccion_items",
+      "titulo": "Sección Opcionales",
+      "items": [
+        { "descripcion": "Item A normal",   "cantidad": 1, "precio_unitario": 100 },
+        { "descripcion": "Item B normal",   "cantidad": 1, "precio_unitario": 200 },
+        { "descripcion": "Item C opcional", "cantidad": 1, "precio_unitario": 50, "es_opcional": true }
+      ]
+    }
+  ]
+}
+
+
+@caso6Id        = {{caso6Create.response.body.data.id}}
+@caso6BloqueId  = {{caso6Create.response.body.data.bloques[0].id}}
+@caso6ItemBId   = {{caso6Create.response.body.data.bloques[0].items[1].id}}
+
+
+### CASO 6 — verificar total_general = 300
+GET {{baseUrl}}/api/presupuestos/{{caso6Id}}
+
+
+### CASO 6 — marcar item B (200) como opcional → recálculo
+PUT {{baseUrl}}/api/presupuestos/{{caso6Id}}/bloques/{{caso6BloqueId}}/items/{{caso6ItemBId}}
+Content-Type: application/json
+
+{ "es_opcional": true }
+
+
+### CASO 6 — verificar total_general = 100 (solo Item A queda no-opcional)
+GET {{baseUrl}}/api/presupuestos/{{caso6Id}}
+
+
+### ============================================================
+### Logout (opcional)
+### ============================================================
+### POST {{baseUrl}}/api/admin/logout
+
+
+### ============================================================
+### ## Cleanup (opcional — descomenta si quieres borrar después)
+### ============================================================
+### NOTA: caso1 termina en estado 'convertido' (terminal). El service
+### solo permite soft-delete en estados 'borrador' o 'rechazado', así que
+### caso1 NO se puede eliminar — para borrarlo manualmente, tendrías que
+### actualizar dbo.presupuestos.activo = 0 en SQL.
+### caso2 y caso6 quedan en 'borrador', sí son soft-deletables.
+
+### # DELETE caso2
+### DELETE {{baseUrl}}/api/presupuestos/{{caso2Id}}
+
+### # DELETE caso6
+### DELETE {{baseUrl}}/api/presupuestos/{{caso6Id}}
