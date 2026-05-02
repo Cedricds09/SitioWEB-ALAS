@@ -18,6 +18,7 @@ const notasRouter = require('./modules/notas/notas.routes');
 const clientesRouter = require('./modules/clientes/clientes.routes');
 const usuariosRouter = require('./modules/usuarios/usuarios.routes');
 const serviciosRouter = require('./modules/servicios/servicios.routes');
+const presupuestosRouter = require('./modules/presupuestos/presupuestos.routes');
 
 const app = express();
 const PORT = env.PORT;
@@ -58,6 +59,9 @@ app.use('/api/notas', notasRouter);
 // Servicios y clientes — protegidos por sesión admin
 app.use('/api/servicios', requireAuth, serviciosRouter);
 app.use('/api/clientes', requireAuth, clientesRouter);
+
+// Presupuestos — autenticación interna del propio router
+app.use('/api/presupuestos', presupuestosRouter);
 
 // Panel admin → sirve main.html (la SPA detecta /admin y muestra el panel)
 app.get('/admin', (_req, res) => {
