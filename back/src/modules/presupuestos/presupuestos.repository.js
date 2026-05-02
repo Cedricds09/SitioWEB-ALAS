@@ -5,7 +5,6 @@
 const { sql, getPool } = require('../../shared/db/pool');
 const {
   PREFIJO_NUMERO,
-  PAD_NUMERO,
   formatNumeroPresupuesto,
 } = require('../../shared/constants/presupuestos');
 
