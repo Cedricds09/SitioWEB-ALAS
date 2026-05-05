@@ -1,19 +1,8 @@
-### ============================================================
-### Runbook E2E — Módulo presupuestos (Fase 1)
-### ============================================================
-### Uso: VS Code + extensión "REST Client" (humao.rest-client).
-### Cookies se mantienen entre requests del mismo archivo.
-### Ejecuta los requests en orden (click "Send Request" sobre cada uno).
-###
-### IMPORTANTE: edita @adminUser / @adminPass abajo con creds reales.
-### ============================================================
-
 @baseUrl   = http://localhost:3000
-@adminUser = TU_USUARIO_ADMIN
-@adminPass = TU_PASSWORD_ADMIN
+@adminUser = (placeholder, editable)
+@adminPass = (placeholder, editable)
 
 
-### Login (auth real está en /api/admin/login en este repo)
 # @name login
 POST {{baseUrl}}/api/admin/login
 Content-Type: application/json
@@ -29,7 +18,7 @@ GET {{baseUrl}}/api/health
 
 
 ### ============================================================
-### CASO 1 — Patrón A (presupuesto simple, apartado_cerrado)
+### CASO 1 — Cliente A (presupuesto simpleeee)
 ### ============================================================
 ### Esperado: 201
 ###   data.numero_presupuesto = "PR-XXXX"
@@ -71,7 +60,7 @@ GET {{baseUrl}}/api/presupuestos/{{caso1Id}}
 
 
 ### ============================================================
-### CASO 2 — Patrón B (multi-sección con items + opcional)
+### CASO 2 — Cliente B (multi-sección)
 ### ============================================================
 ### Esperado: 201
 ###   total_general = 1500 + 2200 + (2*800=1600) + 950   (Sección 1, sin opcional)
@@ -133,7 +122,10 @@ Content-Type: application/json
 }
 
 
+###
+
 @caso2Id = {{caso2Create.response.body.data.id}}
+
 
 
 ### CASO 2 — GET por id (verificar estructura anidada)
@@ -141,7 +133,7 @@ GET {{baseUrl}}/api/presupuestos/{{caso2Id}}
 
 
 ### ============================================================
-### CASO 3 — Validaciones (todos deben dar 400)
+### CASO 3 — Validaciones (Totalidad)
 ### ============================================================
 
 ### 3a) subtotal negativo en apartado_cerrado → 400
@@ -288,6 +280,8 @@ Content-Type: application/json
 }
 
 
+###
+
 @caso6Id        = {{caso6Create.response.body.data.id}}
 @caso6BloqueId  = {{caso6Create.response.body.data.bloques[0].id}}
 @caso6ItemBId   = {{caso6Create.response.body.data.bloques[0].items[1].id}}
@@ -315,7 +309,7 @@ GET {{baseUrl}}/api/presupuestos/{{caso6Id}}
 
 
 ### ============================================================
-### ## Cleanup (opcional — descomenta si quieres borrar después)
+### ## Cleanup
 ### ============================================================
 ### NOTA: caso1 termina en estado 'convertido' (terminal). El service
 ### solo permite soft-delete en estados 'borrador' o 'rechazado', así que
