@@ -14,6 +14,7 @@ const {
   TIPO_BLOQUE,
   ESTADO_PRESUPUESTO,
   TRANSICIONES_PERMITIDAS,
+  FUENTE_PRESUPUESTO,
   NOTA_FINAL_DEFAULT,
 } = require('../../shared/constants/presupuestos');
 
@@ -185,6 +186,9 @@ async function crear(input, sesion) {
         moneda: input.moneda,
         notas_internas: input.notas_internas ?? null,
         creado_por: sesion.uid,
+        tipo_servicio: input.tipo_servicio ?? null,
+        fuente: input.fuente || FUENTE_PRESUPUESTO.ADMIN,
+        estado: ESTADO_PRESUPUESTO.BORRADOR,
       },
       tx,
     );
@@ -478,8 +482,68 @@ async function convertirAServicio(id, sesion) {
   };
 }
 
+// ============================================================
+// Solicitud pública (formulario web — sin sesión)
+// ============================================================
+
+async function crearSolicitudPublica(input) {
+  // Honeypot: si llega lleno, ignorar silenciosamente (anti-bot).
+  if (input.honeypot && input.honeypot.length > 0) {
+    console.log('[PRES][PUB] honeypot disparado — solicitud descartada silenciosamente');
+    return { ignorada: true };
+  }
+
+  console.log(
+    '[PRES][PUB] solicitud cliente=', input.cliente_nombre,
+    'tipo=', input.tipo_servicio,
+  );
+
+  const result = await withTransaction(async (tx) => {
+    const adminId = await repo.obtenerAdminParaSolicitudes(tx);
+    if (!adminId) {
+      throw new ValidationError('No hay un usuario admin disponible para asignar solicitudes.');
+    }
+
+    const numero_presupuesto = await repo.nextNumeroPresupuesto(tx);
+
+    // descripcion_inicial → notas_internas (solo el admin la verá al atender).
+    // introduccion queda vacía hasta que admin la elabore.
+    const notasInternas = `[Solicitud del cliente]\n${input.descripcion_inicial}`;
+
+    const header = await repo.crearHeader(
+      {
+        numero_presupuesto,
+        cliente_nombre: input.cliente_nombre,
+        cliente_telefono: input.cliente_telefono,
+        cliente_direccion: input.cliente_direccion ?? null,
+        introduccion: null,
+        nota_final: NOTA_FINAL_DEFAULT,
+        vigencia_dias: 7,
+        adelanto_porcentaje: 0,
+        moneda: 'MXN',
+        notas_internas: notasInternas,
+        creado_por: adminId,
+        tipo_servicio: input.tipo_servicio,
+        fuente: FUENTE_PRESUPUESTO.FORMULARIO_PUBLICO,
+        estado: ESTADO_PRESUPUESTO.SOLICITUD,
+      },
+      tx,
+    );
+    return header;
+  });
+
+  console.log('[PRES][PUB] solicitud creada id=', result.id, 'numero=', result.numero_presupuesto);
+  return {
+    id: result.id,
+    numero_presupuesto: result.numero_presupuesto,
+    estado: result.estado,
+    ignorada: false,
+  };
+}
+
 module.exports = {
   crear,
+  crearSolicitudPublica,
   listar,
   obtener,
   actualizar,

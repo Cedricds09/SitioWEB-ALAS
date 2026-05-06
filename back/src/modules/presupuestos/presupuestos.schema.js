@@ -5,6 +5,8 @@ const { z } = require('zod');
 const {
   TIPO_BLOQUE,
   ESTADO_PRESUPUESTO,
+  TIPO_SERVICIO,
+  FUENTE_PRESUPUESTO,
   NOTA_FINAL_DEFAULT,
 } = require('../../shared/constants/presupuestos');
 
@@ -153,6 +155,16 @@ const headerCommonFields = {
   moneda: optionalString,
   notas_internas: nullableTrimmedString,
   servicio_id: optionalPositiveInt,
+  tipo_servicio: nullableTrimmedString,
+  fuente: z
+    .preprocess(
+      (v) => (v === undefined || v === null || v === '' ? undefined : String(v).trim()),
+      z.enum(Object.values(FUENTE_PRESUPUESTO), {
+        errorMap: () => ({ message: 'fuente inválida.' }),
+      }),
+    )
+    .optional()
+    .default(FUENTE_PRESUPUESTO.ADMIN),
 };
 
 const crearPresupuestoSchema = z.object({
@@ -200,6 +212,7 @@ const actualizarPresupuestoSchema = z
     moneda: optionalString,
     notas_internas: nullableTrimmedString,
     servicio_id: optionalPositiveInt,
+    tipo_servicio: nullableTrimmedString,
     bloques: z.array(bloqueSchema).optional(),
   })
   .refine(
@@ -269,6 +282,26 @@ const actualizarItemSchema = z
     { message: 'Nada que actualizar.' },
   );
 
+// ===== Solicitud pública (formulario web sin auth) =====
+
+// Honeypot: campo invisible que debe venir vacío. Si llega con contenido,
+// el endpoint silenciosamente ignora la solicitud (anti-bot).
+const crearSolicitudPublicaSchema = z.object({
+  cliente_nombre: requiredString,
+  cliente_telefono: requiredString,
+  cliente_direccion: nullableTrimmedString,
+  tipo_servicio: z.preprocess(
+    (v) => (v == null ? '' : String(v).trim()),
+    z.string().min(1, 'tipo_servicio requerido.').max(100),
+  ),
+  descripcion_inicial: requiredString,
+  // Honeypot — debe venir vacío. Aceptamos cualquier valor; el handler decide.
+  honeypot: z.preprocess(
+    (v) => (v == null ? '' : String(v).trim()),
+    z.string(),
+  ).optional().default(''),
+});
+
 // ===== Workflow =====
 
 const cambiarEstadoSchema = z.object({
@@ -323,6 +356,7 @@ module.exports = {
   agregarItemSchema,
   actualizarItemSchema,
   cambiarEstadoSchema,
+  crearSolicitudPublicaSchema,
   // param schemas
   idParamSchema,
   bloqueIdParamSchema,

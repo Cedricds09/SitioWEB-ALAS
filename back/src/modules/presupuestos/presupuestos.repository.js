@@ -16,6 +16,23 @@ async function makeRequest(tx) {
 }
 
 // ============================================================
+// Lookup auxiliar: id del admin "owner" para solicitudes públicas.
+// Las solicitudes del formulario público no tienen sesión; el FK creado_por
+// debe apuntar a un usuario válido. Usamos el primer admin activo.
+// ============================================================
+
+async function obtenerAdminParaSolicitudes(tx) {
+  const reqDb = await makeRequest(tx);
+  const r = await reqDb.query(`
+    SELECT TOP 1 id
+    FROM dbo.usuarios
+    WHERE rol = 'admin' AND activo = 1
+    ORDER BY id ASC
+  `);
+  return r.recordset[0]?.id || null;
+}
+
+// ============================================================
 // Header — consecutivo
 // ============================================================
 
@@ -53,6 +70,9 @@ async function crearHeader(data, tx) {
     .input('moneda', sql.NVarChar(10), data.moneda || 'MXN')
     .input('notas_internas', sql.NVarChar(sql.MAX), data.notas_internas ?? null)
     .input('creado_por', sql.Int, data.creado_por)
+    .input('tipo_servicio', sql.NVarChar(50), data.tipo_servicio ?? null)
+    .input('fuente', sql.NVarChar(30), data.fuente || 'admin')
+    .input('estado', sql.NVarChar(20), data.estado || 'borrador')
     .query(`
       INSERT INTO dbo.presupuestos
         (numero_presupuesto, servicio_id,
@@ -62,6 +82,7 @@ async function crearHeader(data, tx) {
          introduccion, nota_final,
          vigencia_dias, adelanto_porcentaje, moneda,
          notas_internas, creado_por,
+         tipo_servicio, fuente,
          total_general, estado, fecha_creacion, fecha_modificacion, activo)
       OUTPUT INSERTED.*
       VALUES
@@ -72,7 +93,8 @@ async function crearHeader(data, tx) {
          @introduccion, @nota_final,
          @vigencia_dias, @adelanto_porcentaje, ISNULL(@moneda, 'MXN'),
          @notas_internas, @creado_por,
-         0, 'borrador', SYSUTCDATETIME(), SYSUTCDATETIME(), 1)
+         @tipo_servicio, @fuente,
+         0, @estado, SYSUTCDATETIME(), SYSUTCDATETIME(), 1)
     `);
   return result.recordset[0];
 }
@@ -92,6 +114,7 @@ const HEADER_UPDATABLE = {
   moneda:               sql.NVarChar(10),
   notas_internas:       sql.NVarChar(sql.MAX),
   servicio_id:          sql.Int,
+  tipo_servicio:        sql.NVarChar(50),
 };
 
 async function actualizarHeader(id, campos, tx) {
@@ -240,6 +263,7 @@ async function listar({ estados, creado_por, cliente, desde, hasta }, tx) {
     SELECT id, numero_presupuesto, servicio_id,
            cliente_nombre, cliente_telefono, cliente_direccion,
            ciudad, fecha_documento, vigencia_dias, adelanto_porcentaje, moneda,
+           tipo_servicio, fuente,
            total_general, estado,
            creado_por, fecha_creacion, fecha_modificacion
     FROM dbo.presupuestos
@@ -463,6 +487,8 @@ async function calcularSubtotalSeccion(bloque_id, tx) {
 }
 
 module.exports = {
+  // auxiliares
+  obtenerAdminParaSolicitudes,
   // header
   nextNumeroPresupuesto,
   crearHeader,
