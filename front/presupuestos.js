@@ -633,7 +633,7 @@
 
     const TIPO_LABEL = {
         texto: "📝 Cuerpo",
-        lista_vinetas: "• Lista",
+        lista_vinetas: "• Aclaraciones",
         garantias: "✓ Garantías",
         apartado_cerrado: "💰 Apartado cerrado",
         seccion_items: "🔢 Sección con items",
@@ -717,16 +717,16 @@
                 `;
             case "lista_vinetas":
                 return `
-                    <span class="pres-field-label">Viñetas</span>
+                    <span class="pres-field-label">Aclaraciones</span>
                     <div class="pres-vinetas-list" data-list="vinetas">
                         ${(b.vinetas.length ? b.vinetas : [""]).map((v, i) => `
                             <div class="pres-vineta-row">
-                                <input type="text" data-idx="${i}" value="${escape(v)}" ${ro} placeholder="Viñeta ${i + 1}">
+                                <input type="text" data-idx="${i}" value="${escape(v)}" ${ro} placeholder="Ej: Incluye limpieza al finalizar">
                                 <button type="button" data-act="del-vineta" data-idx="${i}" ${dis}>×</button>
                             </div>
                         `).join("")}
                     </div>
-                    <button type="button" class="pres-add-vineta" data-act="add-vineta" ${dis}>+ Agregar viñeta</button>
+                    <button type="button" class="pres-add-vineta" data-act="add-vineta" ${dis}>+ Agregar aclaración</button>
                 `;
             case "garantias":
                 return `
@@ -862,6 +862,14 @@
         if (j < 0 || j >= arr.length) return;
         [arr[idx], arr[j]] = [arr[j], arr[idx]];
         renderBloques();
+        // Tras re-render, ubicar el bloque movido por _key y aplicar pulse + scroll.
+        requestAnimationFrame(() => {
+            const card = presBloquesList.querySelector(`.pres-bloque-card[data-key="${key}"]`);
+            if (!card) return;
+            card.classList.add("moved");
+            card.scrollIntoView({ behavior: "smooth", block: "center" });
+            setTimeout(() => card.classList.remove("moved"), 650);
+        });
     }
     function removeBloqueByKey(key) {
         const arr = state.currentPres.bloques;

@@ -2198,6 +2198,14 @@ body.modal-open { overflow: hidden; }
     border: 1px solid var(--color-border);
     border-radius: 12px;
     overflow: hidden;
+    transition: transform 250ms ease, box-shadow 250ms ease, background 600ms ease;
+}
+.pres-bloque-card.moved {
+    animation: pres-bloque-pulse 600ms ease;
+}
+@keyframes pres-bloque-pulse {
+    0%   { background: rgba(106, 60, 255, 0.22); box-shadow: 0 0 24px rgba(106, 60, 255, 0.45); }
+    100% { background: rgba(8, 18, 50, 0.55); box-shadow: none; }
 }
 .pres-bloque-head {
     display: flex;
