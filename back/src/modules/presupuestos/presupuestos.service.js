@@ -210,6 +210,7 @@ async function crear(input, sesion) {
         creado_por: sesion.uid,
         asignado_a: asignadoA,
         tipo_servicio: input.tipo_servicio ?? null,
+        numero_cliente: input.numero_cliente ?? null,
         fuente: input.fuente || FUENTE_PRESUPUESTO.ADMIN,
         estado: ESTADO_PRESUPUESTO.BORRADOR,
       },
@@ -235,7 +236,7 @@ async function crear(input, sesion) {
 // Listar
 // ============================================================
 
-async function listar({ estado, mine, cliente, desde, hasta }, sesion) {
+async function listar({ estado, mine, cliente, numero_cliente, desde, hasta }, sesion) {
   const isAdmin = sesion.rol === ROL.ADMIN;
   const estados = (estado || '')
     .split(',')
@@ -250,13 +251,13 @@ async function listar({ estado, mine, cliente, desde, hasta }, sesion) {
       estados,
       asignado_a: sesion.uid,
       soloMineConOrfanas: true,
-      cliente, desde, hasta,
+      cliente, numero_cliente, desde, hasta,
     });
   }
   if (mine === true) {
-    return repo.listar({ estados, asignado_a: sesion.uid, cliente, desde, hasta });
+    return repo.listar({ estados, asignado_a: sesion.uid, cliente, numero_cliente, desde, hasta });
   }
-  return repo.listar({ estados, cliente, desde, hasta });
+  return repo.listar({ estados, cliente, numero_cliente, desde, hasta });
 }
 
 // ============================================================
@@ -590,6 +591,7 @@ async function crearSolicitudPublica(input) {
         creado_por: adminId,
         asignado_a: tecnicoId,
         tipo_servicio: input.tipo_servicio,
+        numero_cliente: null,
         fuente: FUENTE_PRESUPUESTO.FORMULARIO_PUBLICO,
         estado: ESTADO_PRESUPUESTO.SOLICITUD,
       },

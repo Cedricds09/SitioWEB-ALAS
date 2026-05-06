@@ -155,6 +155,7 @@ const headerCommonFields = {
   notas_internas: nullableTrimmedString,
   servicio_id: optionalPositiveInt,
   tipo_servicio: nullableTrimmedString,
+  numero_cliente: nullableTrimmedString,
   fuente: z
     .preprocess(
       (v) => (v === undefined || v === null || v === '' ? undefined : String(v).trim()),
@@ -212,6 +213,7 @@ const actualizarPresupuestoSchema = z
     notas_internas: nullableTrimmedString,
     servicio_id: optionalPositiveInt,
     tipo_servicio: nullableTrimmedString,
+    numero_cliente: nullableTrimmedString,
     asignado_a: optionalPositiveInt,
     bloques: z.array(bloqueSchema).optional(),
   })
@@ -353,6 +355,7 @@ const listarQuerySchema = z.object({
     z.boolean().optional(),
   ),
   cliente: optionalString,
+  numero_cliente: optionalString,
   desde: isoDateString,
   hasta: isoDateString,
 });

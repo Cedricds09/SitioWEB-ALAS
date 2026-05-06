@@ -84,6 +84,7 @@ async function crearHeader(data, tx) {
   const result = await reqDb
     .input('numero_presupuesto', sql.NVarChar(20), data.numero_presupuesto)
     .input('servicio_id', sql.Int, data.servicio_id ?? null)
+    .input('numero_cliente', sql.NVarChar(50), data.numero_cliente ?? null)
     .input('cliente_nombre', sql.NVarChar(200), data.cliente_nombre)
     .input('cliente_telefono', sql.NVarChar(50), data.cliente_telefono ?? null)
     .input('cliente_direccion', sql.NVarChar(500), data.cliente_direccion ?? null)
@@ -103,7 +104,7 @@ async function crearHeader(data, tx) {
     .input('asignado_a', sql.Int, data.asignado_a ?? null)
     .query(`
       INSERT INTO dbo.presupuestos
-        (numero_presupuesto, servicio_id,
+        (numero_presupuesto, servicio_id, numero_cliente,
          cliente_nombre, cliente_telefono, cliente_direccion, cliente_destinatario,
          ciudad,
          fecha_documento,
@@ -114,7 +115,7 @@ async function crearHeader(data, tx) {
          total_general, estado, fecha_creacion, fecha_modificacion, activo)
       OUTPUT INSERTED.*
       VALUES
-        (@numero_presupuesto, @servicio_id,
+        (@numero_presupuesto, @servicio_id, @numero_cliente,
          @cliente_nombre, @cliente_telefono, @cliente_direccion, @cliente_destinatario,
          ISNULL(@ciudad, 'CDMX'),
          ISNULL(@fecha_documento, CAST(SYSUTCDATETIME() AS DATE)),
@@ -144,6 +145,7 @@ const HEADER_UPDATABLE = {
   servicio_id:          sql.Int,
   tipo_servicio:        sql.NVarChar(50),
   asignado_a:           sql.Int,
+  numero_cliente:       sql.NVarChar(50),
 };
 
 async function actualizarHeader(id, campos, tx) {
@@ -264,7 +266,7 @@ async function buscarPorIdCompleto(id, tx) {
   };
 }
 
-async function listar({ estados, asignado_a, soloMineConOrfanas, cliente, desde, hasta }, tx) {
+async function listar({ estados, asignado_a, soloMineConOrfanas, cliente, numero_cliente, desde, hasta }, tx) {
   const reqDb = await makeRequest(tx);
 
   let where = 'WHERE p.activo = 1';
@@ -293,6 +295,10 @@ async function listar({ estados, asignado_a, soloMineConOrfanas, cliente, desde,
     reqDb.input('cliente', sql.NVarChar(200), `%${cliente}%`);
     where += ' AND p.cliente_nombre LIKE @cliente';
   }
+  if (numero_cliente) {
+    reqDb.input('numero_cliente', sql.NVarChar(50), numero_cliente);
+    where += ' AND p.numero_cliente = @numero_cliente';
+  }
   if (desde) {
     reqDb.input('desde', sql.Date, desde);
     where += ' AND p.fecha_documento >= @desde';
@@ -304,6 +310,7 @@ async function listar({ estados, asignado_a, soloMineConOrfanas, cliente, desde,
 
   const r = await reqDb.query(`
     SELECT p.id, p.numero_presupuesto, p.servicio_id,
+           p.numero_cliente,
            p.cliente_nombre, p.cliente_telefono, p.cliente_direccion,
            p.ciudad, p.fecha_documento, p.vigencia_dias, p.adelanto_porcentaje, p.moneda,
            p.tipo_servicio, p.fuente,
