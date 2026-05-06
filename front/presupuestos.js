@@ -458,8 +458,28 @@
         // Cliente autocomplete (solo admin)
         renderClienteSearch(p);
 
+        // Google Places autocomplete sobre el input de dirección.
+        // Si Maps aún no cargó, reintentamos en 500ms (suele cargar tras /api/config).
+        bindMapsAutocompleteOnDireccion();
+
         renderBloques();
         renderFooter(editable);
+    }
+
+    function bindMapsAutocompleteOnDireccion() {
+        if (!presClienteDireccion) return;
+        if (presClienteDireccion.dataset.acBound === "1") return;
+        if (window.AlasMaps && window.AlasMaps.isReady()) {
+            window.AlasMaps.attach(presClienteDireccion);
+            return;
+        }
+        // Reintento corto: Maps puede cargar tras /api/config. No hacemos polling
+        // indefinido; un solo retry alcanza para 99% de los casos.
+        setTimeout(() => {
+            if (window.AlasMaps && window.AlasMaps.isReady()) {
+                window.AlasMaps.attach(presClienteDireccion);
+            }
+        }, 800);
     }
 
     /* ---------- Cliente autocomplete (admin only) ---------- */

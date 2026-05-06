@@ -139,6 +139,13 @@
         );
     }
 
+    // Exposición global para módulos externos (presupuestos.js) que necesiten
+    // bindar inputs creados dinámicamente fuera del init.
+    window.AlasMaps = {
+        attach: (input, latEl, lngEl) => attachAutocomplete(input, latEl || null, lngEl || null),
+        isReady: () => mapsReady,
+    };
+
     function loadMapsScript(apiKey) {
         if (!apiKey || mapsReady || window.__alasMapsLoading) return;
         window.__alasMapsLoading = true;
