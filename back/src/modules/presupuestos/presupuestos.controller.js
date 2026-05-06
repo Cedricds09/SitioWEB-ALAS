@@ -103,6 +103,33 @@ async function convertirAServicio(req, res) {
   res.json(result);
 }
 
+// POST /api/presupuestos/solicitud (público, sin auth)
+async function crearSolicitudPublica(req, res) {
+  const ip = req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress;
+  console.log('[PRES][PUB] solicitud entrante ip=', ip);
+
+  const result = await service.crearSolicitudPublica(req.body);
+
+  // WhatsApp pre-armado (cliente sin telefono backend → abre selector de contacto).
+  const tel = String(req.body.cliente_telefono || '').replace(/\D/g, '');
+  const waBase = 'https://wa.me/525531675824';
+  const waText = encodeURIComponent(
+    `Hola ALAS, soy ${req.body.cliente_nombre}.\n` +
+    `Acabo de enviar una solicitud de cotización para: ${req.body.tipo_servicio}.\n` +
+    `Mi tel: ${tel || '(no proporcionado)'}.\n` +
+    `Detalle: ${req.body.descripcion_inicial}`,
+  );
+  const whatsapp_url = `${waBase}?text=${waText}`;
+
+  res.json({
+    ok: true,
+    mensaje: 'Solicitud recibida. Te contactaremos a la brevedad.',
+    whatsapp_url,
+    presupuesto_id: result.id || null,
+    numero_presupuesto: result.numero_presupuesto || null,
+  });
+}
+
 module.exports = {
   crear,
   listar,
@@ -117,4 +144,5 @@ module.exports = {
   eliminarItem,
   cambiarEstado,
   convertirAServicio,
+  crearSolicitudPublica,
 };

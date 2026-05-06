@@ -6,8 +6,18 @@ const ctrl = require('./presupuestos.controller');
 const validate = require('../../shared/middleware/validate.middleware');
 const { requireAuth } = require('../../shared/middleware/auth.middleware');
 const asyncHandler = require('../../shared/middleware/async-handler');
+const { publicSolicitudLimiter } = require('../../shared/middleware/rate-limit.middleware');
 const S = require('./presupuestos.schema');
 
+// ===== PÚBLICO (sin auth, con rate limit + honeypot dentro del service) =====
+router.post(
+  '/solicitud',
+  publicSolicitudLimiter,
+  validate({ body: S.crearSolicitudPublicaSchema }),
+  asyncHandler(ctrl.crearSolicitudPublica),
+);
+
+// ===== PROTEGIDO (requiere sesión) =====
 router.use(requireAuth);
 
 // Header
