@@ -293,16 +293,66 @@
         return out;
     }
 
+    // Banner contextual del editor según razón del read-only.
+    // - solicitud sin atender: violeta info.
+    // - estado terminal/enviado: amarillo warning.
+    // - técnico viendo presupuesto ajeno: gris info.
+    function renderBanner(p, editable) {
+        if (editable && p.id != null && state.sesion && state.sesion.rol === "admin"
+            && p.estado !== "borrador") {
+            // Admin editando un presupuesto en estado sensible: warning no bloqueante.
+            presEditorReadonly.hidden = false;
+            presEditorReadonly.className = "pres-editor-banner is-warning";
+            presEditorReadonly.textContent =
+                `Este presupuesto ya está en estado "${p.estado}". Como admin puedes editarlo, pero ten cuidado: ya pudo haberse compartido con el cliente.`;
+            return;
+        }
+
+        if (editable) {
+            presEditorReadonly.hidden = true;
+            return;
+        }
+
+        // No editable — calcular razón.
+        presEditorReadonly.hidden = false;
+        if (p.estado === "solicitud") {
+            presEditorReadonly.className = "pres-editor-banner is-info";
+            presEditorReadonly.textContent =
+                "Esta solicitud aún no ha sido atendida. Click 'Atender' para convertirla en borrador y empezar a editarla.";
+        } else if (state.sesion && state.sesion.rol === "tecnico"
+                   && p.asignado_a !== state.sesion.uid) {
+            const nombre = p.asignado_a_nombre || "otro técnico";
+            presEditorReadonly.className = "pres-editor-banner is-muted";
+            presEditorReadonly.textContent =
+                `Este presupuesto está asignado a ${nombre}. Solo el admin o el técnico asignado pueden editarlo.`;
+        } else {
+            // Estado terminal/sensible (enviado, aprobado, convertido, rechazado).
+            presEditorReadonly.className = "pres-editor-banner is-warning";
+            presEditorReadonly.textContent =
+                "Este presupuesto ya fue enviado al cliente. No se puede editar para mantener integridad.";
+        }
+    }
+
+    // Calcula si el editor debe permitir edición.
+    // - Nuevo (sin id) → editable.
+    // - Admin → editable siempre (aunque estado != borrador, mostramos warning).
+    // - Técnico → solo si asignado al uid de sesión Y estado === 'borrador'.
+    function isEditable(p) {
+        if (!state.sesion) return false;
+        if (p.id == null) return true;
+        if (state.sesion.rol === "admin") return true;
+        return state.sesion.uid === p.asignado_a && p.estado === "borrador";
+    }
+
     function renderEditor() {
         const p = state.currentPres;
-        const isAdmin = state.sesion && state.sesion.rol === "admin";
-        const editable = !!isAdmin && (p.estado === "borrador" || p.id === null);
+        const editable = isEditable(p);
 
         presEditorTitle.textContent = p.id ? "Editar presupuesto" : "Nuevo presupuesto";
         presEditorFolio.textContent = p.id ? p.numero_presupuesto : "";
         presEditorEstado.textContent = p.estado;
         presEditorEstado.className = `estado-badge pres-estado-badge ${p.estado}`;
-        presEditorReadonly.hidden = editable;
+        renderBanner(p, editable);
 
         // Cliente
         presClienteNombre.value = p.cliente_nombre || "";
@@ -323,7 +373,7 @@
         inputs.forEach((el) => { el.disabled = !editable; });
         presAddBloqueBtn.hidden = !editable;
 
-        renderBloques(editable);
+        renderBloques();
         renderFooter(editable);
     }
 
@@ -335,7 +385,8 @@
         seccion_items: "🔢 Sección con items",
     };
 
-    function renderBloques(editable) {
+    function renderBloques() {
+        const editable = isEditable(state.currentPres);
         const blocks = state.currentPres.bloques || [];
         if (!blocks.length) {
             presBloquesList.innerHTML = '<div class="pres-empty">Sin bloques. Agrega el primero.</div>';
@@ -367,9 +418,9 @@
             const btnUp = card.querySelector('[data-act="up"]');
             const btnDown = card.querySelector('[data-act="down"]');
             const btnDel = card.querySelector('[data-act="del"]');
-            btnUp && btnUp.addEventListener("click", () => moveBloque(idx, -1));
-            btnDown && btnDown.addEventListener("click", () => moveBloque(idx, +1));
-            btnDel && btnDel.addEventListener("click", () => removeBloque(idx));
+            btnUp && btnUp.addEventListener("click", () => moveBloqueByKey(bloque._key, -1));
+            btnDown && btnDown.addEventListener("click", () => moveBloqueByKey(bloque._key, +1));
+            btnDel && btnDel.addEventListener("click", () => removeBloqueByKey(bloque._key));
 
             bindBloqueInputs(card, bloque, editable);
         });
@@ -478,14 +529,14 @@
                     const i = parseInt(btn.getAttribute("data-idx"), 10);
                     b[key].splice(i, 1);
                     if (!b[key].length) b[key] = [""];
-                    renderBloques(true);
+                    renderBloques();
                 });
             });
             const addBtn = card.querySelector('[data-act="add-vineta"], [data-act="add-garantia"]');
             addBtn && addBtn.addEventListener("click", () => {
                 if (!b[key].length) b[key] = [];
                 b[key].push("");
-                renderBloques(true);
+                renderBloques();
             });
         }
 
@@ -508,28 +559,36 @@
                 });
                 row.querySelector('[data-act="del-item"]').addEventListener("click", () => {
                     b.items.splice(i, 1);
-                    renderBloques(true);
+                    renderBloques();
                     recalcLocal();
                 });
             });
             const addItemBtn = card.querySelector('[data-act="add-item"]');
             addItemBtn && addItemBtn.addEventListener("click", () => {
                 b.items.push({ descripcion: "", cantidad: 1, precio_unitario: 0, es_opcional: false });
-                renderBloques(true);
+                renderBloques();
             });
         }
     }
 
-    function moveBloque(idx, dir) {
+    // Operan sobre _key (estable) en lugar de idx, para evitar bug de re-orden:
+    // el closure captura un idx que puede quedar obsoleto si hay clicks rápidos
+    // antes del re-render.
+    function moveBloqueByKey(key, dir) {
         const arr = state.currentPres.bloques;
+        const idx = arr.findIndex((b) => b._key === key);
+        if (idx === -1) return;
         const j = idx + dir;
         if (j < 0 || j >= arr.length) return;
         [arr[idx], arr[j]] = [arr[j], arr[idx]];
-        renderBloques(true);
+        renderBloques();
     }
-    function removeBloque(idx) {
-        state.currentPres.bloques.splice(idx, 1);
-        renderBloques(true);
+    function removeBloqueByKey(key) {
+        const arr = state.currentPres.bloques;
+        const idx = arr.findIndex((b) => b._key === key);
+        if (idx === -1) return;
+        arr.splice(idx, 1);
+        renderBloques();
         recalcLocal();
     }
 
@@ -804,7 +863,7 @@
             items: tipo === "seccion_items" ? [{ descripcion: "", cantidad: 1, precio_unitario: 0, es_opcional: false }] : [],
         };
         state.currentPres.bloques.push(nuevo);
-        renderBloques(true);
+        renderBloques();
         recalcLocal();
     }
 })();
