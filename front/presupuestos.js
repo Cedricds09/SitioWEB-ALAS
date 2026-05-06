@@ -70,7 +70,21 @@
         searchTerm: "",
         currentPres: null,       // presupuesto en edición
         nextLocalKey: 1,
+        tecnicosCache: null,     // cache de la lista de técnicos
     };
+
+    // Devuelve técnicos activos (con id) — necesita /usuarios (admin only) porque
+    // /usuarios/tecnicos no devuelve id.
+    async function getTecnicos() {
+        if (state.tecnicosCache) return state.tecnicosCache;
+        try {
+            const body = await api("/api/admin/usuarios");
+            state.tecnicosCache = (body.data || []).filter((u) => u.activo && u.rol === "tecnico");
+            return state.tecnicosCache;
+        } catch {
+            return [];
+        }
+    }
 
     /* ---------- DOM refs ---------- */
     const presSection = $("presupuestosSection");
@@ -100,6 +114,8 @@
     const presAdelanto = $("presAdelanto");
     const presIntroduccion = $("presIntroduccion");
     const presNotasInternas = $("presNotasInternas");
+    const presAsignadoLabel = $("presAsignadoLabel");
+    const presAsignadoSelect = $("presAsignadoSelect");
     const presBloquesList = $("presBloquesList");
     const presAddBloqueBtn = $("presAddBloqueBtn");
     const presFootTotal = $("presFootTotal");
@@ -172,6 +188,9 @@
 
         const html = state.items.map((p) => {
             const isSol = p.estado === "solicitud";
+            const asignadoTag = p.asignado_a_nombre
+                ? `<span class="pres-asignado-tag">Asignado a: <strong>${escape(p.asignado_a_nombre)}</strong></span>`
+                : `<span class="pres-asignado-tag is-empty">Sin asignar</span>`;
             return `
                 <div class="pres-row ${isSol ? "is-solicitud" : ""}" data-id="${p.id}">
                     <span class="pres-row-folio">${escape(p.numero_presupuesto)}</span>
@@ -179,6 +198,7 @@
                     <span class="pres-row-total">${fmtMoney(p.total_general)}</span>
                     <div class="pres-row-meta">
                         <span class="estado-badge pres-estado-badge ${p.estado}">${p.estado}</span>
+                        ${asignadoTag}
                         ${p.tipo_servicio ? `<span><strong>Servicio:</strong> ${escape(p.tipo_servicio)}</span>` : ""}
                         <span><strong>Fecha:</strong> ${escape(fmtFecha(p.fecha_documento || p.fecha_creacion))}</span>
                         ${p.fuente === "formulario_publico" ? '<span>📩 Solicitud web</span>' : ""}
@@ -373,8 +393,52 @@
         inputs.forEach((el) => { el.disabled = !editable; });
         presAddBloqueBtn.hidden = !editable;
 
+        // Dropdown de reasignación (solo admin)
+        renderAsignadoDropdown(p);
+
         renderBloques();
         renderFooter(editable);
+    }
+
+    async function renderAsignadoDropdown(p) {
+        const isAdmin = state.sesion && state.sesion.rol === "admin";
+        if (!isAdmin) {
+            presAsignadoLabel.hidden = true;
+            return;
+        }
+        presAsignadoLabel.hidden = false;
+        const tecnicos = await getTecnicos();
+        const opciones = ['<option value="">— Sin asignar —</option>']
+            .concat(tecnicos.map((t) => {
+                // /api/admin/usuarios/tecnicos no devuelve `id`; usamos `usuario` como key.
+                // Para mapping a id real, hace falta ir por /api/admin/usuarios. Workaround:
+                // pedimos lista completa cuando admin abre dropdown.
+                return `<option value="${t.id ?? ''}">${escape(t.usuario)}</option>`;
+            }));
+        presAsignadoSelect.innerHTML = opciones.join("");
+        presAsignadoSelect.value = p.asignado_a != null ? String(p.asignado_a) : "";
+
+        // En modo nuevo (sin id), no se puede reasignar todavía: deshabilitar.
+        presAsignadoSelect.disabled = p.id == null;
+
+        presAsignadoSelect.onchange = async () => {
+            if (p.id == null) return;
+            const v = presAsignadoSelect.value;
+            const newId = v === "" ? null : parseInt(v, 10);
+            try {
+                const body = await api(`/api/presupuestos/${p.id}/reasignar`, {
+                    method: "POST",
+                    body: JSON.stringify({ asignado_a: newId }),
+                });
+                state.currentPres.asignado_a = body.data.asignado_a;
+                state.currentPres.asignado_a_nombre = body.data.asignado_a_nombre || null;
+                toast(newId ? "Reasignado." : "Desasignado.", "ok");
+                loadList();
+            } catch (err) {
+                toast("Error al reasignar: " + err.message, "error");
+                presAsignadoSelect.value = p.asignado_a != null ? String(p.asignado_a) : "";
+            }
+        };
     }
 
     const TIPO_LABEL = {
