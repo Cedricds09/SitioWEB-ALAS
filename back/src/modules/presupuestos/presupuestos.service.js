@@ -117,14 +117,33 @@ async function _recalcularTotal(presupuesto_id, tx) {
   return total;
 }
 
-function _validarPropiedad(presupuesto, sesion) {
+// Admin ve todo. Técnico ve los suyos (asignado_a) + solicitudes huérfanas.
+// Lanza NotFoundError (404) en lugar de Forbidden para no revelar existencia.
+function _validarVisibilidad(presupuesto, sesion) {
   if (sesion.rol === ROL.ADMIN) return;
-  if (presupuesto.creado_por !== sesion.uid) {
-    throw new ForbiddenError('No autorizado para acceder a este presupuesto.');
+  const esSuyo = presupuesto.asignado_a === sesion.uid;
+  const esSolicitudHuerfana =
+    presupuesto.estado === ESTADO_PRESUPUESTO.SOLICITUD && presupuesto.asignado_a == null;
+  if (!esSuyo && !esSolicitudHuerfana) {
+    throw new NotFoundError('Presupuesto no encontrado.');
   }
 }
 
-function _validarEditable(presupuesto) {
+// Mantenido por compatibilidad con flujos que requieran ownership estricto
+// (mutaciones de header/bloques/items hechas por técnico).
+function _validarPropiedad(presupuesto, sesion) {
+  if (sesion.rol === ROL.ADMIN) return;
+  const esSuyo = presupuesto.asignado_a === sesion.uid;
+  const esSolicitudHuerfana =
+    presupuesto.estado === ESTADO_PRESUPUESTO.SOLICITUD && presupuesto.asignado_a == null;
+  if (!esSuyo && !esSolicitudHuerfana) {
+    throw new NotFoundError('Presupuesto no encontrado.');
+  }
+}
+
+function _validarEditable(presupuesto, sesion) {
+  // Admin override: puede editar en cualquier estado (UI muestra warning).
+  if (sesion && sesion.rol === ROL.ADMIN) return;
   if (presupuesto.estado !== ESTADO_PRESUPUESTO.BORRADOR) {
     throw new ConflictError(
       `Solo se puede editar un presupuesto en estado borrador (estado actual: ${presupuesto.estado}).`,
@@ -166,6 +185,9 @@ async function _cargarItemDeBloque(bloque, item_id, tx) {
 async function crear(input, sesion) {
   console.log('[PRES] crear por uid=', sesion.uid, 'cliente=', input.cliente_nombre);
 
+  // Autoasignación: técnico que crea queda asignado; admin queda sin asignar.
+  const asignadoA = sesion.rol === ROL.TECNICO ? sesion.uid : null;
+
   const result = await withTransaction(async (tx) => {
     const numero_presupuesto = await repo.nextNumeroPresupuesto(tx);
 
@@ -186,6 +208,7 @@ async function crear(input, sesion) {
         moneda: input.moneda,
         notas_internas: input.notas_internas ?? null,
         creado_por: sesion.uid,
+        asignado_a: asignadoA,
         tipo_servicio: input.tipo_servicio ?? null,
         fuente: input.fuente || FUENTE_PRESUPUESTO.ADMIN,
         estado: ESTADO_PRESUPUESTO.BORRADOR,
@@ -219,10 +242,21 @@ async function listar({ estado, mine, cliente, desde, hasta }, sesion) {
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
 
-  const filtraMis = !isAdmin || mine === true;
-  const creado_por = filtraMis ? sesion.uid : undefined;
-
-  return repo.listar({ estados, creado_por, cliente, desde, hasta });
+  // Visibilidad:
+  // - Técnico: SIEMPRE solo ve los suyos + solicitudes huérfanas (mine ignorado).
+  // - Admin: si mine=true filtra por sus propios; si no, ve TODO.
+  if (!isAdmin) {
+    return repo.listar({
+      estados,
+      asignado_a: sesion.uid,
+      soloMineConOrfanas: true,
+      cliente, desde, hasta,
+    });
+  }
+  if (mine === true) {
+    return repo.listar({ estados, asignado_a: sesion.uid, cliente, desde, hasta });
+  }
+  return repo.listar({ estados, cliente, desde, hasta });
 }
 
 // ============================================================
@@ -232,7 +266,7 @@ async function listar({ estado, mine, cliente, desde, hasta }, sesion) {
 async function obtener(id, sesion) {
   const p = await repo.buscarPorIdCompleto(id);
   if (!p) throw new NotFoundError('Presupuesto no encontrado.');
-  _validarPropiedad(p, sesion);
+  _validarVisibilidad(p, sesion);
   return p;
 }
 
@@ -245,7 +279,7 @@ async function actualizar(id, campos, sesion) {
     const cur = await repo.buscarPorIdPlano(id, tx);
     if (!cur || !cur.activo) throw new NotFoundError('Presupuesto no encontrado.');
     _validarPropiedad(cur, sesion);
-    _validarEditable(cur);
+    _validarEditable(cur, sesion);
 
     const headerCampos = { ...campos };
     delete headerCampos.bloques;
@@ -299,7 +333,7 @@ async function agregarBloque(presupuesto_id, datos, sesion) {
     const p = await repo.buscarPorIdPlano(presupuesto_id, tx);
     if (!p || !p.activo) throw new NotFoundError('Presupuesto no encontrado.');
     _validarPropiedad(p, sesion);
-    _validarEditable(p);
+    _validarEditable(p, sesion);
 
     const orden = datos.orden ?? (await repo.obtenerMaxOrdenBloque(presupuesto_id, tx)) + 1;
     const inserted = await _insertarBloqueConItems(presupuesto_id, datos, orden, tx);
@@ -315,7 +349,7 @@ async function actualizarBloque(presupuesto_id, bloque_id, campos, sesion) {
     const p = await repo.buscarPorIdPlano(presupuesto_id, tx);
     if (!p || !p.activo) throw new NotFoundError('Presupuesto no encontrado.');
     _validarPropiedad(p, sesion);
-    _validarEditable(p);
+    _validarEditable(p, sesion);
 
     const b = await _cargarBloqueDePresupuesto(presupuesto_id, bloque_id, tx);
 
@@ -355,7 +389,7 @@ async function eliminarBloque(presupuesto_id, bloque_id, sesion) {
     const p = await repo.buscarPorIdPlano(presupuesto_id, tx);
     if (!p || !p.activo) throw new NotFoundError('Presupuesto no encontrado.');
     _validarPropiedad(p, sesion);
-    _validarEditable(p);
+    _validarEditable(p, sesion);
 
     await _cargarBloqueDePresupuesto(presupuesto_id, bloque_id, tx);
     await repo.eliminarBloque(bloque_id, tx);
@@ -373,7 +407,7 @@ async function agregarItem(presupuesto_id, bloque_id, datos, sesion) {
     const p = await repo.buscarPorIdPlano(presupuesto_id, tx);
     if (!p || !p.activo) throw new NotFoundError('Presupuesto no encontrado.');
     _validarPropiedad(p, sesion);
-    _validarEditable(p);
+    _validarEditable(p, sesion);
 
     const b = await _cargarBloqueDePresupuesto(presupuesto_id, bloque_id, tx);
     if (b.tipo !== TIPO_BLOQUE.SECCION_ITEMS) {
@@ -404,7 +438,7 @@ async function actualizarItem(presupuesto_id, bloque_id, item_id, campos, sesion
     const p = await repo.buscarPorIdPlano(presupuesto_id, tx);
     if (!p || !p.activo) throw new NotFoundError('Presupuesto no encontrado.');
     _validarPropiedad(p, sesion);
-    _validarEditable(p);
+    _validarEditable(p, sesion);
 
     const b = await _cargarBloqueDePresupuesto(presupuesto_id, bloque_id, tx);
     await _cargarItemDeBloque(b, item_id, tx);
@@ -423,7 +457,7 @@ async function eliminarItem(presupuesto_id, bloque_id, item_id, sesion) {
     const p = await repo.buscarPorIdPlano(presupuesto_id, tx);
     if (!p || !p.activo) throw new NotFoundError('Presupuesto no encontrado.');
     _validarPropiedad(p, sesion);
-    _validarEditable(p);
+    _validarEditable(p, sesion);
 
     const b = await _cargarBloqueDePresupuesto(presupuesto_id, bloque_id, tx);
     await _cargarItemDeBloque(b, item_id, tx);
@@ -456,6 +490,34 @@ async function cambiarEstado(id, nuevoEstado, sesion) {
   const updated = await repo.cambiarEstado(id, nuevoEstado);
   console.log(`[PRES] estado id=${id} ${p.estado} → ${nuevoEstado}`);
   return updated;
+}
+
+// ============================================================
+// Reasignación (solo admin)
+// ============================================================
+
+async function reasignar(id, asignadoA, sesion) {
+  if (sesion.rol !== ROL.ADMIN) {
+    throw new ForbiddenError('Reasignar requiere rol admin.');
+  }
+
+  const result = await withTransaction(async (tx) => {
+    const p = await repo.buscarPorIdPlano(id, tx);
+    if (!p || !p.activo) throw new NotFoundError('Presupuesto no encontrado.');
+
+    if (asignadoA !== null) {
+      const ok = await repo.validarAsignable(asignadoA, tx);
+      if (!ok) {
+        throw new ValidationError('El usuario indicado no existe, no está activo o no es técnico.');
+      }
+    }
+
+    await repo.actualizarHeader(id, { asignado_a: asignadoA }, tx);
+    return repo.buscarPorIdCompleto(id, tx);
+  });
+
+  console.log('[PRES] reasignado id=', id, 'a uid=', asignadoA);
+  return result;
 }
 
 async function convertirAServicio(id, sesion) {
@@ -504,6 +566,9 @@ async function crearSolicitudPublica(input) {
       throw new ValidationError('No hay un usuario admin disponible para asignar solicitudes.');
     }
 
+    // Autoasignación: primer técnico activo (NULL si no hay técnicos).
+    const tecnicoId = await repo.getPrimerTecnicoDisponible(tx);
+
     const numero_presupuesto = await repo.nextNumeroPresupuesto(tx);
 
     // descripcion_inicial → notas_internas (solo el admin la verá al atender).
@@ -523,6 +588,7 @@ async function crearSolicitudPublica(input) {
         moneda: 'MXN',
         notas_internas: notasInternas,
         creado_por: adminId,
+        asignado_a: tecnicoId,
         tipo_servicio: input.tipo_servicio,
         fuente: FUENTE_PRESUPUESTO.FORMULARIO_PUBLICO,
         estado: ESTADO_PRESUPUESTO.SOLICITUD,
@@ -556,4 +622,5 @@ module.exports = {
   eliminarItem,
   cambiarEstado,
   convertirAServicio,
+  reasignar,
 };

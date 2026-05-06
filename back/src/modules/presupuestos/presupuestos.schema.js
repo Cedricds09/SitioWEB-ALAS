@@ -212,6 +212,7 @@ const actualizarPresupuestoSchema = z
     notas_internas: nullableTrimmedString,
     servicio_id: optionalPositiveInt,
     tipo_servicio: nullableTrimmedString,
+    asignado_a: optionalPositiveInt,
     bloques: z.array(bloqueSchema).optional(),
   })
   .refine(
@@ -309,6 +310,19 @@ const cambiarEstadoSchema = z.object({
   }),
 });
 
+// Reasignación admin: asignado_a debe ser entero positivo o null.
+const reasignarSchema = z.object({
+  asignado_a: z.preprocess(
+    (v) => {
+      if (v === null) return null;
+      if (v === undefined || v === '') return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : NaN;
+    },
+    z.union([z.number().int().positive(), z.null()]),
+  ),
+});
+
 // ===== Param schemas =====
 
 const idParamSchema = z.object({
@@ -355,6 +369,7 @@ module.exports = {
   agregarItemSchema,
   actualizarItemSchema,
   cambiarEstadoSchema,
+  reasignarSchema,
   crearSolicitudPublicaSchema,
   // param schemas
   idParamSchema,

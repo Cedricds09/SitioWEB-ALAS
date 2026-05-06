@@ -4,7 +4,7 @@ const router = require('express').Router();
 
 const ctrl = require('./presupuestos.controller');
 const validate = require('../../shared/middleware/validate.middleware');
-const { requireAuth } = require('../../shared/middleware/auth.middleware');
+const { requireAuth, requireAdmin } = require('../../shared/middleware/auth.middleware');
 const asyncHandler = require('../../shared/middleware/async-handler');
 const { publicSolicitudLimiter } = require('../../shared/middleware/rate-limit.middleware');
 const S = require('./presupuestos.schema');
@@ -86,6 +86,14 @@ router.put(
   '/:id/estado',
   validate({ params: S.idParamSchema, body: S.cambiarEstadoSchema }),
   asyncHandler(ctrl.cambiarEstado),
+);
+
+// Reasignación (admin only)
+router.post(
+  '/:id/reasignar',
+  requireAdmin,
+  validate({ params: S.idParamSchema, body: S.reasignarSchema }),
+  asyncHandler(ctrl.reasignar),
 );
 router.post(
   '/:id/convertir',

@@ -32,6 +32,33 @@ async function obtenerAdminParaSolicitudes(tx) {
   return r.recordset[0]?.id || null;
 }
 
+// Primer técnico activo disponible para autoasignación de solicitudes públicas.
+async function getPrimerTecnicoDisponible(tx) {
+  const reqDb = await makeRequest(tx);
+  const r = await reqDb.query(`
+    SELECT TOP 1 id
+    FROM dbo.usuarios
+    WHERE rol = 'tecnico' AND activo = 1
+    ORDER BY id ASC
+  `);
+  return r.recordset[0]?.id || null;
+}
+
+// Validar que un usuario candidato a asignación sea técnico activo (o NULL).
+async function validarAsignable(usuarioId, tx) {
+  if (usuarioId === null || usuarioId === undefined) return true;
+  const reqDb = await makeRequest(tx);
+  const r = await reqDb
+    .input('id', sql.Int, usuarioId)
+    .query(`
+      SELECT TOP 1 id, usuario, rol, activo
+      FROM dbo.usuarios
+      WHERE id = @id
+    `);
+  const u = r.recordset[0];
+  return !!(u && u.activo && u.rol === 'tecnico');
+}
+
 // ============================================================
 // Header — consecutivo
 // ============================================================
@@ -73,6 +100,7 @@ async function crearHeader(data, tx) {
     .input('tipo_servicio', sql.NVarChar(50), data.tipo_servicio ?? null)
     .input('fuente', sql.NVarChar(30), data.fuente || 'admin')
     .input('estado', sql.NVarChar(20), data.estado || 'borrador')
+    .input('asignado_a', sql.Int, data.asignado_a ?? null)
     .query(`
       INSERT INTO dbo.presupuestos
         (numero_presupuesto, servicio_id,
@@ -81,7 +109,7 @@ async function crearHeader(data, tx) {
          fecha_documento,
          introduccion, nota_final,
          vigencia_dias, adelanto_porcentaje, moneda,
-         notas_internas, creado_por,
+         notas_internas, creado_por, asignado_a,
          tipo_servicio, fuente,
          total_general, estado, fecha_creacion, fecha_modificacion, activo)
       OUTPUT INSERTED.*
@@ -92,7 +120,7 @@ async function crearHeader(data, tx) {
          ISNULL(@fecha_documento, CAST(SYSUTCDATETIME() AS DATE)),
          @introduccion, @nota_final,
          @vigencia_dias, @adelanto_porcentaje, ISNULL(@moneda, 'MXN'),
-         @notas_internas, @creado_por,
+         @notas_internas, @creado_por, @asignado_a,
          @tipo_servicio, @fuente,
          0, @estado, SYSUTCDATETIME(), SYSUTCDATETIME(), 1)
     `);
@@ -115,6 +143,7 @@ const HEADER_UPDATABLE = {
   notas_internas:       sql.NVarChar(sql.MAX),
   servicio_id:          sql.Int,
   tipo_servicio:        sql.NVarChar(50),
+  asignado_a:           sql.Int,
 };
 
 async function actualizarHeader(id, campos, tx) {
@@ -186,7 +215,12 @@ async function buscarPorIdCompleto(id, tx) {
   const reqDb = await makeRequest(tx);
   const headerR = await reqDb
     .input('id', sql.Int, id)
-    .query('SELECT * FROM dbo.presupuestos WHERE id = @id AND activo = 1');
+    .query(`
+      SELECT p.*, u.usuario AS asignado_a_nombre
+      FROM dbo.presupuestos p
+      LEFT JOIN dbo.usuarios u ON u.id = p.asignado_a
+      WHERE p.id = @id AND p.activo = 1
+    `);
   if (!headerR.recordset.length) return null;
   const header = headerR.recordset[0];
 
@@ -230,45 +264,56 @@ async function buscarPorIdCompleto(id, tx) {
   };
 }
 
-async function listar({ estados, creado_por, cliente, desde, hasta }, tx) {
+async function listar({ estados, asignado_a, soloMineConOrfanas, cliente, desde, hasta }, tx) {
   const reqDb = await makeRequest(tx);
 
-  let where = 'WHERE activo = 1';
+  let where = 'WHERE p.activo = 1';
 
   if (Array.isArray(estados) && estados.length) {
     const placeholders = estados.map((_, i) => {
       reqDb.input(`e${i}`, sql.NVarChar(20), estados[i]);
       return `@e${i}`;
     });
-    where += ` AND estado IN (${placeholders.join(',')})`;
+    where += ` AND p.estado IN (${placeholders.join(',')})`;
   }
-  if (creado_por !== undefined && creado_por !== null) {
-    reqDb.input('creado_por', sql.Int, creado_por);
-    where += ' AND creado_por = @creado_por';
+
+  // Visibilidad por rol:
+  // - admin: sin filtro (asignado_a/soloMineConOrfanas vienen undefined).
+  // - tecnico: soloMineConOrfanas=true → ve los suyos + solicitudes huérfanas
+  //   (estado='solicitud' Y asignado_a IS NULL — compatibilidad con datos previos).
+  if (soloMineConOrfanas && asignado_a !== undefined && asignado_a !== null) {
+    reqDb.input('mine', sql.Int, asignado_a);
+    where += ` AND (p.asignado_a = @mine OR (p.estado = 'solicitud' AND p.asignado_a IS NULL))`;
+  } else if (asignado_a !== undefined && asignado_a !== null) {
+    reqDb.input('asignado_a', sql.Int, asignado_a);
+    where += ' AND p.asignado_a = @asignado_a';
   }
+
   if (cliente) {
     reqDb.input('cliente', sql.NVarChar(200), `%${cliente}%`);
-    where += ' AND cliente_nombre LIKE @cliente';
+    where += ' AND p.cliente_nombre LIKE @cliente';
   }
   if (desde) {
     reqDb.input('desde', sql.Date, desde);
-    where += ' AND fecha_documento >= @desde';
+    where += ' AND p.fecha_documento >= @desde';
   }
   if (hasta) {
     reqDb.input('hasta', sql.Date, hasta);
-    where += ' AND fecha_documento <= @hasta';
+    where += ' AND p.fecha_documento <= @hasta';
   }
 
   const r = await reqDb.query(`
-    SELECT id, numero_presupuesto, servicio_id,
-           cliente_nombre, cliente_telefono, cliente_direccion,
-           ciudad, fecha_documento, vigencia_dias, adelanto_porcentaje, moneda,
-           tipo_servicio, fuente,
-           total_general, estado,
-           creado_por, fecha_creacion, fecha_modificacion
-    FROM dbo.presupuestos
+    SELECT p.id, p.numero_presupuesto, p.servicio_id,
+           p.cliente_nombre, p.cliente_telefono, p.cliente_direccion,
+           p.ciudad, p.fecha_documento, p.vigencia_dias, p.adelanto_porcentaje, p.moneda,
+           p.tipo_servicio, p.fuente,
+           p.total_general, p.estado,
+           p.creado_por, p.asignado_a, p.fecha_creacion, p.fecha_modificacion,
+           u.usuario AS asignado_a_nombre
+    FROM dbo.presupuestos p
+    LEFT JOIN dbo.usuarios u ON u.id = p.asignado_a
     ${where}
-    ORDER BY fecha_creacion DESC
+    ORDER BY p.fecha_creacion DESC
   `);
   return r.recordset;
 }
@@ -489,6 +534,8 @@ async function calcularSubtotalSeccion(bloque_id, tx) {
 module.exports = {
   // auxiliares
   obtenerAdminParaSolicitudes,
+  getPrimerTecnicoDisponible,
+  validarAsignable,
   // header
   nextNumeroPresupuesto,
   crearHeader,

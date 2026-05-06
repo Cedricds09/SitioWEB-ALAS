@@ -98,6 +98,12 @@ async function cambiarEstado(req, res) {
   res.json({ ok: true, data });
 }
 
+// POST /api/presupuestos/:id/reasignar  (admin only)
+async function reasignar(req, res) {
+  const data = await service.reasignar(req.params.id, req.body.asignado_a, req.session || {});
+  res.json({ ok: true, data });
+}
+
 // POST /api/presupuestos/:id/convertir
 async function convertirAServicio(req, res) {
   const result = await service.convertirAServicio(req.params.id, req.session || {});
@@ -155,6 +161,7 @@ module.exports = {
   eliminarItem,
   cambiarEstado,
   convertirAServicio,
+  reasignar,
   descargarPdf,
   crearSolicitudPublica,
 };
