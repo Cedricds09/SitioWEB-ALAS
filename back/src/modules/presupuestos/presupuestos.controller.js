@@ -3,6 +3,7 @@
 // No tiene SQL ni reglas de negocio.
 
 const service = require('./presupuestos.service');
+const { generarPresupuestoPdf } = require('../../shared/integrations/pdf-presupuesto.service');
 
 // POST /api/presupuestos
 async function crear(req, res) {
@@ -103,6 +104,16 @@ async function convertirAServicio(req, res) {
   res.json(result);
 }
 
+// GET /api/presupuestos/:id/pdf (requireAuth)
+async function descargarPdf(req, res) {
+  const presupuesto = await service.obtener(req.params.id, req.session || {});
+  const filename = `${presupuesto.numero_presupuesto || 'presupuesto'}.pdf`;
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  console.log('[PDF] presupuesto id=', presupuesto.id, 'numero=', presupuesto.numero_presupuesto);
+  generarPresupuestoPdf(res, presupuesto);
+}
+
 // POST /api/presupuestos/solicitud (público, sin auth)
 async function crearSolicitudPublica(req, res) {
   const ip = req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress;
@@ -144,5 +155,6 @@ module.exports = {
   eliminarItem,
   cambiarEstado,
   convertirAServicio,
+  descargarPdf,
   crearSolicitudPublica,
 };

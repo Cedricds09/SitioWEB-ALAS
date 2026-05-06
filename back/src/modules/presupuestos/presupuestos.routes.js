@@ -93,4 +93,11 @@ router.post(
   asyncHandler(ctrl.convertirAServicio),
 );
 
+// PDF
+router.get(
+  '/:id/pdf',
+  validate({ params: S.idParamSchema }),
+  asyncHandler(ctrl.descargarPdf),
+);
+
 module.exports = router;
