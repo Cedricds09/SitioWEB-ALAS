@@ -5,7 +5,6 @@ const { z } = require('zod');
 const {
   TIPO_BLOQUE,
   ESTADO_PRESUPUESTO,
-  TIPO_SERVICIO,
   FUENTE_PRESUPUESTO,
   NOTA_FINAL_DEFAULT,
 } = require('../../shared/constants/presupuestos');
