@@ -12,6 +12,7 @@ const TIPO_BLOQUE = Object.freeze({
 });
 
 const ESTADO_PRESUPUESTO = Object.freeze({
+  SOLICITUD:  'solicitud',
   BORRADOR:   'borrador',
   ENVIADO:    'enviado',
   APROBADO:   'aprobado',
@@ -21,11 +22,29 @@ const ESTADO_PRESUPUESTO = Object.freeze({
 
 // Tabla de transiciones permitidas. Estados terminales tienen lista vacía.
 const TRANSICIONES_PERMITIDAS = Object.freeze({
+  solicitud:  ['borrador', 'rechazado'],
   borrador:   ['enviado', 'rechazado'],
   enviado:    ['aprobado', 'rechazado'],
   aprobado:   ['convertido'],
   rechazado:  [],
   convertido: [],
+});
+
+// Tipos de servicio expuestos en el formulario público de cotización.
+// Coinciden con las opciones del select en main.html.
+const TIPO_SERVICIO = Object.freeze({
+  GAS:          'Gas LP / Natural',
+  PLOMERIA:     'Plomería',
+  ELECTRICIDAD: 'Electricidad',
+  PINTURA:      'Pintura',
+  SOLDADURA:    'Soldadura',
+  OTRO:         'Otro',
+});
+
+// Origen del presupuesto: creado en panel admin o llegó desde el formulario público.
+const FUENTE_PRESUPUESTO = Object.freeze({
+  ADMIN:              'admin',
+  FORMULARIO_PUBLICO: 'formulario_publico',
 });
 
 // Cláusula comercial estándar (se aplica como nota_final si el body no manda otra).
@@ -46,6 +65,8 @@ module.exports = {
   TIPO_BLOQUE,
   ESTADO_PRESUPUESTO,
   TRANSICIONES_PERMITIDAS,
+  TIPO_SERVICIO,
+  FUENTE_PRESUPUESTO,
   NOTA_FINAL_DEFAULT,
   PREFIJO_NUMERO,
   PAD_NUMERO,
