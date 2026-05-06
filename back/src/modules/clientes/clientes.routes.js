@@ -13,4 +13,10 @@ router.get(
   asyncHandler(ctrl.buscar),
 );
 
+router.get(
+  '/:numero_cliente/historial',
+  validate({ params: C.numeroClienteParamSchema }),
+  asyncHandler(ctrl.historial),
+);
+
 module.exports = router;

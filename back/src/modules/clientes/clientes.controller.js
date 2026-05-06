@@ -7,4 +7,9 @@ async function buscar(req, res) {
   res.json({ ok: true, data });
 }
 
-module.exports = { buscar };
+async function historial(req, res) {
+  const data = await service.historial(req.params.numero_cliente, req.session || {});
+  res.json({ ok: true, data });
+}
+
+module.exports = { buscar, historial };

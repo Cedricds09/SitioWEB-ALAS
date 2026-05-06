@@ -45,7 +45,24 @@ async function diagnosticarCliente(cliente) {
   return result.recordset;
 }
 
+// Lista todas las notas de un cliente (para historial agregado en clientes module).
+async function listarPorCliente(numero_cliente) {
+  const pool = await getPool();
+  const r = await pool
+    .request()
+    .input('cliente', sql.NVarChar(50), numero_cliente)
+    .query(`
+      SELECT id, numero_cliente, nombre_cliente, numero_nota, validacion,
+             telefono, fecha, conceptos, total, estado
+      FROM dbo.notas
+      WHERE LTRIM(RTRIM(CAST(numero_cliente AS NVARCHAR(50)))) = @cliente
+      ORDER BY fecha DESC
+    `);
+  return r.recordset;
+}
+
 module.exports = {
   buscarPorClienteValidacion,
   diagnosticarCliente,
+  listarPorCliente,
 };

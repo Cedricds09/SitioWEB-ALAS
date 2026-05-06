@@ -25,4 +25,11 @@ const buscarQuerySchema = z.object({
   limit: limitNumber,
 });
 
-module.exports = { buscarQuerySchema };
+const numeroClienteParamSchema = z.object({
+  numero_cliente: z.preprocess(
+    (v) => (v == null ? '' : String(v).trim()),
+    z.string().min(1, 'numero_cliente requerido.').max(50),
+  ),
+});
+
+module.exports = { buscarQuerySchema, numeroClienteParamSchema };
