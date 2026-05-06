@@ -344,43 +344,67 @@
     }
 
     // Banner contextual del editor según razón del read-only.
-    // - solicitud sin atender: violeta info.
-    // - estado terminal/enviado: amarillo warning.
-    // - técnico viendo presupuesto ajeno: gris info.
+    // 5 variantes:
+    //   1. Solicitud asignada al user actual → info violeta + CTA "Atender".
+    //   2. Solicitud genérica (no asignada al user) → info violeta.
+    //   3. Estado sensible + admin → warning amarillo (admin override implícito).
+    //   4. Estado sensible + técnico → warning amarillo bloqueante.
+    //   5. Técnico viendo presupuesto de otro técnico → muted gris.
     function renderBanner(p, editable) {
-        if (editable && p.id != null && state.sesion && state.sesion.rol === "admin"
-            && p.estado !== "borrador") {
-            // Admin editando un presupuesto en estado sensible: warning no bloqueante.
+        const sess = state.sesion || {};
+        const isAdmin = sess.rol === "admin";
+        const isOwnSolicitud = p.estado === "solicitud"
+            && Number(p.asignado_a) === Number(sess.uid);
+
+        // 1. Solicitud asignada al user actual.
+        if (p.estado === "solicitud" && isOwnSolicitud) {
             presEditorReadonly.hidden = false;
-            presEditorReadonly.className = "pres-editor-banner is-warning";
+            presEditorReadonly.className = "pres-editor-banner is-info";
             presEditorReadonly.textContent =
-                `Este presupuesto ya está en estado "${p.estado}". Como admin puedes editarlo, pero ten cuidado: ya pudo haberse compartido con el cliente.`;
+                "Esta solicitud está asignada a ti. Click 'Atender' para empezar a editarla.";
             return;
         }
 
+        // 2. Solicitud genérica (no del user, o admin viendo).
+        if (p.estado === "solicitud") {
+            presEditorReadonly.hidden = false;
+            presEditorReadonly.className = "pres-editor-banner is-info";
+            presEditorReadonly.textContent =
+                "Esta solicitud aún no ha sido atendida. Click 'Atender' para convertirla en borrador y empezar a editarla.";
+            return;
+        }
+
+        // 3. Admin editando estado sensible (editable=true por override).
+        if (editable && p.id != null && isAdmin && p.estado !== "borrador") {
+            presEditorReadonly.hidden = false;
+            presEditorReadonly.className = "pres-editor-banner is-warning";
+            presEditorReadonly.textContent =
+                "Este presupuesto ya fue enviado al cliente. Editar puede afectar integridad.";
+            return;
+        }
+
+        // Editor editable normal (borrador o nuevo) → sin banner.
         if (editable) {
             presEditorReadonly.hidden = true;
             return;
         }
 
-        // No editable — calcular razón.
-        presEditorReadonly.hidden = false;
-        if (p.estado === "solicitud") {
-            presEditorReadonly.className = "pres-editor-banner is-info";
-            presEditorReadonly.textContent =
-                "Esta solicitud aún no ha sido atendida. Click 'Atender' para convertirla en borrador y empezar a editarla.";
-        } else if (state.sesion && state.sesion.rol === "tecnico"
-                   && Number(p.asignado_a) !== Number(state.sesion.uid)) {
+        // 5. Técnico viendo presupuesto ajeno.
+        if (sess.rol === "tecnico"
+            && Number(p.asignado_a) !== Number(sess.uid)) {
             const nombre = p.asignado_a_nombre || "otro técnico";
+            presEditorReadonly.hidden = false;
             presEditorReadonly.className = "pres-editor-banner is-muted";
             presEditorReadonly.textContent =
-                `Este presupuesto está asignado a ${nombre}. Solo el admin o el técnico asignado pueden editarlo.`;
-        } else {
-            // Estado terminal/sensible (enviado, aprobado, convertido, rechazado).
-            presEditorReadonly.className = "pres-editor-banner is-warning";
-            presEditorReadonly.textContent =
-                "Este presupuesto ya fue enviado al cliente. No se puede editar para mantener integridad.";
+                `Este presupuesto está asignado a ${nombre}.`;
+            return;
         }
+
+        // 4. Estado sensible + técnico (asignado al user pero estado != borrador).
+        presEditorReadonly.hidden = false;
+        presEditorReadonly.className = "pres-editor-banner is-warning";
+        presEditorReadonly.textContent =
+            "Este presupuesto ya fue enviado al cliente. No se puede editar.";
     }
 
     // Calcula si el editor debe permitir edición.
