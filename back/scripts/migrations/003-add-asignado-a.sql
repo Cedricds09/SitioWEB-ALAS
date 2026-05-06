@@ -7,7 +7,6 @@
 -- - Presupuestos creados por admin: NULL (sin asignar) hasta reasignación.
 -- =============================================================================
 
--- 1a. Agregar columna asignado_a (nullable, FK a usuarios)
 IF NOT EXISTS (
     SELECT 1 FROM sys.columns
     WHERE object_id = OBJECT_ID('dbo.presupuestos') AND name = 'asignado_a'
