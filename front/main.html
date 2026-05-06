@@ -842,8 +842,9 @@
                             </label>
                         </div>
                         <label>
-                            <span>Introducción <small>(visible al cliente)</small></span>
-                            <textarea id="presIntroduccion" rows="3" placeholder="Texto contextual al inicio del presupuesto…"></textarea>
+                            <span>Intro <small>(saludo breve, visible al cliente)</small></span>
+                            <textarea id="presIntroduccion" rows="2" placeholder="Ej. Sra. Cándida López, le compartimos el presupuesto solicitado:"></textarea>
+                            <small class="pres-form-hint">Para texto extenso, usa un bloque "Cuerpo" abajo.</small>
                         </label>
                         <label>
                             <span>Notas internas <small>(no van al cliente)</small></span>
@@ -876,8 +877,8 @@
             <div class="pres-tipo-grid">
                 <button type="button" class="pres-tipo-card" data-tipo="texto">
                     <span class="pres-tipo-icon">📝</span>
-                    <strong>Texto</strong>
-                    <small>Párrafo libre o introducción</small>
+                    <strong>Cuerpo</strong>
+                    <small>Párrafo libre o sección narrativa</small>
                 </button>
                 <button type="button" class="pres-tipo-card" data-tipo="lista_vinetas">
                     <span class="pres-tipo-icon">•</span>

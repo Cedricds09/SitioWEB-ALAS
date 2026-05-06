@@ -442,12 +442,23 @@
     }
 
     const TIPO_LABEL = {
-        texto: "📝 Texto",
+        texto: "📝 Cuerpo",
         lista_vinetas: "• Lista",
         garantias: "✓ Garantías",
         apartado_cerrado: "💰 Apartado cerrado",
         seccion_items: "🔢 Sección con items",
     };
+
+    // Auto-select on focus para inputs numéricos (issue 6: defaults 0/1 molestos).
+    // Listener delegado, una vez por sección.
+    if (presBloquesList && !presBloquesList.dataset.focusBound) {
+        presBloquesList.dataset.focusBound = "1";
+        presBloquesList.addEventListener("focusin", (e) => {
+            if (e.target.tagName === "INPUT" && e.target.type === "number") {
+                setTimeout(() => e.target.select && e.target.select(), 0);
+            }
+        });
+    }
 
     function renderBloques() {
         const editable = isEditable(state.currentPres);
@@ -463,7 +474,7 @@
                     <div class="pres-bloque-actions" ${editable ? "" : 'hidden'}>
                         <button type="button" data-act="up"   title="Subir" ${idx === 0 ? "disabled" : ""}>↑</button>
                         <button type="button" data-act="down" title="Bajar" ${idx === blocks.length - 1 ? "disabled" : ""}>↓</button>
-                        <button type="button" data-act="del" class="is-danger" title="Eliminar">🗑</button>
+                        <button type="button" data-act="del" class="is-danger" title="Eliminar">🗑️</button>
                     </div>
                 </header>
                 <div class="pres-bloque-body">
@@ -527,29 +538,29 @@
                 `;
             case "apartado_cerrado":
                 return `
-                    <span class="pres-field-label">Título</span>
-                    <input type="text" data-field="titulo" value="${escape(b.titulo)}" ${ro} placeholder="Ej. Instalación de tubería conduit">
-                    <span class="pres-field-label">Descripción</span>
-                    <textarea data-field="contenido_texto" rows="4" ${ro} placeholder="Detalle del trabajo…">${escape(b.contenido_texto)}</textarea>
+                    <span class="pres-field-label">Título del apartado</span>
+                    <input type="text" data-field="titulo" value="${escape(b.titulo)}" class="pres-titulo-input" ${ro} placeholder="Ej. Instalación de tubería conduit">
+                    <span class="pres-field-label">Descripción del trabajo</span>
+                    <textarea data-field="contenido_texto" rows="4" ${ro} placeholder="Detalle: alcance, materiales, condiciones…">${escape(b.contenido_texto)}</textarea>
                     <span class="pres-field-label">Subtotal cerrado (MXN)</span>
                     <input type="number" data-field="subtotal" value="${Number(b.subtotal) || 0}" min="0" step="0.01" ${ro}>
                 `;
             case "seccion_items":
                 return `
                     <span class="pres-field-label">Título de la sección</span>
-                    <input type="text" data-field="titulo" value="${escape(b.titulo)}" ${ro} placeholder="Ej. Departamento 1">
+                    <input type="text" data-field="titulo" value="${escape(b.titulo)}" class="pres-titulo-input" ${ro} placeholder="Ej. Departamento 1">
                     <span class="pres-field-label">Items</span>
                     <div class="pres-items-table">
                         <div class="pres-items-row head">
-                            <span>Descripción</span><span>Cant.</span><span>P. Unit.</span><span>Opc.</span><span></span>
+                            <span>Descripción</span><span>Cant.</span><span>P. Unit.</span><span title="Marcar si el item NO suma al total">Opcional</span><span></span>
                         </div>
                         ${b.items.map((it, i) => `
                             <div class="pres-items-row" data-item-idx="${i}">
                                 <input type="text" data-field="descripcion" value="${escape(it.descripcion)}" ${ro} placeholder="Descripción">
-                                <input type="number" data-field="cantidad" value="${it.cantidad}" min="0.01" step="0.01" ${ro}>
+                                <input type="number" data-field="cantidad" value="${it.cantidad}" min="1" step="1" ${ro}>
                                 <input type="number" data-field="precio_unitario" value="${it.precio_unitario}" min="0" step="0.01" ${ro}>
-                                <label class="opt-check"><input type="checkbox" data-field="es_opcional" ${it.es_opcional ? "checked" : ""} ${dis}></label>
-                                <button type="button" data-act="del-item" ${dis}>×</button>
+                                <label class="opt-check" title="Marcar si NO suma al total"><input type="checkbox" data-field="es_opcional" ${it.es_opcional ? "checked" : ""} ${dis}></label>
+                                <button type="button" data-act="del-item" ${dis} title="Eliminar item">🗑️</button>
                             </div>
                         `).join("")}
                     </div>

@@ -146,14 +146,14 @@ function generarPresupuestoPdf(res, p) {
   if (p.tipo_servicio) line('Servicio:', p.tipo_servicio);
   y += 6 * PT;
 
-  // ===== Introducción =====
+  // ===== Introducción (sin header — un saludo breve no necesita título) =====
   if (p.introduccion) {
-    section('Introducción');
+    ensureSpace(20 * PT);
     doc.font('Helvetica').fontSize(10).fillColor(TEXT).text(p.introduccion, M, y, {
       width: W - M * 2,
       align: 'justify',
     });
-    y = doc.y + 8 * PT;
+    y = doc.y + 10 * PT;
   }
 
   // ===== Bloques =====
