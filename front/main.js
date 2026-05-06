@@ -338,6 +338,12 @@
         const isAdmin = !!(currentUser && currentUser.rol === "admin");
         usuariosSection.hidden = !isAdmin;
 
+        // Notifica a otros módulos (presupuestos.js, etc.) que la sesión cambió.
+        // detail: { usuario, rol } o null si se cerró la sesión.
+        document.dispatchEvent(
+            new CustomEvent("alas:session-ready", { detail: currentUser })
+        );
+
         // Filtro Estado SIEMPRE visible (Activos/Finalizados). Reset a Activos.
         filterRow.hidden = false;
         estadoFiltro = "ACTIVOS";
@@ -361,6 +367,7 @@
         currentUser = null;
         userPill.hidden = true;
         usuariosSection.hidden = true;
+        document.dispatchEvent(new CustomEvent("alas:session-ready", { detail: null }));
         if (typeof stopPolling === "function") stopPolling();
         setTimeout(() => {
             const target = loginUser && !loginUser.value ? loginUser : loginPass;

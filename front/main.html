@@ -524,6 +524,42 @@
 
                 </div>
 
+                <!-- ============ PRESUPUESTOS (admin y técnico) ============ -->
+                <section class="presupuestos-section" id="presupuestosSection" hidden>
+                    <article class="card dash-card">
+                        <header class="dash-card-head">
+                            <div>
+                                <h3>Presupuestos</h3>
+                                <span class="dash-card-sub" id="presBandejaTag" hidden>📩 <span id="presBandejaCount">0</span> solicitud(es) pendiente(s)</span>
+                            </div>
+                            <div class="dash-card-head-actions">
+                                <button type="button" class="btn-icon" id="presRefresh" title="Recargar">↻ Recargar</button>
+                                <button type="button" class="btn btn-primary" id="presNuevo">+ Nuevo presupuesto</button>
+                            </div>
+                        </header>
+                        <div class="dash-card-body">
+                            <div class="filter-row pres-filter-row">
+                                <label class="search-field pres-search">
+                                    <span class="visually-hidden">Buscar cliente</span>
+                                    <input type="search" id="presSearch" placeholder="Buscar por cliente…" autocomplete="off" />
+                                </label>
+                                <span class="filter-label">Estado:</span>
+                                <button type="button" class="filter-btn is-active" data-pres-estado="activos">Activos</button>
+                                <button type="button" class="filter-btn" data-pres-estado="solicitud">Solicitudes</button>
+                                <button type="button" class="filter-btn" data-pres-estado="aprobado">Aprobados</button>
+                                <button type="button" class="filter-btn" data-pres-estado="convertido">Convertidos</button>
+                                <button type="button" class="filter-btn" data-pres-estado="rechazado">Rechazados</button>
+                                <span class="filter-sep" id="presScopeWrap" hidden>
+                                    <span class="filter-label">Ver:</span>
+                                    <button type="button" class="filter-btn is-active" data-pres-scope="all">Todos</button>
+                                    <button type="button" class="filter-btn" data-pres-scope="mine">Mis presupuestos</button>
+                                </span>
+                            </div>
+                            <div id="presList" class="pres-list"></div>
+                        </div>
+                    </article>
+                </section>
+
                 <!-- ============ GESTIÓN DE USUARIOS (solo admin) ============ -->
                 <section class="usuarios-section" id="usuariosSection" hidden>
                     <article class="card dash-card">
@@ -743,6 +779,127 @@
         </div>
     </div>
 
+    <!-- Modal Editor de presupuesto (full-screen) -->
+    <div id="presEditorBack" class="modal-back" role="dialog" aria-modal="true" aria-labelledby="presEditorTitle">
+        <div class="modal modal-fullscreen pres-editor">
+            <header class="pres-editor-head">
+                <div class="pres-editor-head-left">
+                    <h3 id="presEditorTitle">Nuevo presupuesto</h3>
+                    <span class="pres-editor-folio" id="presEditorFolio"></span>
+                    <span class="estado-badge pres-estado-badge" id="presEditorEstado"></span>
+                </div>
+                <button type="button" class="btn-icon" id="presEditorClose">✕ Cerrar</button>
+            </header>
+            <div class="pres-editor-banner" id="presEditorReadonly" hidden>
+                Solo lectura — necesitas permisos de admin para editar.
+            </div>
+            <div class="pres-editor-body">
+                <aside class="pres-editor-cliente">
+                    <h4 class="pres-editor-section-title">Datos del cliente y documento</h4>
+                    <form class="form" id="presClienteForm" novalidate>
+                        <label>
+                            <span>Nombre del cliente</span>
+                            <input type="text" id="presClienteNombre" required maxlength="200" autocomplete="off" />
+                        </label>
+                        <label>
+                            <span>Teléfono</span>
+                            <input type="tel" id="presClienteTelefono" maxlength="50" autocomplete="off" />
+                        </label>
+                        <label>
+                            <span>Dirección</span>
+                            <input type="text" id="presClienteDireccion" maxlength="500" autocomplete="off" />
+                        </label>
+                        <label>
+                            <span>Destinatario <small>(opcional, ej. "Para Administración")</small></span>
+                            <input type="text" id="presClienteDestinatario" maxlength="200" autocomplete="off" />
+                        </label>
+                        <label>
+                            <span>Tipo de servicio</span>
+                            <select id="presTipoServicio">
+                                <option value="">— Sin especificar —</option>
+                                <option>Gas LP / Natural</option>
+                                <option>Plomería</option>
+                                <option>Electricidad</option>
+                                <option>Pintura</option>
+                                <option>Soldadura</option>
+                                <option>Otro</option>
+                            </select>
+                        </label>
+                        <div class="form-row">
+                            <label>
+                                <span>Vigencia (días)</span>
+                                <input type="number" id="presVigencia" min="1" value="7" />
+                            </label>
+                            <label>
+                                <span>Adelanto (%)</span>
+                                <input type="number" id="presAdelanto" min="0" max="100" value="0" />
+                            </label>
+                        </div>
+                        <label>
+                            <span>Introducción <small>(visible al cliente)</small></span>
+                            <textarea id="presIntroduccion" rows="3" placeholder="Texto contextual al inicio del presupuesto…"></textarea>
+                        </label>
+                        <label>
+                            <span>Notas internas <small>(no van al cliente)</small></span>
+                            <textarea id="presNotasInternas" rows="3" placeholder="Anotaciones privadas…"></textarea>
+                        </label>
+                    </form>
+                </aside>
+                <main class="pres-editor-bloques">
+                    <h4 class="pres-editor-section-title">Bloques del presupuesto</h4>
+                    <div id="presBloquesList" class="pres-bloques-list"></div>
+                    <button type="button" class="btn btn-ghost pres-add-bloque-btn" id="presAddBloqueBtn">+ Agregar bloque</button>
+                </main>
+            </div>
+            <footer class="pres-editor-foot">
+                <div class="pres-foot-total">
+                    <span class="pres-foot-label">Total general</span>
+                    <span class="pres-foot-monto" id="presFootTotal">$0</span>
+                </div>
+                <div class="pres-foot-actions" id="presFootActions"></div>
+            </footer>
+            <p class="login-error pres-foot-error" id="presEditorError" role="alert"></p>
+        </div>
+    </div>
+
+    <!-- Modal selector de tipo de bloque -->
+    <div id="presTipoBlBack" class="modal-back" role="dialog" aria-modal="true" aria-labelledby="presTipoBlTitle">
+        <div class="modal">
+            <h3 id="presTipoBlTitle">Selecciona el tipo de bloque</h3>
+            <p class="section-text" style="margin-bottom: 1rem;">Cada tipo organiza el contenido de forma distinta dentro del presupuesto.</p>
+            <div class="pres-tipo-grid">
+                <button type="button" class="pres-tipo-card" data-tipo="texto">
+                    <span class="pres-tipo-icon">📝</span>
+                    <strong>Texto</strong>
+                    <small>Párrafo libre o introducción</small>
+                </button>
+                <button type="button" class="pres-tipo-card" data-tipo="lista_vinetas">
+                    <span class="pres-tipo-icon">•</span>
+                    <strong>Lista</strong>
+                    <small>Viñetas descriptivas sin precio</small>
+                </button>
+                <button type="button" class="pres-tipo-card" data-tipo="garantias">
+                    <span class="pres-tipo-icon">✓</span>
+                    <strong>Garantías</strong>
+                    <small>Lista de respaldos por categoría</small>
+                </button>
+                <button type="button" class="pres-tipo-card" data-tipo="apartado_cerrado">
+                    <span class="pres-tipo-icon">💰</span>
+                    <strong>Apartado cerrado</strong>
+                    <small>Trabajo único con un subtotal</small>
+                </button>
+                <button type="button" class="pres-tipo-card" data-tipo="seccion_items">
+                    <span class="pres-tipo-icon">🔢</span>
+                    <strong>Sección con items</strong>
+                    <small>Tabla de líneas con precios</small>
+                </button>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-ghost" id="presTipoBlCancel">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
     <a class="wa-float public-only" id="waFloat" href="#" target="_blank" rel="noopener" aria-label="Contactar por WhatsApp">
         <svg viewBox="0 0 32 32" fill="currentColor" aria-hidden="true">
             <path d="M16 3C9 3 3.4 8.6 3.4 15.6c0 2.5.7 4.9 2 7L3 29l6.6-2.3c2 1.1 4.2 1.7 6.4 1.7 7 0 12.6-5.6 12.6-12.6S23 3 16 3zm0 22.9c-1.9 0-3.8-.5-5.4-1.5l-.4-.2-3.9 1.4 1.4-3.8-.3-.4c-1.1-1.7-1.7-3.7-1.7-5.8 0-5.8 4.7-10.4 10.5-10.4 2.8 0 5.4 1.1 7.4 3.1 2 2 3.1 4.6 3.1 7.4-.1 5.6-4.8 10.2-10.7 10.2zm5.7-7.8c-.3-.2-1.8-.9-2.1-1s-.5-.2-.7.2-.8 1-1 1.2-.4.2-.7.1c-.3-.2-1.3-.5-2.5-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6.1-.1.3-.3.4-.5.1-.2.2-.3.3-.5.1-.2.1-.4 0-.5-.1-.2-.7-1.7-1-2.3-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1.1 1-1.1 2.5s1.1 2.9 1.3 3.1c.2.2 2.2 3.3 5.3 4.7.7.3 1.3.5 1.8.6.7.2 1.4.2 1.9.1.6-.1 1.8-.7 2-1.4.2-.7.2-1.3.2-1.4-.1-.1-.3-.2-.6-.3z"/>
@@ -754,5 +911,6 @@
     <script src="main.js"></script>
     <script src="pdf.js"></script>
     <script src="notes.js"></script>
+    <script src="presupuestos.js"></script>
 </body>
 </html>
