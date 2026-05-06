@@ -2284,6 +2284,76 @@ body.modal-open { overflow: hidden; }
     color: var(--color-silver-3);
     font-style: italic;
 }
+
+/* Cliente autocomplete */
+.pres-cliente-search-wrap { position: relative; }
+.pres-cliente-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-purple-soft);
+    border-radius: 10px;
+    max-height: 260px;
+    overflow-y: auto;
+    margin-top: 0.3rem;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+.pres-cliente-results-empty {
+    padding: 0.7rem 0.9rem;
+    color: var(--color-silver-3);
+    font-size: 0.85rem;
+    font-style: italic;
+}
+.pres-cliente-result {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 0.4rem 0.7rem;
+    align-items: center;
+    padding: 0.6rem 0.9rem;
+    cursor: pointer;
+    border-bottom: 1px solid var(--color-border);
+    transition: background 0.12s;
+}
+.pres-cliente-result:hover,
+.pres-cliente-result.is-active {
+    background: rgba(106, 60, 255, 0.10);
+}
+.pres-cliente-result:last-child { border-bottom: none; }
+.pres-cliente-result-folio {
+    font-weight: 600;
+    color: var(--color-silver-1);
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+}
+.pres-cliente-result-name { color: var(--color-silver-1); font-size: 0.9rem; }
+.pres-cliente-result-meta { color: var(--color-silver-3); font-size: 0.78rem; }
+
+.pres-cliente-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.4rem;
+    padding: 0.35rem 0.7rem;
+    background: rgba(106, 60, 255, 0.14);
+    border: 1px solid rgba(106, 60, 255, 0.40);
+    border-radius: 999px;
+    font-size: 0.8rem;
+    color: var(--color-silver-1);
+    align-self: start;
+}
+.pres-cliente-tag button {
+    background: transparent;
+    border: none;
+    color: var(--color-silver-2);
+    cursor: pointer;
+    font-size: 0.95rem;
+    padding: 0;
+    line-height: 1;
+}
+.pres-cliente-tag button:hover { color: #ffb4bb; }
 .pres-field-label {
     font-size: 0.7rem;
     color: var(--color-silver-3);

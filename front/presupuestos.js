@@ -134,6 +134,13 @@
     const presNotasInternas = $("presNotasInternas");
     const presAsignadoLabel = $("presAsignadoLabel");
     const presAsignadoSelect = $("presAsignadoSelect");
+    // Autocomplete cliente (admin only)
+    const presClienteSearchLabel = $("presClienteSearchLabel");
+    const presClienteSearchInput = $("presClienteSearchInput");
+    const presClienteSearchResults = $("presClienteSearchResults");
+    const presClienteTag = $("presClienteTag");
+    const presClienteTagText = $("presClienteTagText");
+    const presClienteTagClear = $("presClienteTagClear");
     const presBloquesList = $("presBloquesList");
     const presAddBloqueBtn = $("presAddBloqueBtn");
     const presFootTotal = $("presFootTotal");
@@ -275,6 +282,7 @@
             numero_presupuesto: "(nuevo)",
             estado: "borrador",
             fuente: "admin",
+            numero_cliente: null,
             cliente_nombre: "",
             cliente_telefono: "",
             cliente_direccion: "",
@@ -423,9 +431,120 @@
         // Dropdown de reasignación (solo admin)
         renderAsignadoDropdown(p);
 
+        // Cliente autocomplete (solo admin)
+        renderClienteSearch(p);
+
         renderBloques();
         renderFooter(editable);
     }
+
+    /* ---------- Cliente autocomplete (admin only) ---------- */
+
+    function renderClienteSearch(p) {
+        const isAdmin = state.sesion && state.sesion.rol === "admin";
+        if (!isAdmin) {
+            presClienteSearchLabel.hidden = true;
+            return;
+        }
+        presClienteSearchLabel.hidden = false;
+        presClienteSearchInput.value = "";
+        presClienteSearchResults.hidden = true;
+        presClienteSearchResults.innerHTML = "";
+        renderClienteTag(p);
+    }
+
+    function renderClienteTag(p) {
+        if (!presClienteTag) return;
+        if (p && p.numero_cliente) {
+            presClienteTag.hidden = false;
+            presClienteTagText.textContent = `Cliente: ${p.numero_cliente}`;
+        } else {
+            presClienteTag.hidden = true;
+            presClienteTagText.textContent = "";
+        }
+    }
+
+    let clienteSearchTimer = null;
+    presClienteSearchInput && presClienteSearchInput.addEventListener("input", (e) => {
+        const q = e.target.value.trim();
+        clearTimeout(clienteSearchTimer);
+        if (!q) {
+            presClienteSearchResults.hidden = true;
+            return;
+        }
+        clienteSearchTimer = setTimeout(() => searchClientes(q), 300);
+    });
+
+    async function searchClientes(q) {
+        try {
+            const body = await api(`/api/clientes?q=${encodeURIComponent(q)}&limit=20`);
+            const rows = body.data || [];
+            if (!rows.length) {
+                presClienteSearchResults.innerHTML =
+                    '<div class="pres-cliente-results-empty">Sin coincidencias. Si es nuevo, deja vacío.</div>';
+                presClienteSearchResults.hidden = false;
+                return;
+            }
+            presClienteSearchResults.innerHTML = rows.map((c) => `
+                <div class="pres-cliente-result" data-numero="${escape(c.numero_cliente)}"
+                     data-nombre="${escape(c.nombre_cliente || '')}"
+                     data-telefono="${escape(c.telefono || '')}">
+                    <span class="pres-cliente-result-folio">${escape(c.numero_cliente)}</span>
+                    <span class="pres-cliente-result-name">${escape(c.nombre_cliente || '(sin nombre)')}</span>
+                    <span class="pres-cliente-result-meta">${escape(c.telefono || '')} · ${c.total_servicios} svc</span>
+                </div>
+            `).join("");
+            presClienteSearchResults.hidden = false;
+
+            presClienteSearchResults.querySelectorAll(".pres-cliente-result").forEach((row) => {
+                row.addEventListener("click", () => {
+                    seleccionarCliente({
+                        numero_cliente: row.dataset.numero,
+                        nombre: row.dataset.nombre,
+                        telefono: row.dataset.telefono,
+                    });
+                });
+            });
+        } catch (err) {
+            console.warn("[PRES] búsqueda cliente falló:", err);
+            presClienteSearchResults.innerHTML =
+                '<div class="pres-cliente-results-empty">Error en la búsqueda. Inténtalo de nuevo.</div>';
+            presClienteSearchResults.hidden = false;
+        }
+    }
+
+    function seleccionarCliente(sel) {
+        const p = state.currentPres;
+        if (!p) return;
+        p.numero_cliente = sel.numero_cliente;
+        // Auto-llenar campos vacíos. Si admin ya escribió algo, se respeta.
+        if (!presClienteNombre.value || presClienteNombre.value.trim() === "") {
+            presClienteNombre.value = sel.nombre || "";
+            p.cliente_nombre = sel.nombre || "";
+        }
+        if (!presClienteTelefono.value || presClienteTelefono.value.trim() === "") {
+            presClienteTelefono.value = sel.telefono || "";
+            p.cliente_telefono = sel.telefono || "";
+        }
+        renderClienteTag(p);
+        presClienteSearchInput.value = "";
+        presClienteSearchResults.hidden = true;
+        markDirty();
+    }
+
+    presClienteTagClear && presClienteTagClear.addEventListener("click", () => {
+        if (!state.currentPres) return;
+        state.currentPres.numero_cliente = null;
+        renderClienteTag(state.currentPres);
+        markDirty();
+    });
+
+    // Cierra dropdown al click fuera.
+    document.addEventListener("click", (e) => {
+        if (!presClienteSearchLabel) return;
+        if (presClienteSearchLabel.contains(e.target)) return;
+        presClienteSearchResults.hidden = true;
+    });
 
     async function renderAsignadoDropdown(p) {
         const isAdmin = state.sesion && state.sesion.rol === "admin";
@@ -772,6 +891,7 @@
 
     function recolectarHeader() {
         return {
+            numero_cliente: (state.currentPres && state.currentPres.numero_cliente) || null,
             cliente_nombre: presClienteNombre.value.trim(),
             cliente_telefono: presClienteTelefono.value.trim() || null,
             cliente_direccion: presClienteDireccion.value.trim() || null,

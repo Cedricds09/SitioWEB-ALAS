@@ -797,6 +797,16 @@
                 <aside class="pres-editor-cliente">
                     <h4 class="pres-editor-section-title">Datos del cliente y documento</h4>
                     <form class="form" id="presClienteForm" novalidate>
+                        <label class="pres-cliente-search-wrap" id="presClienteSearchLabel" hidden>
+                            <span>Cliente existente <small>(opcional, solo admin)</small></span>
+                            <input type="search" id="presClienteSearchInput" placeholder="Buscar por nombre o número de cliente…" autocomplete="off" />
+                            <span class="pres-cliente-tag" id="presClienteTag" hidden>
+                                <span id="presClienteTagText"></span>
+                                <button type="button" id="presClienteTagClear" title="Quitar vínculo">✕</button>
+                            </span>
+                            <small class="pres-form-hint">Si encuentras al cliente, los datos se llenarán automáticamente. Si es nuevo, deja vacío.</small>
+                            <div id="presClienteSearchResults" class="pres-cliente-results" hidden></div>
+                        </label>
                         <label>
                             <span>Nombre del cliente</span>
                             <input type="text" id="presClienteNombre" required maxlength="200" autocomplete="off" />
