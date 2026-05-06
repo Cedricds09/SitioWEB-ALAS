@@ -71,17 +71,35 @@
         currentPres: null,       // presupuesto en edición
         nextLocalKey: 1,
         tecnicosCache: null,     // cache de la lista de técnicos
+        isDirty: false,          // hay cambios sin guardar en el editor
     };
+
+    function markDirty() { state.isDirty = true; }
+    function clearDirty() { state.isDirty = false; }
+    function confirmDiscardIfDirty() {
+        if (!state.isDirty) return true;
+        return window.confirm(
+            "Tienes cambios sin guardar. ¿Salir y descartarlos?"
+        );
+    }
+    function tryCloseEditor() {
+        if (!confirmDiscardIfDirty()) return;
+        clearDirty();
+        closeModal(presEditorBack);
+    }
 
     // Devuelve técnicos activos (con id) — necesita /usuarios (admin only) porque
     // /usuarios/tecnicos no devuelve id.
+    // Cachea solo cuando la lista tiene >=1 elemento (no cachear errores transientes).
     async function getTecnicos() {
-        if (state.tecnicosCache) return state.tecnicosCache;
+        if (state.tecnicosCache && state.tecnicosCache.length) return state.tecnicosCache;
         try {
             const body = await api("/api/admin/usuarios");
-            state.tecnicosCache = (body.data || []).filter((u) => u.activo && u.rol === "tecnico");
-            return state.tecnicosCache;
-        } catch {
+            const tecnicos = (body.data || []).filter((u) => u.activo && u.rol === "tecnico");
+            if (tecnicos.length) state.tecnicosCache = tecnicos;
+            return tecnicos;
+        } catch (err) {
+            console.warn("[PRES] No se pudo cargar lista de técnicos:", err);
             return [];
         }
     }
@@ -133,6 +151,7 @@
         state.sesion = e.detail;
         if (!state.sesion) {
             presSection.hidden = true;
+            state.tecnicosCache = null;
             return;
         }
         presSection.hidden = false;
@@ -142,6 +161,9 @@
         if (!isAdmin) {
             state.filtroScope = "mine";
         }
+        // Precalentar cache de técnicos para que dropdown reasignación esté listo
+        // cuando admin abra el primer editor.
+        if (isAdmin) getTecnicos();
         loadList();
     });
 
@@ -340,7 +362,7 @@
             presEditorReadonly.textContent =
                 "Esta solicitud aún no ha sido atendida. Click 'Atender' para convertirla en borrador y empezar a editarla.";
         } else if (state.sesion && state.sesion.rol === "tecnico"
-                   && p.asignado_a !== state.sesion.uid) {
+                   && Number(p.asignado_a) !== Number(state.sesion.uid)) {
             const nombre = p.asignado_a_nombre || "otro técnico";
             presEditorReadonly.className = "pres-editor-banner is-muted";
             presEditorReadonly.textContent =
@@ -357,11 +379,14 @@
     // - Nuevo (sin id) → editable.
     // - Admin → editable siempre (aunque estado != borrador, mostramos warning).
     // - Técnico → solo si asignado al uid de sesión Y estado === 'borrador'.
+    // Coerción Number(...) en ambos lados: evita type mismatch (uid number vs
+    // asignado_a string en algunas rutas de carga).
     function isEditable(p) {
         if (!state.sesion) return false;
         if (p.id == null) return true;
         if (state.sesion.rol === "admin") return true;
-        return state.sesion.uid === p.asignado_a && p.estado === "borrador";
+        const sameUser = Number(p.asignado_a) === Number(state.sesion.uid);
+        return sameUser && p.estado === "borrador";
     }
 
     function renderEditor() {
@@ -373,6 +398,8 @@
         presEditorEstado.textContent = p.estado;
         presEditorEstado.className = `estado-badge pres-estado-badge ${p.estado}`;
         renderBanner(p, editable);
+        // Reset dirty state al cargar/refrescar el editor (datos nuevos del backend).
+        clearDirty();
 
         // Cliente
         presClienteNombre.value = p.cliente_nombre || "";
@@ -449,15 +476,30 @@
         seccion_items: "🔢 Sección con items",
     };
 
-    // Auto-select on focus para inputs numéricos (issue 6: defaults 0/1 molestos).
-    // Listener delegado, una vez por sección.
-    if (presBloquesList && !presBloquesList.dataset.focusBound) {
-        presBloquesList.dataset.focusBound = "1";
-        presBloquesList.addEventListener("focusin", (e) => {
-            if (e.target.tagName === "INPUT" && e.target.type === "number") {
-                setTimeout(() => e.target.select && e.target.select(), 0);
+    // Auto-select on focus para inputs numéricos en TODO el modal editor
+    // (issue 6: defaults 0/1 molestos en cantidad, precio_unitario, subtotal,
+    // vigencia, adelanto). Listener delegado.
+    if (presEditorBack && !presEditorBack.dataset.focusBound) {
+        presEditorBack.dataset.focusBound = "1";
+        presEditorBack.addEventListener("focusin", (e) => {
+            const t = e.target;
+            if (t.tagName === "INPUT" && t.type === "number" && !t.disabled && !t.readOnly) {
+                // setTimeout 0 para que pase tras autoFocus del browser.
+                setTimeout(() => { try { t.select(); } catch { /* noop */ } }, 0);
             }
         });
+        // Dirty state tracking: cualquier input/change marca el editor sucio.
+        // Excluimos el dropdown de reasignación (envía cambio inmediato a backend).
+        const dirtyHandler = (e) => {
+            const t = e.target;
+            if (!t || !t.tagName) return;
+            if (t.id === "presAsignadoSelect") return;
+            if (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT") {
+                markDirty();
+            }
+        };
+        presEditorBack.addEventListener("input", dirtyHandler);
+        presEditorBack.addEventListener("change", dirtyHandler);
     }
 
     function renderBloques() {
@@ -898,15 +940,15 @@
         window.open(`/api/presupuestos/${p.id}/pdf`, "_blank", "noopener");
     }
 
-    /* ---------- Modales: cerrar ---------- */
-    presEditorClose && presEditorClose.addEventListener("click", () => closeModal(presEditorBack));
+    /* ---------- Modales: cerrar (con confirmación si hay cambios sucios) ---------- */
+    presEditorClose && presEditorClose.addEventListener("click", tryCloseEditor);
     presEditorBack && presEditorBack.addEventListener("click", (e) => {
-        if (e.target === presEditorBack) closeModal(presEditorBack);
+        if (e.target === presEditorBack) tryCloseEditor();
     });
     document.addEventListener("keydown", (e) => {
         if (e.key === "Escape") {
-            if (presEditorBack && presEditorBack.classList.contains("show")) closeModal(presEditorBack);
-            if (presTipoBlBack && presTipoBlBack.classList.contains("show")) closeModal(presTipoBlBack);
+            if (presEditorBack && presEditorBack.classList.contains("show")) tryCloseEditor();
+            else if (presTipoBlBack && presTipoBlBack.classList.contains("show")) closeModal(presTipoBlBack);
         }
     });
 
