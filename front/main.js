@@ -19,25 +19,59 @@
 
     const quoteForm = document.getElementById("quoteForm");
     if (quoteForm) {
-        quoteForm.addEventListener("submit", (e) => {
+        quoteForm.addEventListener("submit", async (e) => {
             e.preventDefault();
             const data = new FormData(quoteForm);
-            const name = data.get("name").trim();
-            const phone = data.get("phone").trim();
+            const name = (data.get("name") || "").trim();
+            const phone = (data.get("phone") || "").trim();
             const service = data.get("service");
             const address = (data.get("address") || "").trim();
             const lat = (data.get("lat") || "").trim();
             const lng = (data.get("lng") || "").trim();
-            const message = data.get("message").trim();
+            const message = (data.get("message") || "").trim();
+            const honeypot = (data.get("website") || "").trim();
+
             const mapsLink = lat && lng ? `https://maps.google.com/?q=${lat},${lng}` : "";
-            const text =
+            const waText =
                 `Hola ALAS, soy ${name}.\n` +
                 `Teléfono: ${phone}\n` +
                 `Servicio: ${service}\n` +
                 (address ? `Dirección: ${address}\n` : "") +
                 (mapsLink ? `Ubicación: ${mapsLink}\n` : "") +
                 `\n${message}`;
-            window.open(waLink(text), "_blank", "noopener");
+            const waUrl = waLink(waText);
+
+            const submitBtn = quoteForm.querySelector('button[type="submit"]');
+            const originalLabel = submitBtn ? submitBtn.textContent : "";
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = "Enviando…";
+            }
+
+            // Guardar la solicitud en backend, después redirigir a WhatsApp.
+            // Si el backend falla, redirigimos igualmente para no perder al cliente.
+            try {
+                await fetch("/api/presupuestos/solicitud", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        cliente_nombre: name,
+                        cliente_telefono: phone,
+                        cliente_direccion: address || null,
+                        tipo_servicio: service,
+                        descripcion_inicial: message,
+                        honeypot,
+                    }),
+                });
+            } catch (err) {
+                console.warn("[QUOTE] no se pudo guardar solicitud, abriendo WhatsApp:", err);
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalLabel;
+                }
+                window.open(waUrl, "_blank", "noopener");
+            }
         });
     }
 

@@ -469,6 +469,18 @@ img { max-width: 100%; display: block; }
 .form-actions { display: flex; gap: 1rem; flex-wrap: wrap; }
 .form-actions .btn { justify-self: initial; }
 
+/* Honeypot anti-bot: invisible para humanos pero indexable por bots */
+.hp-field {
+    position: absolute !important;
+    left: -10000px !important;
+    top: auto !important;
+    width: 1px !important;
+    height: 1px !important;
+    overflow: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
 @media (max-width: 680px) {
     .item-row { grid-template-columns: 1fr 110px 40px; }
     .form-actions .btn { flex: 1 1 100%; }
