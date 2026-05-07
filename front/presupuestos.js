@@ -132,6 +132,8 @@
     const presAdelanto = $("presAdelanto");
     const presIntroduccion = $("presIntroduccion");
     const presNotasInternas = $("presNotasInternas");
+    const presSolicitudOriginal = $("presSolicitudOriginal");
+    const presSolicitudOriginalText = $("presSolicitudOriginalText");
     const presAsignadoLabel = $("presAsignadoLabel");
     const presAsignadoSelect = $("presAsignadoSelect");
     // Autocomplete cliente (admin only)
@@ -275,6 +277,35 @@
     });
 
     /* ---------- Editor ---------- */
+
+    // Issue 30: divide notas_internas en (original, editable) cuando el
+    // presupuesto vino del formulario público con prefijo "[Solicitud del cliente]".
+    // El servicio de backend usa exactamente ese prefijo (presupuestos.service.js).
+    function splitSolicitudOriginal(notas) {
+        const PREFIX = "[Solicitud del cliente]\n";
+        if (!notas || !notas.startsWith(PREFIX)) {
+            return { original: "", editable: notas || "" };
+        }
+        const rest = notas.slice(PREFIX.length);
+        // Permitimos que el técnico haya añadido notas DESPUÉS, separadas por línea en blanco.
+        const sepIdx = rest.indexOf("\n\n");
+        if (sepIdx === -1) {
+            return { original: rest, editable: "" };
+        }
+        return {
+            original: rest.slice(0, sepIdx),
+            editable: rest.slice(sepIdx + 2),
+        };
+    }
+
+    // Inverso de splitSolicitudOriginal: re-arma notas_internas para enviar al backend.
+    function joinSolicitudOriginal(original, editable) {
+        const ed = (editable || "").trim();
+        if (!original) return ed || null;
+        return ed
+            ? `[Solicitud del cliente]\n${original}\n\n${ed}`
+            : `[Solicitud del cliente]\n${original}`;
+    }
 
     function nuevoPresupuestoLocal() {
         return {
@@ -442,7 +473,19 @@
         presVigencia.value = p.vigencia_dias || 7;
         presAdelanto.value = p.adelanto_porcentaje || 0;
         presIntroduccion.value = p.introduccion || "";
-        presNotasInternas.value = p.notas_internas || "";
+        // Issue 30: si las notas_internas comienzan con "[Solicitud del cliente]"
+        // (formato del formulario público), extraer ese bloque como read-only
+        // arriba del textarea. El técnico solo edita SUS propias notas internas.
+        const splitNotas = splitSolicitudOriginal(p.notas_internas || "");
+        state.currentPres._solicitudOriginal = splitNotas.original;
+        if (splitNotas.original) {
+            presSolicitudOriginal.hidden = false;
+            presSolicitudOriginalText.textContent = splitNotas.original;
+        } else {
+            presSolicitudOriginal.hidden = true;
+            presSolicitudOriginalText.textContent = "";
+        }
+        presNotasInternas.value = splitNotas.editable;
 
         // Disable inputs si no editable
         const inputs = [
@@ -957,7 +1000,11 @@
             vigencia_dias: parseInt(presVigencia.value, 10) || 7,
             adelanto_porcentaje: parseFloat(presAdelanto.value) || 0,
             introduccion: presIntroduccion.value.trim() || null,
-            notas_internas: presNotasInternas.value.trim() || null,
+            // Issue 30: re-añade "[Solicitud del cliente]\n<original>\n\n" si aplica.
+            notas_internas: joinSolicitudOriginal(
+                state.currentPres && state.currentPres._solicitudOriginal,
+                presNotasInternas.value,
+            ),
         };
     }
 
