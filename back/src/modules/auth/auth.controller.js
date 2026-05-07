@@ -8,9 +8,9 @@ const {
 } = require('../../shared/auth/session');
 
 async function login(req, res) {
-  const { token, usuario, rol } = await service.login(req.body.usuario, req.body.password);
+  const { token, uid, usuario, rol } = await service.login(req.body.usuario, req.body.password);
   setAuthCookie(res, token);
-  res.json({ ok: true, data: { usuario, rol } });
+  res.json({ ok: true, data: { uid, usuario, rol } });
 }
 
 function logout(_req, res) {
@@ -23,6 +23,7 @@ function check(req, res) {
   res.json({
     ok: true,
     authed: !!sess,
+    uid: sess ? sess.uid : null,
     usuario: sess ? sess.usu : null,
     rol: sess ? sess.rol : null,
   });

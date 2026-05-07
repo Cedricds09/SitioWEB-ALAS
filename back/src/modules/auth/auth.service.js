@@ -28,7 +28,7 @@ async function login(usuario, password) {
   });
 
   console.log('[AUTH] login OK usuario=', u.usuario, 'id=', u.id);
-  return { token, usuario: u.usuario, rol: u.rol };
+  return { token, uid: u.id, usuario: u.usuario, rol: u.rol };
 }
 
 module.exports = { login };

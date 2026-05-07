@@ -404,7 +404,7 @@
             const res = await fetch(`${API_BASE}/api/admin/check`, { credentials: "include" });
             const body = await res.json();
             if (body.authed) {
-                applyUserContext({ usuario: body.usuario, rol: body.rol });
+                applyUserContext({ uid: body.uid, usuario: body.usuario, rol: body.rol });
                 showDash();
             } else {
                 showLogin();
