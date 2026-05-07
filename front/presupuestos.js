@@ -88,6 +88,22 @@
         closeModal(presEditorBack);
     }
 
+    // Issue 32: ejecuta una acción que opera sobre la versión guardada del
+    // presupuesto. Si hay cambios pendientes, ofrece guardar primero. Si user
+    // cancela, aborta sin ejecutar. Si user acepta, guarda y luego ejecuta.
+    async function ensureSavedThen(actionLabel, action) {
+        if (!state.isDirty) {
+            return action();
+        }
+        const ok = window.confirm(
+            `Tienes cambios sin guardar. ¿Guardar antes de "${actionLabel}"?`
+        );
+        if (!ok) return;
+        await save({ keepOpen: true });
+        if (state.isDirty) return; // guardado falló — abortar
+        return action();
+    }
+
     // Devuelve técnicos activos (con id) — necesita /usuarios (admin only) porque
     // /usuarios/tecnicos no devuelve id.
     // Cachea solo cuando la lista tiene >=1 elemento (no cachear errores transientes).
@@ -961,19 +977,21 @@
             buttons.push({ label: "Rechazar", danger: true, action: () => cambiarEstado("rechazado") });
         } else if (p.estado === "borrador" && editable) {
             buttons.push({ label: "Guardar", primary: true, action: () => save({ keepOpen: true }) });
-            buttons.push({ label: "Marcar enviado", action: () => cambiarEstado("enviado") });
+            // Issue 32: "Marcar enviado" requiere version guardada — ofrecer save first.
+            buttons.push({ label: "Marcar enviado", action: () => ensureSavedThen("Marcar enviado", () => cambiarEstado("enviado")) });
             buttons.push({ label: "Eliminar", danger: true, action: () => eliminar() });
         } else if (p.estado === "enviado" && isAdmin) {
-            buttons.push({ label: "Marcar aprobado", primary: true, action: () => cambiarEstado("aprobado") });
+            buttons.push({ label: "Marcar aprobado", primary: true, action: () => ensureSavedThen("Marcar aprobado", () => cambiarEstado("aprobado")) });
             buttons.push({ label: "Marcar rechazado", danger: true, action: () => cambiarEstado("rechazado") });
         } else if (p.estado === "aprobado" && isAdmin) {
-            buttons.push({ label: "Convertir a servicio", primary: true, action: () => convertirAServicio() });
+            buttons.push({ label: "Convertir a servicio", primary: true, action: () => ensureSavedThen("Convertir a servicio", () => convertirAServicio()) });
         }
 
         // Acciones disponibles en TODOS los estados con id.
+        // Issue 32: compartir y PDF dependen de la versión guardada → ensureSavedThen.
         if (p.id) {
-            buttons.push({ label: "📨 Compartir WA", action: () => compartirWhatsApp() });
-            buttons.push({ label: "⬇ Descargar PDF", action: () => descargarPDF() });
+            buttons.push({ label: "📨 Compartir WA", action: () => ensureSavedThen("Compartir por WhatsApp", () => compartirWhatsApp()) });
+            buttons.push({ label: "⬇ Descargar PDF", action: () => ensureSavedThen("Descargar PDF", () => descargarPDF()) });
         }
 
         presFootActions.innerHTML = "";
