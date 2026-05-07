@@ -276,6 +276,34 @@ function generarPresupuestoPdf(res, p) {
     });
   y += totalBoxH + 12 * PT;
 
+  // ===== Nota legal sobre items opcionales (Issue 35 — Fase 2.10) =====
+  // Solo se imprime si el presupuesto tiene AL MENOS un item con es_opcional = 1
+  // dentro de algún bloque seccion_items. Protección contractual: deja claro
+  // que opcionales NO están incluidos en el TOTAL y requieren autorización
+  // por escrito + costo adicional.
+  const hayOpcionales = bloques.some(
+    (b) => b.tipo === 'seccion_items'
+      && Array.isArray(b.items)
+      && b.items.some((it) => it.es_opcional),
+  );
+  if (hayOpcionales) {
+    ensureSpace(34 * PT);
+    const noteText =
+      'IMPORTANTE: Los items marcados como "opcional" NO están incluidos en el TOTAL ' +
+      'presupuestado. Para incluirlos en el trabajo, deberán ser autorizados por escrito ' +
+      'previamente, lo que generará un costo adicional al monto aquí indicado.';
+    const padding = 6 * PT;
+    const noteW = W - M * 2;
+    doc.font('Helvetica-Bold').fontSize(8).fillColor(TEXT);
+    const noteH = doc.heightOfString(noteText, { width: noteW - padding * 2 }) + padding * 2;
+    doc.rect(M, y, noteW, noteH).fillAndStroke('#fff8e1', '#d4a23b');
+    doc.text(noteText, M + padding, y + padding, {
+      width: noteW - padding * 2,
+      align: 'justify',
+    });
+    y += noteH + 8 * PT;
+  }
+
   // ===== Términos comerciales =====
   ensureSpace(40 * PT);
   doc.font('Helvetica').fontSize(9).fillColor(MUTED);
