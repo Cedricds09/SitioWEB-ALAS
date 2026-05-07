@@ -1086,9 +1086,11 @@
             "",
             "Le compartimos el presupuesto solicitado:",
             "",
-            `📋 Presupuesto ${p.numero_presupuesto}`,
-            `📅 ${fmtFecha(p.fecha_documento || p.fecha_creacion)}`,
-            `💰 Total: ${fmtMoney(p.total_general)} ${p.moneda || "MXN"}`,
+            // Emojis vía codepoint escapado para inmunizar contra cambios de encoding del archivo.
+            // \u{1F4CB} = 📋 (clipboard) · \u{1F4C5} = 📅 (calendar) · \u{1F4B0} = 💰 (money bag)
+            `\u{1F4CB} Presupuesto ${p.numero_presupuesto}`,
+            `\u{1F4C5} ${fmtFecha(p.fecha_documento || p.fecha_creacion)}`,
+            `\u{1F4B0} Total: ${fmtMoney(p.total_general)} ${p.moneda || "MXN"}`,
         ];
         if (detalles) {
             lines.push("", "Detalle:", detalles);
