@@ -901,14 +901,19 @@
     function renderFooter(editable) {
         const p = state.currentPres;
         recalcLocal();
-        const isAdmin = state.sesion && state.sesion.rol === "admin";
+        const sess = state.sesion || {};
+        const isAdmin = sess.rol === "admin";
+        // Técnico asignado a la solicitud también puede atender/rechazar.
+        const esResponsable = isAdmin
+            || (sess.rol === "tecnico" && Number(p.asignado_a) === Number(sess.uid));
 
         const buttons = [];
 
         if (p.id === null) {
             // Modo nuevo
             buttons.push({ label: "Guardar borrador", primary: true, action: () => save({ keepOpen: true }) });
-        } else if (p.estado === "solicitud" && isAdmin) {
+        } else if (p.estado === "solicitud" && esResponsable) {
+            // Issue 23: admin O técnico asignado pueden atender/rechazar la solicitud.
             buttons.push({ label: "Atender (pasar a borrador)", primary: true, action: () => cambiarEstado("borrador") });
             buttons.push({ label: "Rechazar", danger: true, action: () => cambiarEstado("rechazado") });
         } else if (p.estado === "borrador" && editable) {
@@ -922,7 +927,7 @@
             buttons.push({ label: "Convertir a servicio", primary: true, action: () => convertirAServicio() });
         }
 
-        // Acciones disponibles en TODOS los estados con id (excepto solicitud sin contenido)
+        // Acciones disponibles en TODOS los estados con id.
         if (p.id) {
             buttons.push({ label: "📨 Compartir WA", action: () => compartirWhatsApp() });
             buttons.push({ label: "⬇ Descargar PDF", action: () => descargarPDF() });
