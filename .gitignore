@@ -36,5 +36,7 @@ coverage/
 !docs/**/*.pdf
 
 # Documentación interna sensible (NO publicar en repo público).
-# Contiene schema de DB, endpoints, lógica de auth, patrones de seguridad.
-docs/SYSTEM-OVERVIEW.md
+# La carpeta docs/ es 100% para contexto privado: schemas de DB, endpoints,
+# lógica de auth, patrones de seguridad, atajos para sesiones de Claude.
+# JAMÁS subir nada de aquí.
+docs/
