@@ -1210,9 +1210,13 @@
         }
     }
 
-    /* ===== Polling lista activos (auto-refresh sin recargar) ===== */
-    const POLL_INTERVAL_MS = 20000;
-    let pollTimer = null;
+    /* ===== Refresh por eventos (Issue 27 — eliminado polling agresivo) =====
+       Antes había setInterval cada 20s que producía race condition al finalizar
+       servicios: el polling traía la lista vieja después del POST finalizar y
+       UI mostraba el servicio "reaparecer" un instante. Ahora la lista se
+       refresca solo en eventos: crear, finalizar, editar, cambio de tab,
+       o cuando el tab vuelve a primer plano (visibilitychange).
+       startPolling/stopPolling se mantienen como stubs para no romper callers. */
     function isAnyModalOpen() {
         return (confirmBack && confirmBack.classList.contains("show")) ||
                (ajusteBack && ajusteBack.classList.contains("show")) ||
@@ -1222,14 +1226,14 @@
                (notaBack && notaBack.classList.contains("show")) ||
                (finalizeBack && finalizeBack.classList.contains("show"));
     }
-    function shouldPoll() {
+    function shouldRefresh() {
         return !document.hidden &&
                !dashSection.hidden &&
                !tabActive.hidden &&
                !isAnyModalOpen();
     }
-    async function pollTick() {
-        if (!shouldPoll()) return;
+    async function refrescarListaActivos() {
+        if (!shouldRefresh()) return;
         try {
             await loadTecnicos();
             const url = `${API_BASE}/api/servicios${scope === "mine" ? "?mine=1" : ""}`;
@@ -1242,18 +1246,11 @@
             });
         } catch {}
     }
-    function startPolling() {
-        if (pollTimer) return;
-        pollTimer = setInterval(pollTick, POLL_INTERVAL_MS);
-    }
-    function stopPolling() {
-        if (!pollTimer) return;
-        clearInterval(pollTimer);
-        pollTimer = null;
-    }
+    function startPolling() { /* no-op desde Fase 2.8 */ }
+    function stopPolling() { /* no-op desde Fase 2.8 */ }
     document.addEventListener("visibilitychange", () => {
         if (document.hidden) return;
-        if (!dashSection.hidden) pollTick();
+        if (!dashSection.hidden) refrescarListaActivos();
     });
 
     /* =====================================================
