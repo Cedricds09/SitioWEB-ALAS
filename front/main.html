@@ -182,8 +182,8 @@
                         <input type="text" name="name" required placeholder="Tu nombre">
                     </label>
                     <label>
-                        <span>Teléfono</span>
-                        <input type="tel" name="phone" required placeholder="55 0000 0000">
+                        <span>Teléfono <small>(10 dígitos)</small></span>
+                        <input type="tel" name="phone" required maxlength="10" inputmode="numeric" pattern="\d{10}" placeholder="5500000000">
                     </label>
                 </div>
 
@@ -449,8 +449,8 @@
                                 </label>
                                 <p class="form-hint">El número de cliente se genera automáticamente al guardar (formato <code>CL-0001</code>).</p>
                                 <label>
-                                    <span>Teléfono</span>
-                                    <input type="tel" name="telefono" placeholder="55 0000 0000" autocomplete="off" />
+                                    <span>Teléfono <small>(10 dígitos)</small></span>
+                                    <input type="tel" name="telefono" maxlength="10" inputmode="numeric" pattern="\d{10}" placeholder="5500000000" autocomplete="off" />
                                 </label>
                                 <label>
                                     <span>Dirección del servicio</span>
@@ -593,7 +593,7 @@
                                     </label>
                                     <label>
                                         <span>WhatsApp <small>(10 dígitos sin lada)</small></span>
-                                        <input type="tel" name="telefono" id="telNew" autocomplete="off" placeholder="5531675824" maxlength="20" />
+                                        <input type="tel" name="telefono" id="telNew" autocomplete="off" placeholder="5531675824" maxlength="10" inputmode="numeric" pattern="\d{10}" />
                                     </label>
                                     <div class="form-actions">
                                         <button type="submit" class="btn btn-primary" id="userSubmit">Crear usuario</button>
@@ -683,8 +683,8 @@
                     <input type="text" id="editNombre" required maxlength="100" />
                 </label>
                 <label>
-                    <span>Teléfono</span>
-                    <input type="tel" id="editTelefono" maxlength="20" />
+                    <span>Teléfono <small>(10 dígitos)</small></span>
+                    <input type="tel" id="editTelefono" maxlength="10" inputmode="numeric" pattern="\d{10}" />
                 </label>
                 <label>
                     <span>Dirección</span>
@@ -813,7 +813,7 @@
                         </label>
                         <label>
                             <span>Teléfono</span>
-                            <input type="tel" id="presClienteTelefono" maxlength="50" autocomplete="off" />
+                            <input type="tel" id="presClienteTelefono" maxlength="10" inputmode="numeric" pattern="\d{10}" placeholder="5500000000" autocomplete="off" />
                         </label>
                         <label>
                             <span>Dirección</span>

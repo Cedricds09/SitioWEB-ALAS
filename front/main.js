@@ -89,6 +89,17 @@
     const yearEl = document.getElementById("year");
     if (yearEl) yearEl.textContent = new Date().getFullYear();
 
+    // Filtra a solo dígitos en cualquier input type=tel del documento.
+    // El backend valida estricto 10 dígitos (Issue 25); este listener evita
+    // que el usuario teclee espacios/guiones/paréntesis y que el form falle.
+    document.addEventListener("input", (e) => {
+        const t = e.target;
+        if (t && t.tagName === "INPUT" && t.type === "tel") {
+            const cleaned = t.value.replace(/\D+/g, "");
+            if (cleaned !== t.value) t.value = cleaned;
+        }
+    });
+
     /* =====================================================
        GOOGLE MAPS PLACES AUTOCOMPLETE (público + admin)
        Carga dinámica de script: SOLO tras obtener la key.

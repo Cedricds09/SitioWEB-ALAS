@@ -31,6 +31,28 @@ const nullableTrimmedString = z.preprocess(
   z.union([z.string(), z.null()]).optional(),
 );
 
+// Teléfono: 10 dígitos exactos. Strip de no-dígitos antes de validar.
+// Defensa en profundidad — la columna cliente_telefono tiene CHECK constraint
+// (CK_presupuestos_cliente_telefono_formato, migración 005).
+const telefonoString = z.preprocess(
+  (v) => {
+    if (v === undefined) return undefined;
+    if (v == null) return null;
+    const digits = String(v).replace(/\D+/g, '');
+    return digits === '' ? null : digits;
+  },
+  z.union([
+    z.string().regex(/^\d{10}$/, 'Teléfono debe ser 10 dígitos.'),
+    z.null(),
+  ]).optional(),
+);
+
+// Versión requerida del telefono (para crearSolicitudPublicaSchema).
+const telefonoRequerido = z.preprocess(
+  (v) => (v == null ? '' : String(v).replace(/\D+/g, '')),
+  z.string().regex(/^\d{10}$/, 'Teléfono debe ser 10 dígitos.'),
+);
+
 const optionalPositiveInt = z.preprocess(
   (v) => {
     if (v === undefined || v === null || v === '') return undefined;
@@ -128,7 +150,7 @@ const bloqueSchema = z.discriminatedUnion('tipo', [
 
 const headerCommonFields = {
   cliente_nombre: requiredString,
-  cliente_telefono: nullableTrimmedString,
+  cliente_telefono: telefonoString,
   cliente_direccion: nullableTrimmedString,
   cliente_destinatario: nullableTrimmedString,
   ciudad: optionalString,
@@ -186,7 +208,7 @@ const crearPresupuestoSchema = z.object({
 const actualizarPresupuestoSchema = z
   .object({
     cliente_nombre: optionalString,
-    cliente_telefono: nullableTrimmedString,
+    cliente_telefono: telefonoString,
     cliente_direccion: nullableTrimmedString,
     cliente_destinatario: nullableTrimmedString,
     ciudad: optionalString,
@@ -290,7 +312,7 @@ const actualizarItemSchema = z
 // el endpoint silenciosamente ignora la solicitud (anti-bot).
 const crearSolicitudPublicaSchema = z.object({
   cliente_nombre: requiredString,
-  cliente_telefono: requiredString,
+  cliente_telefono: telefonoRequerido,
   cliente_direccion: nullableTrimmedString,
   tipo_servicio: z.preprocess(
     (v) => (v == null ? '' : String(v).trim()),

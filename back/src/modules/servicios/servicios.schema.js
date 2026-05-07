@@ -28,6 +28,23 @@ const nullableTrimmedString = z.preprocess(
   z.union([z.string(), z.null()]).optional(),
 );
 
+// Teléfono: 10 dígitos exactos. Strip de no-dígitos antes de validar (defensa
+// contra espacios/guiones/paréntesis del frontend). Vacío/null → null.
+// Defensa en profundidad — la columna en BD también tiene CHECK constraint
+// (CK_servicios_telefono_formato, migración 005).
+const telefonoString = z.preprocess(
+  (v) => {
+    if (v === undefined) return undefined;
+    if (v == null) return null;
+    const digits = String(v).replace(/\D+/g, '');
+    return digits === '' ? null : digits;
+  },
+  z.union([
+    z.string().regex(/^\d{10}$/, 'Teléfono debe ser 10 dígitos.'),
+    z.null(),
+  ]).optional(),
+);
+
 // Número opcional con coerción defensiva. '' o no-finito → null; sino number.
 const optionalNumber = z.preprocess(
   (v) => {
@@ -54,7 +71,7 @@ const moneyNumber = z.preprocess(
 const crearServicioSchema = z.object({
   numero_cliente: optionalString,
   nombre_cliente: requiredString,
-  telefono: optionalString,
+  telefono: telefonoString,
   direccion: optionalString,
   lat: optionalNumber,
   lng: optionalNumber,
@@ -65,7 +82,7 @@ const crearServicioSchema = z.object({
 const editarServicioSchema = z
   .object({
     nombre_cliente: optionalString,
-    telefono: nullableTrimmedString,
+    telefono: telefonoString,
     direccion: nullableTrimmedString,
     lat: optionalNumber,
     lng: optionalNumber,
