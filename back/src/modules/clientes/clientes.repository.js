@@ -18,11 +18,13 @@ async function buscar({ q, limit }) {
 
   // Agrupado por numero_cliente para evitar duplicados.
   // Devuelve metadata útil (conteo de servicios y fecha del último) para la UI.
+  // Issue 40: incluir `direccion` para que autocomplete del frontend la llene.
   const result = await reqDb.query(`
     SELECT
       numero_cliente,
       MAX(nombre_cliente) AS nombre_cliente,
       MAX(telefono)       AS telefono,
+      MAX(direccion)      AS direccion,
       COUNT(*)            AS total_servicios,
       MAX(fecha_inicio)   AS ultimo_servicio
     FROM dbo.servicios

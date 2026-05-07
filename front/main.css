@@ -1174,7 +1174,9 @@ body:not(.admin-mode) .admin-only { display: none !important; }
     transform: translateY(140%);
     opacity: 0;
     transition: transform 360ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 240ms ease;
-    z-index: 50;
+    /* Issue 34 (Fase 2.12): por encima de modal-back (z-index 60) para que el
+       toast "Guardado" sea visible cuando el editor de presupuesto está abierto. */
+    z-index: 80;
 }
 .toast.show { transform: translateY(0); opacity: 1; }
 .toast::before {

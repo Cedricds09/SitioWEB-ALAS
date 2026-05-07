@@ -535,8 +535,12 @@
         try {
             await fetch(`${API_BASE}/api/admin/logout`, { method: "POST", credentials: "include" });
         } catch {}
-        showLogin();
-        toast("Sesión cerrada.", "success");
+        // Issue 41 (seguridad): forzar reload limpia TODO el estado en memoria
+        // (variables JS, listeners, formularios). Garantiza que la próxima sesión
+        // arranque limpia sin riesgo de filtración entre usuarios.
+        try { sessionStorage.clear(); } catch { /* noop */ }
+        // Pequeño delay para que cookie de logout se procese antes del reload.
+        setTimeout(() => { window.location.reload(); }, 50);
     });
 
     /* ===== Tabs ===== */
@@ -942,7 +946,8 @@
             svcClienteResults.innerHTML = rows.map((c) => `
                 <div class="pres-cliente-result" data-numero="${escape(c.numero_cliente || "")}"
                      data-nombre="${escape(c.nombre_cliente || "")}"
-                     data-telefono="${escape(c.telefono || "")}">
+                     data-telefono="${escape(c.telefono || "")}"
+                     data-direccion="${escape(c.direccion || "")}">
                     <span class="pres-cliente-result-folio">${escape(c.numero_cliente || "")}</span>
                     <span class="pres-cliente-result-name">${escape(c.nombre_cliente || "(sin nombre)")}</span>
                     <span class="pres-cliente-result-meta">${escape(c.telefono || "")} · ${c.total_servicios || 0} svc</span>
@@ -955,6 +960,7 @@
                         numero_cliente: row.dataset.numero,
                         nombre: row.dataset.nombre,
                         telefono: row.dataset.telefono,
+                        direccion: row.dataset.direccion,
                     });
                 });
             });
@@ -969,8 +975,10 @@
         if (svcTelefonoInput && sel.telefono && !svcTelefonoInput.value.trim()) {
             svcTelefonoInput.value = sel.telefono;
         }
-        // No autollenar dirección — el módulo /api/clientes no la devuelve hoy.
-        // Si el campo está vacío, queda al user llenarlo.
+        // Issue 40: autollenar dirección si está disponible y el campo está vacío.
+        if (svcDireccionInput && sel.direccion && !svcDireccionInput.value.trim()) {
+            svcDireccionInput.value = sel.direccion;
+        }
         svcClienteResults.hidden = true;
     }
 

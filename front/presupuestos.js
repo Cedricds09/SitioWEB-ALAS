@@ -598,7 +598,8 @@
             presClienteSearchResults.innerHTML = rows.map((c) => `
                 <div class="pres-cliente-result" data-numero="${escape(c.numero_cliente)}"
                      data-nombre="${escape(c.nombre_cliente || '')}"
-                     data-telefono="${escape(c.telefono || '')}">
+                     data-telefono="${escape(c.telefono || '')}"
+                     data-direccion="${escape(c.direccion || '')}">
                     <span class="pres-cliente-result-folio">${escape(c.numero_cliente)}</span>
                     <span class="pres-cliente-result-name">${escape(c.nombre_cliente || '(sin nombre)')}</span>
                     <span class="pres-cliente-result-meta">${escape(c.telefono || '')} · ${c.total_servicios} svc</span>
@@ -612,6 +613,7 @@
                         numero_cliente: row.dataset.numero,
                         nombre: row.dataset.nombre,
                         telefono: row.dataset.telefono,
+                        direccion: row.dataset.direccion,
                     });
                 });
             });
@@ -635,6 +637,11 @@
         if (!presClienteTelefono.value || presClienteTelefono.value.trim() === "") {
             presClienteTelefono.value = sel.telefono || "";
             p.cliente_telefono = sel.telefono || "";
+        }
+        // Issue 40: autollenar dirección si llega del backend y el campo está vacío.
+        if (sel.direccion && (!presClienteDireccion.value || presClienteDireccion.value.trim() === "")) {
+            presClienteDireccion.value = sel.direccion;
+            p.cliente_direccion = sel.direccion;
         }
         renderClienteTag(p);
         presClienteSearchInput.value = "";
@@ -992,7 +999,15 @@
             buttons.push({ label: "Marcar aprobado", primary: true, action: () => ensureSavedThen("Marcar aprobado", () => cambiarEstado("aprobado")) });
             buttons.push({ label: "Marcar rechazado", danger: true, action: () => cambiarEstado("rechazado") });
         } else if (p.estado === "aprobado" && esResponsable) {
-            buttons.push({ label: "Convertir a servicio", primary: true, action: () => ensureSavedThen("Convertir a servicio", () => convertirAServicio()) });
+            // Issue 42: la conversión real a servicio queda diferida a Fase 4.
+            // Por ahora el endpoint solo cambia estado a 'convertido'. Tooltip +
+            // confirm explícito para evitar confusión de expectativas.
+            buttons.push({
+                label: "Convertir a servicio (beta)",
+                primary: true,
+                title: "Función en desarrollo — Fase 4. Hoy solo marca como convertido; no crea el servicio automáticamente.",
+                action: () => ensureSavedThen("Convertir a servicio", () => convertirAServicioConAviso()),
+            });
         }
 
         // Acciones disponibles en TODOS los estados con id.
@@ -1008,9 +1023,20 @@
             btn.type = "button";
             btn.className = "btn " + (b.primary ? "btn-primary" : (b.danger ? "btn-ghost" : "btn-ghost"));
             btn.textContent = b.label;
+            if (b.title) btn.title = b.title;
             btn.addEventListener("click", b.action);
             presFootActions.appendChild(btn);
         });
+    }
+
+    // Issue 42: wrapper de convertirAServicio con confirm explicativo.
+    async function convertirAServicioConAviso() {
+        const ok = window.confirm(
+            "Esta función aún no crea el servicio automáticamente. Solo marcará el " +
+            "presupuesto como convertido (Fase 4 hará la generación real). ¿Continuar?"
+        );
+        if (!ok) return;
+        return convertirAServicio();
     }
 
     /* ---------- Persistencia ---------- */
