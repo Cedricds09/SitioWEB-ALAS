@@ -443,11 +443,13 @@
                         </header>
                         <div class="dash-card-body">
                             <form class="form" id="svcForm" novalidate>
-                                <label>
+                                <label class="pres-cliente-search-wrap">
                                     <span>Nombre del cliente</span>
-                                    <input type="text" name="nombre_cliente" required autocomplete="off" placeholder="Nombre Apellido" />
+                                    <input type="text" name="nombre_cliente" id="svcNombreCliente" required autocomplete="off" placeholder="Nombre Apellido" />
+                                    <input type="hidden" name="numero_cliente" id="svcNumeroCliente" />
+                                    <div id="svcClienteResults" class="pres-cliente-results" hidden></div>
                                 </label>
-                                <p class="form-hint">El número de cliente se genera automáticamente al guardar (formato <code>CL-0001</code>).</p>
+                                <p class="form-hint">Si el cliente ya existe, sus datos se llenarán automáticamente. Si no, el número de cliente se genera al guardar (<code>CL-0001</code>).</p>
                                 <label>
                                     <span>Teléfono <small>(10 dígitos)</small></span>
                                     <input type="tel" name="telefono" maxlength="10" inputmode="numeric" pattern="\d{10}" placeholder="5500000000" autocomplete="off" />

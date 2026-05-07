@@ -480,12 +480,22 @@ async function cambiarEstado(id, nuevoEstado, sesion) {
 
   _validarTransicion(p.estado, nuevoEstado);
 
-  // Permisos por destino:
-  // aprobado / convertido → admin
-  // enviado / rechazado → owner o admin (ya validado en _validarPropiedad)
-  const requiereAdmin = [ESTADO_PRESUPUESTO.APROBADO, ESTADO_PRESUPUESTO.CONVERTIDO];
-  if (requiereAdmin.includes(nuevoEstado) && sesion.rol !== ROL.ADMIN) {
-    throw new ForbiddenError(`Cambiar a estado "${nuevoEstado}" requiere rol admin.`);
+  // Permisos por destino (Issue 36v2):
+  // - aprobado / convertido: admin O técnico responsable (asignado_a === uid).
+  //   _validarPropiedad ya restringió que el técnico vea el presupuesto si es
+  //   suyo o solicitud huérfana, pero aquí queremos permitir explícitamente
+  //   al técnico asignado aprobar/rechazar/convertir su propio presupuesto.
+  // - enviado / rechazado: cualquier propietario (admin, técnico responsable,
+  //   o solicitud huérfana) — _validarPropiedad ya cubre esto.
+  const requiereAdminOResponsable = [ESTADO_PRESUPUESTO.APROBADO, ESTADO_PRESUPUESTO.CONVERTIDO];
+  if (requiereAdminOResponsable.includes(nuevoEstado)) {
+    const esResponsable = sesion.rol === ROL.ADMIN
+      || (sesion.rol === ROL.TECNICO && Number(p.asignado_a) === Number(sesion.uid));
+    if (!esResponsable) {
+      throw new ForbiddenError(
+        `Cambiar a estado "${nuevoEstado}" requiere ser admin o el técnico asignado.`
+      );
+    }
   }
 
   const updated = await repo.cambiarEstado(id, nuevoEstado);
@@ -531,8 +541,11 @@ async function convertirAServicio(id, sesion) {
       `Solo se puede convertir un presupuesto en estado aprobado (actual: ${p.estado}).`,
     );
   }
-  if (sesion.rol !== ROL.ADMIN) {
-    throw new ForbiddenError('Convertir a servicio requiere rol admin.');
+  // Issue 36v2: admin O técnico responsable puede convertir.
+  const esResponsable = sesion.rol === ROL.ADMIN
+    || (sesion.rol === ROL.TECNICO && Number(p.asignado_a) === Number(sesion.uid));
+  if (!esResponsable) {
+    throw new ForbiddenError('Convertir a servicio requiere ser admin o el técnico asignado.');
   }
 
   await repo.cambiarEstado(id, ESTADO_PRESUPUESTO.CONVERTIDO);

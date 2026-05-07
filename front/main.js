@@ -889,6 +889,91 @@
     wireMoneyPreview("totalInput", "totalPreview");
     wireMoneyPreview("editTotal", "editTotalPreview");
 
+    /* ===== Issue 39: autocomplete cliente en svcForm =====
+       Endpoint GET /api/clientes?q=...&limit=20 ya existe (Fase 2.6).
+       Si admin escribe parte del nombre, mostrar dropdown con resultados.
+       Click en uno: setea hidden numero_cliente + autollena teléfono y dirección.
+       Si user borra el nombre o escribe uno nuevo no coincidente, queda como cliente nuevo. */
+    const svcNombreInput = document.getElementById("svcNombreCliente");
+    const svcNumeroHidden = document.getElementById("svcNumeroCliente");
+    const svcClienteResults = document.getElementById("svcClienteResults");
+    const svcTelefonoInput = document.querySelector('#svcForm [name="telefono"]');
+    const svcDireccionInput = document.querySelector('#svcForm [name="direccion"]');
+
+    let svcClienteTimer = null;
+    if (svcNombreInput && svcClienteResults) {
+        svcNombreInput.addEventListener("input", () => {
+            // Si user re-escribe el nombre, desvincula el numero_cliente para no
+            // mandar uno viejo al backend.
+            if (svcNumeroHidden && svcNumeroHidden.value) svcNumeroHidden.value = "";
+            const q = svcNombreInput.value.trim();
+            clearTimeout(svcClienteTimer);
+            if (q.length < 2) {
+                svcClienteResults.hidden = true;
+                svcClienteResults.innerHTML = "";
+                return;
+            }
+            svcClienteTimer = setTimeout(() => svcBuscarClientes(q), 300);
+        });
+
+        // Cierra dropdown al click fuera del label.
+        document.addEventListener("click", (e) => {
+            if (!svcClienteResults) return;
+            const wrap = svcNombreInput.closest("label");
+            if (wrap && !wrap.contains(e.target)) {
+                svcClienteResults.hidden = true;
+            }
+        });
+    }
+
+    async function svcBuscarClientes(q) {
+        try {
+            const res = await fetch(`${API_BASE}/api/clientes?q=${encodeURIComponent(q)}&limit=20`, {
+                credentials: "include",
+            });
+            if (res.status === 401) return;
+            const body = await res.json();
+            const rows = (body && body.data) || [];
+            if (!rows.length) {
+                svcClienteResults.hidden = true;
+                svcClienteResults.innerHTML = "";
+                return;
+            }
+            svcClienteResults.innerHTML = rows.map((c) => `
+                <div class="pres-cliente-result" data-numero="${escape(c.numero_cliente || "")}"
+                     data-nombre="${escape(c.nombre_cliente || "")}"
+                     data-telefono="${escape(c.telefono || "")}">
+                    <span class="pres-cliente-result-folio">${escape(c.numero_cliente || "")}</span>
+                    <span class="pres-cliente-result-name">${escape(c.nombre_cliente || "(sin nombre)")}</span>
+                    <span class="pres-cliente-result-meta">${escape(c.telefono || "")} · ${c.total_servicios || 0} svc</span>
+                </div>
+            `).join("");
+            svcClienteResults.hidden = false;
+            svcClienteResults.querySelectorAll(".pres-cliente-result").forEach((row) => {
+                row.addEventListener("click", () => {
+                    svcSeleccionarCliente({
+                        numero_cliente: row.dataset.numero,
+                        nombre: row.dataset.nombre,
+                        telefono: row.dataset.telefono,
+                    });
+                });
+            });
+        } catch (err) {
+            console.warn("[SVC] búsqueda cliente falló:", err);
+        }
+    }
+
+    function svcSeleccionarCliente(sel) {
+        if (svcNombreInput && sel.nombre) svcNombreInput.value = sel.nombre;
+        if (svcNumeroHidden) svcNumeroHidden.value = sel.numero_cliente || "";
+        if (svcTelefonoInput && sel.telefono && !svcTelefonoInput.value.trim()) {
+            svcTelefonoInput.value = sel.telefono;
+        }
+        // No autollenar dirección — el módulo /api/clientes no la devuelve hoy.
+        // Si el campo está vacío, queda al user llenarlo.
+        svcClienteResults.hidden = true;
+    }
+
     svcRefresh.addEventListener("click", () => {
         if (!tabActive.hidden) listar("click svcRefresh");
         else if (!clientHistory.hidden && clientHistory.dataset.cliente) {

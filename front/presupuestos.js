@@ -174,7 +174,7 @@
     if (!presSection) return;
 
     /* ---------- Inicialización via evento de sesión ---------- */
-    document.addEventListener("alas:session-ready", (e) => {
+    document.addEventListener("alas:session-ready", async (e) => {
         state.sesion = e.detail;
         if (!state.sesion) {
             presSection.hidden = true;
@@ -191,7 +191,10 @@
         // Precalentar cache de técnicos para que dropdown reasignación esté listo
         // cuando admin abra el primer editor.
         if (isAdmin) getTecnicos();
-        loadList();
+        // Issue 38: await garantiza que la lista se popula antes de que cualquier
+        // otro listener (filtros, búsqueda) pueda disparar otra request.
+        console.log("[PRES] loadList inicial via alas:session-ready");
+        await loadList();
     });
 
     /* ---------- Listar presupuestos ---------- */
@@ -481,6 +484,8 @@
         renderBanner(p, editable);
         // Reset dirty state al cargar/refrescar el editor (datos nuevos del backend).
         clearDirty();
+        // Issue 37: limpiar cualquier .form-error remanente de un submit previo.
+        presEditorBack.querySelectorAll(".form-error").forEach((el) => el.classList.remove("form-error"));
 
         // Cliente
         presClienteNombre.value = p.cliente_nombre || "";
@@ -982,10 +987,11 @@
             // Issue 32: "Marcar enviado" requiere version guardada — ofrecer save first.
             buttons.push({ label: "Marcar enviado", action: () => ensureSavedThen("Marcar enviado", () => cambiarEstado("enviado")) });
             buttons.push({ label: "Eliminar", danger: true, action: () => eliminar() });
-        } else if (p.estado === "enviado" && isAdmin) {
+        } else if (p.estado === "enviado" && esResponsable) {
+            // Issue 36v2: técnico responsable también puede aprobar/rechazar.
             buttons.push({ label: "Marcar aprobado", primary: true, action: () => ensureSavedThen("Marcar aprobado", () => cambiarEstado("aprobado")) });
             buttons.push({ label: "Marcar rechazado", danger: true, action: () => cambiarEstado("rechazado") });
-        } else if (p.estado === "aprobado" && isAdmin) {
+        } else if (p.estado === "aprobado" && esResponsable) {
             buttons.push({ label: "Convertir a servicio", primary: true, action: () => ensureSavedThen("Convertir a servicio", () => convertirAServicio()) });
         }
 
@@ -1053,6 +1059,13 @@
 
     async function save({ keepOpen } = {}) {
         const p = state.currentPres;
+        // Issue 34v2: si no hay cambios y el presupuesto YA existe, no spam al
+        // backend. Avisar al user con toast neutro. Modo nuevo (p.id === null)
+        // siempre intenta guardar aunque no haya marcado dirty (primer save).
+        if (p && p.id !== null && !state.isDirty) {
+            toast("No hay cambios para guardar.", "success");
+            return;
+        }
         const header = recolectarHeader();
         if (!header.cliente_nombre) {
             presEditorError.textContent = "El nombre del cliente es obligatorio.";

@@ -296,8 +296,11 @@ function generarPresupuestoPdf(res, p) {
     const noteW = W - M * 2;
     doc.font('Helvetica-Bold').fontSize(8).fillColor(TEXT);
     const noteH = doc.heightOfString(noteText, { width: noteW - padding * 2 }) + padding * 2;
+    // Pintar el rect primero. fillAndStroke deja el fillColor del doc en
+    // '#fff8e1' (cremita), por eso el texto subsiguiente quedaba invisible.
+    // Re-seteamos fillColor a TEXT antes del .text() (Issue 35v2).
     doc.rect(M, y, noteW, noteH).fillAndStroke('#fff8e1', '#d4a23b');
-    doc.text(noteText, M + padding, y + padding, {
+    doc.fillColor(TEXT).text(noteText, M + padding, y + padding, {
       width: noteW - padding * 2,
       align: 'justify',
     });

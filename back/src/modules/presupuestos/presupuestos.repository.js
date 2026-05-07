@@ -320,7 +320,7 @@ async function listar({ estados, asignado_a, soloMineConOrfanas, cliente, numero
     FROM dbo.presupuestos p
     LEFT JOIN dbo.usuarios u ON u.id = p.asignado_a
     ${where}
-    ORDER BY p.fecha_creacion DESC
+    ORDER BY p.fecha_creacion DESC, p.id DESC
   `);
   return r.recordset;
 }

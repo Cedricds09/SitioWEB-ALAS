@@ -2314,6 +2314,16 @@ body.modal-open { overflow: hidden; }
     background: rgba(239, 68, 68, 0.06);
 }
 
+/* Issue 37: Algunos browsers (Firefox, Safari) muestran box-shadow rojo en
+   inputs `:required` vacíos o `:invalid` desde el load — se confunde con el
+   highlight de error real. Suprimir el default; nuestro `.form-error` es la
+   ÚNICA fuente de border rojo, aplicado solo tras submit fallido. */
+.form input:invalid,
+.form textarea:invalid,
+.form select:invalid {
+    box-shadow: none;
+}
+
 /* Bloque read-only "Solicitud original del cliente" (Issue 30) */
 .pres-solicitud-original {
     background: rgba(40, 180, 220, 0.08);
