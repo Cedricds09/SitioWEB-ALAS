@@ -1017,6 +1017,7 @@
     const editLat = document.getElementById("editLat");
     const editLng = document.getElementById("editLng");
     const editConceptos = document.getElementById("editConceptos");
+    const editTipoServicio = document.getElementById("editTipoServicio");
     const editTotal = document.getElementById("editTotal");
     const editTecnico = document.getElementById("editTecnico");
     const editSvcCancel = document.getElementById("editSvcCancel");
@@ -1032,6 +1033,7 @@
         editLat.value = r.lat != null ? r.lat : "";
         editLng.value = r.lng != null ? r.lng : "";
         editConceptos.value = r.conceptos || "";
+        if (editTipoServicio) editTipoServicio.value = r.tipo_servicio || "";
         editTotal.value = Number(r.total) || 0;
         const ep = document.getElementById("editTotalPreview");
         if (ep) ep.textContent = money(editTotal.value);
@@ -1065,6 +1067,7 @@
             lat: editLat.value || null,
             lng: editLng.value || null,
             conceptos: editConceptos.value.trim(),
+            tipo_servicio: (editTipoServicio && editTipoServicio.value) || null,
             total: editTotal.value,
             tecnico_asignado: editTecnico.value || null,
         };

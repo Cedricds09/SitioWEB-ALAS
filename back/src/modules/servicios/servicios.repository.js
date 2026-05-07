@@ -87,16 +87,17 @@ async function crearServicio(data, tx) {
     .input('lat', sql.Decimal(10, 7), data.lat)
     .input('lng', sql.Decimal(10, 7), data.lng)
     .input('conceptos', sql.NVarChar(sql.MAX), data.conceptos)
+    .input('tipo_servicio', sql.NVarChar(50), data.tipo_servicio ?? null)
     .input('total', sql.Decimal(12, 2), data.total)
     .input('estado', sql.NVarChar(20), ESTADO_SERVICIO.PENDIENTE)
     .input('tecnico_asignado', sql.NVarChar(50), data.tecnico_asignado)
     .query(`
       INSERT INTO dbo.servicios
-        (numero_cliente, nombre_cliente, telefono, direccion, lat, lng, conceptos, total,
+        (numero_cliente, nombre_cliente, telefono, direccion, lat, lng, conceptos, tipo_servicio, total,
          estado, fecha_inicio, tecnico_asignado)
       OUTPUT INSERTED.*
       VALUES
-        (@numero_cliente, @nombre_cliente, @telefono, @direccion, @lat, @lng, @conceptos, @total,
+        (@numero_cliente, @nombre_cliente, @telefono, @direccion, @lat, @lng, @conceptos, @tipo_servicio, @total,
          @estado, GETDATE(), @tecnico_asignado)
     `);
   return result.recordset[0];
@@ -116,7 +117,7 @@ async function listarServicios({ estados, tecnico }) {
   }
   const result = await reqDb.query(`
     SELECT id, numero_cliente, nombre_cliente, telefono, direccion, lat, lng, conceptos,
-           total, estado, fecha_inicio, fecha_fin, ajuste,
+           total, estado, fecha_inicio, fecha_fin, ajuste, tipo_servicio,
            tecnico_asignado, atendido_por, numero_nota, resolucion
     FROM dbo.servicios
     WHERE activo = 1 AND estado IN (${placeholders.join(',')})
@@ -133,7 +134,7 @@ async function listarPorCliente(numero_cliente) {
     .input('numero_cliente', sql.NVarChar(50), numero_cliente)
     .query(`
       SELECT id, numero_cliente, nombre_cliente, telefono, direccion, lat, lng, conceptos,
-             total, estado, fecha_inicio, fecha_fin, ajuste,
+             total, estado, fecha_inicio, fecha_fin, ajuste, tipo_servicio,
              tecnico_asignado, atendido_por, numero_nota, resolucion
       FROM dbo.servicios
       WHERE activo = 1 AND numero_cliente = @numero_cliente
@@ -147,7 +148,7 @@ async function buscarPorId(id, { lock = false } = {}, tx) {
   const lockHint = lock ? 'WITH (UPDLOCK, ROWLOCK)' : '';
   const result = await reqDb.input('id', sql.Int, id).query(`
     SELECT id, numero_cliente, nombre_cliente, telefono, direccion, lat, lng, conceptos,
-           total, estado, fecha_inicio, fecha_fin, ajuste,
+           total, estado, fecha_inicio, fecha_fin, ajuste, tipo_servicio,
            tecnico_asignado, atendido_por, numero_nota, resolucion, activo
     FROM dbo.servicios ${lockHint}
     WHERE id = @id
@@ -169,6 +170,7 @@ async function actualizarServicio(id, campos) {
   if (campos.lat !== undefined) addSet('lat', sql.Decimal(10, 7), campos.lat);
   if (campos.lng !== undefined) addSet('lng', sql.Decimal(10, 7), campos.lng);
   if (campos.conceptos !== undefined) addSet('conceptos', sql.NVarChar(sql.MAX), campos.conceptos);
+  if (campos.tipo_servicio !== undefined) addSet('tipo_servicio', sql.NVarChar(50), campos.tipo_servicio);
   if (campos.total !== undefined) addSet('total', sql.Decimal(12, 2), campos.total);
   if (campos.tecnico_asignado !== undefined) addSet('tecnico_asignado', sql.NVarChar(50), campos.tecnico_asignado);
 

@@ -31,6 +31,7 @@ async function crear(input) {
         lat: input.lat ?? null,
         lng: input.lng ?? null,
         conceptos: input.conceptos,
+        tipo_servicio: input.tipo_servicio ?? null,
         total: input.total ?? 0,
         tecnico_asignado: tecnico,
       },

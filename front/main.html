@@ -463,6 +463,19 @@
                                     <textarea name="conceptos" rows="4" required placeholder="Detalle del servicio…"></textarea>
                                 </label>
                                 <label>
+                                    <span>Tipo de servicio</span>
+                                    <select name="tipo_servicio" id="tipoServicioInput">
+                                        <option value="">— Sin especificar —</option>
+                                        <option>Gas LP / Natural</option>
+                                        <option>Plomería</option>
+                                        <option>Electricidad</option>
+                                        <option>Pintura</option>
+                                        <option>Soldadura</option>
+                                        <option>Mantenimiento integral</option>
+                                        <option>Otro</option>
+                                    </select>
+                                </label>
+                                <label>
                                     <span>Total (MXN)</span>
                                     <input type="number" name="total" id="totalInput" min="0" step="0.01" required placeholder="0.00" />
                                     <span class="money-preview" id="totalPreview">$0</span>
@@ -695,6 +708,19 @@
                 <label>
                     <span>Descripción del trabajo</span>
                     <textarea id="editConceptos" rows="4" required></textarea>
+                </label>
+                <label>
+                    <span>Tipo de servicio</span>
+                    <select id="editTipoServicio">
+                        <option value="">— Sin especificar —</option>
+                        <option>Gas LP / Natural</option>
+                        <option>Plomería</option>
+                        <option>Electricidad</option>
+                        <option>Pintura</option>
+                        <option>Soldadura</option>
+                        <option>Mantenimiento integral</option>
+                        <option>Otro</option>
+                    </select>
                 </label>
                 <label>
                     <span>Total (MXN)</span>

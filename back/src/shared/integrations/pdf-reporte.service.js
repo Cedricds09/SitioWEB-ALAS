@@ -154,6 +154,7 @@ function generarReporteTecnico(res, s) {
 
   // ===== Servicio =====
   section('Servicio');
+  if (s.tipo_servicio) line('Tipo de servicio:', s.tipo_servicio);
   line('Fecha inicio:', fmtFecha(s.fecha_inicio));
   line('Fecha fin:', fmtFecha(s.fecha_fin));
   line('Técnico asignado:', s.tecnico_asignado);

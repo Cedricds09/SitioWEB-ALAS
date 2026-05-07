@@ -76,6 +76,7 @@ const crearServicioSchema = z.object({
   lat: optionalNumber,
   lng: optionalNumber,
   conceptos: requiredString,
+  tipo_servicio: nullableTrimmedString,
   total: moneyNumber,
 });
 
@@ -95,6 +96,7 @@ const editarServicioSchema = z
       },
       z.number().min(0).optional(),
     ),
+    tipo_servicio: nullableTrimmedString,
     tecnico_asignado: nullableTrimmedString,
   })
   .refine(
