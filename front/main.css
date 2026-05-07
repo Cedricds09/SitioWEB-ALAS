@@ -395,6 +395,10 @@ img { max-width: 100%; display: block; }
     display: grid;
     gap: 0.5rem;
 }
+/* `display: grid` sobrescribe el [hidden] del user agent stylesheet —
+   restaurar para que toggling `hidden` desde JS realmente oculte el label.
+   Issue 24 (Fase 2.7): técnico veía el dropdown de asignación pese a hidden. */
+.form label[hidden] { display: none; }
 .form label span {
     font-size: 0.85rem;
     letter-spacing: 0.1em;
