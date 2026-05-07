@@ -1062,9 +1062,67 @@
             loadList();
             if (!keepOpen) closeModal(presEditorBack);
         } catch (err) {
-            presEditorError.textContent = err.message;
-            toast("Error: " + err.message, "error");
+            const msg = traducirErrorZod(err.message);
+            presEditorError.textContent = msg;
+            toast(msg, "error");
         }
+    }
+
+    // Issue 31: traduce paths técnicos de Zod (bloques.X.contenido_texto, etc.)
+    // a mensajes legibles en español. Acepta múltiples errores separados por "; "
+    // (formato del validate.middleware).
+    function traducirErrorZod(msg) {
+        if (!msg) return "Error.";
+        const partes = String(msg).split("; ");
+        const FIELD_LABELS = {
+            cliente_nombre: "Nombre del cliente",
+            cliente_telefono: "Teléfono del cliente",
+            cliente_direccion: "Dirección del cliente",
+            cliente_destinatario: "Destinatario",
+            ciudad: "Ciudad",
+            fecha_documento: "Fecha del documento",
+            tipo_servicio: "Tipo de servicio",
+            vigencia_dias: "Vigencia (días)",
+            adelanto_porcentaje: "Adelanto (%)",
+            moneda: "Moneda",
+            introduccion: "Introducción",
+            notas_internas: "Notas internas",
+            numero_cliente: "Número de cliente",
+            descripcion: "Descripción",
+            cantidad: "Cantidad",
+            precio_unitario: "Precio unitario",
+            es_opcional: "Opcional",
+            titulo: "Título",
+            contenido_texto: "Contenido",
+            subtotal: "Subtotal",
+            vinetas: "Aclaraciones",
+            garantias: "Garantías",
+            estado: "Estado",
+            asignado_a: "Asignado a",
+        };
+        const traducidas = partes.map((parte) => {
+            const sep = parte.indexOf(": ");
+            if (sep < 0) return parte;
+            const path = parte.slice(0, sep);
+            const detalle = parte.slice(sep + 2);
+            // bloques.N.algo, bloques.N.items.M.algo
+            const mBloqueItem = path.match(/^bloques\.(\d+)\.items\.(\d+)\.(\w+)/);
+            if (mBloqueItem) {
+                const b = Number(mBloqueItem[1]) + 1;
+                const i = Number(mBloqueItem[2]) + 1;
+                const f = FIELD_LABELS[mBloqueItem[3]] || mBloqueItem[3];
+                return `Bloque #${b} → item #${i} (${f}): ${detalle}`;
+            }
+            const mBloque = path.match(/^bloques\.(\d+)\.(\w+)/);
+            if (mBloque) {
+                const b = Number(mBloque[1]) + 1;
+                const f = FIELD_LABELS[mBloque[2]] || mBloque[2];
+                return `Bloque #${b} (${f}): ${detalle}`;
+            }
+            const f = FIELD_LABELS[path] || path;
+            return `${f}: ${detalle}`;
+        });
+        return traducidas.join("\n");
     }
 
     async function cambiarEstado(nuevoEstado) {
