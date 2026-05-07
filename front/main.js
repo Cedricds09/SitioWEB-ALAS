@@ -182,7 +182,7 @@
             // Re-render del dashboard admin para inyectar mini mapas
             if (document.body.classList.contains("admin-mode")) {
                 const dash = document.getElementById("adminDash");
-                if (dash && !dash.hidden && typeof listar === "function") listar();
+                if (dash && !dash.hidden && typeof listar === "function") listar("Maps script onload");
             }
         };
         script.onerror = (e) => {
@@ -406,7 +406,7 @@
     function showDash() {
         loginSection.hidden = true;
         dashSection.hidden = false;
-        listar();
+        listar("showDash (login/checkSession)");
         if (typeof startPolling === "function") startPolling();
     }
 
@@ -703,7 +703,11 @@
         return `${API_BASE}/api/servicios${qs ? "?" + qs : ""}`;
     }
 
-    async function listar() {
+    async function listar(reason = "manual") {
+        // Log temporal (Issue 27v2): rastrea cada refresh para detectar
+        // fuentes inesperadas. Quitar cuando el bug de "servicio desaparece"
+        // quede confirmado como cerrado.
+        console.log("[REFRESH SERVICIOS]", new Date().toISOString(), "razón:", reason);
         svcList.innerHTML = '<div class="svc-empty"><span class="svc-loader"></span>Cargando servicios…</div>';
         try {
             await loadTecnicos();
@@ -808,7 +812,7 @@
     wireMoneyPreview("editTotal", "editTotalPreview");
 
     svcRefresh.addEventListener("click", () => {
-        if (!tabActive.hidden) listar();
+        if (!tabActive.hidden) listar("click svcRefresh");
         else if (!clientHistory.hidden && clientHistory.dataset.cliente) {
             cargarHistorial(clientHistory.dataset.cliente, clientHistory.dataset.nombre);
         } else {
@@ -1210,48 +1214,24 @@
         }
     }
 
-    /* ===== Refresh por eventos (Issue 27 — eliminado polling agresivo) =====
-       Antes había setInterval cada 20s que producía race condition al finalizar
-       servicios: el polling traía la lista vieja después del POST finalizar y
-       UI mostraba el servicio "reaparecer" un instante. Ahora la lista se
-       refresca solo en eventos: crear, finalizar, editar, cambio de tab,
-       o cuando el tab vuelve a primer plano (visibilitychange).
-       startPolling/stopPolling se mantienen como stubs para no romper callers. */
-    function isAnyModalOpen() {
-        return (confirmBack && confirmBack.classList.contains("show")) ||
-               (ajusteBack && ajusteBack.classList.contains("show")) ||
-               (passBack && passBack.classList.contains("show")) ||
-               (editSvcBack && editSvcBack.classList.contains("show")) ||
-               (editUserBack && editUserBack.classList.contains("show")) ||
-               (notaBack && notaBack.classList.contains("show")) ||
-               (finalizeBack && finalizeBack.classList.contains("show"));
-    }
-    function shouldRefresh() {
-        return !document.hidden &&
-               !dashSection.hidden &&
-               !tabActive.hidden &&
-               !isAnyModalOpen();
-    }
-    async function refrescarListaActivos() {
-        if (!shouldRefresh()) return;
-        try {
-            await loadTecnicos();
-            const url = `${API_BASE}/api/servicios${scope === "mine" ? "?mine=1" : ""}`;
-            const res = await fetch(url, { credentials: "include" });
-            if (res.status === 401) return;
-            const body = await res.json();
-            if (!res.ok || !body.ok) return;
-            renderServicios(body.data, svcList, {
-                emptyMsg: scope === "mine" ? "No tienes servicios asignados." : "Sin servicios activos por el momento.",
-            });
-        } catch {}
-    }
+    /* ===== Refresh ESTRICTAMENTE por evento (Issue 27v2) =====
+       Eliminado TODO refresh automático: no setInterval, no visibilitychange,
+       no focus listener. La lista se refresca SOLO cuando hay un evento
+       legítimo del usuario:
+         - crear servicio (POST 201)
+         - editar (PUT 200)
+         - asignar (PUT 200)
+         - ajuste (PUT 200)
+         - finalizar (POST 200)
+         - reabrir (POST 200)
+         - reasignar técnico (PUT 200)
+         - click manual en svcRefresh
+         - cambio de tab activos/finalizados
+       startPolling/stopPolling y refrescarListaActivos quedan como stubs
+       no-op para no romper callers existentes. */
     function startPolling() { /* no-op desde Fase 2.8 */ }
     function stopPolling() { /* no-op desde Fase 2.8 */ }
-    document.addEventListener("visibilitychange", () => {
-        if (document.hidden) return;
-        if (!dashSection.hidden) refrescarListaActivos();
-    });
+    function refrescarListaActivos() { /* no-op desde Fase 2.9 */ }
 
     /* =====================================================
        MÓDULO USUARIOS (solo admin)
