@@ -100,6 +100,17 @@
         }
     });
 
+    // Bloquea scroll del mouse sobre inputs type=number (Issue 26):
+    // por default el browser incrementa/decrementa el valor con la rueda. En
+    // inputs con step="0.01" puede sumar 0.01 sin que el usuario lo note,
+    // produciendo totales tipo 1000.01 en vez de 1000.
+    document.addEventListener("wheel", (e) => {
+        const t = e.target;
+        if (t && t.tagName === "INPUT" && t.type === "number" && document.activeElement === t) {
+            t.blur();
+        }
+    }, { passive: true });
+
     /* =====================================================
        GOOGLE MAPS PLACES AUTOCOMPLETE (público + admin)
        Carga dinámica de script: SOLO tras obtener la key.
