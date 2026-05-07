@@ -8,7 +8,7 @@ const { z } = require('zod');
 // String requerido tras trim. Acepta null/undefined → "" → falla min(1).
 const requiredString = z.preprocess(
   (v) => (v == null ? '' : String(v).trim()),
-  z.string().min(1),
+  z.string().min(1, 'Este campo es obligatorio.'),
 );
 
 // String opcional. null/'' → undefined; resto → trim string.
@@ -63,7 +63,7 @@ const moneyNumber = z.preprocess(
     const n = Number(v);
     return Number.isFinite(n) ? n : 0;
   },
-  z.number().min(0),
+  z.number({ invalid_type_error: 'Debe ser un número.' }).min(0, 'No puede ser negativo.'),
 );
 
 // ===== Body schemas =====
