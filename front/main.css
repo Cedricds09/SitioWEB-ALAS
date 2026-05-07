@@ -2297,6 +2297,23 @@ body.modal-open { overflow: hidden; }
     font-style: italic;
 }
 
+/* Issue 33: highlight rojo de campos problemáticos tras validación.
+   Se quita al tipear (listener delegado en JS). */
+.form-error,
+.form input.form-error,
+.form textarea.form-error,
+.form select.form-error,
+.pres-bloque-card.form-error {
+    border: 2px solid #ef4444 !important;
+    box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.25);
+}
+.form-error:focus,
+.form input.form-error:focus,
+.form textarea.form-error:focus,
+.form select.form-error:focus {
+    background: rgba(239, 68, 68, 0.06);
+}
+
 /* Bloque read-only "Solicitud original del cliente" (Issue 30) */
 .pres-solicitud-original {
     background: rgba(40, 180, 220, 0.08);

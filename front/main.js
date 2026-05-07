@@ -118,10 +118,52 @@
             const label = FIELD_LABELS_FRONT[path] || path;
             return `${label}: ${detalle}`;
         });
-        // Si hay múltiples campos faltantes con el mismo mensaje, agruparlos.
         const bullets = traducidas.length > 1 ? "\n• " + traducidas.join("\n• ") : traducidas[0];
         return traducidas.length > 1 ? `Por favor revisa:${bullets}` : bullets;
     }
+
+    // Issue 33: parsea el mensaje Zod del backend, devuelve los paths (campos) afectados.
+    function pathsDeError(msg) {
+        if (!msg) return [];
+        return String(msg).split("; ").map((p) => {
+            const sep = p.indexOf(": ");
+            return sep < 0 ? null : p.slice(0, sep);
+        }).filter(Boolean);
+    }
+
+    // Marca con border rojo los inputs (por name o id) listados en `paths`,
+    // dentro del scope `formEl`. Hace scroll al primero. Devuelve count.
+    function highlightCamposConError(formEl, paths) {
+        if (!formEl || !paths || !paths.length) return 0;
+        let primer = null;
+        let count = 0;
+        for (const path of paths) {
+            // Path puede ser anidado (bloques.0.contenido_texto) — para forms planos
+            // basta con el primer segmento.
+            const top = String(path).split(".")[0];
+            const el = formEl.querySelector(
+                `[name="${top}"], #${top}Input, #${top}`
+            );
+            if (el) {
+                el.classList.add("form-error");
+                count++;
+                if (!primer) primer = el;
+            }
+        }
+        if (primer && primer.scrollIntoView) {
+            primer.scrollIntoView({ behavior: "smooth", block: "center" });
+            try { primer.focus({ preventScroll: true }); } catch { /* noop */ }
+        }
+        return count;
+    }
+
+    // Listener delegado: cuando user edita un input con .form-error, quita la clase.
+    document.addEventListener("input", (e) => {
+        const t = e.target;
+        if (t && t.classList && t.classList.contains("form-error")) {
+            t.classList.remove("form-error");
+        }
+    });
 
     // Filtra a solo dígitos en cualquier input type=tel del documento.
     // El backend valida estricto 10 dígitos (Issue 25); este listener evita
@@ -789,6 +831,8 @@
             listar();
         } catch (err) {
             toast(traducirErrorBackend(err.message), "error");
+            // Issue 33: highlight + scroll al primer campo problemático.
+            highlightCamposConError(svcForm, pathsDeError(err.message));
         } finally {
             svcSubmit.disabled = false;
             svcSubmit.textContent = original;

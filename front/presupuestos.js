@@ -1083,6 +1083,54 @@
             const msg = traducirErrorZod(err.message);
             presEditorError.textContent = msg;
             toast(msg, "error");
+            // Issue 33: marcar campos/bloques problemáticos.
+            highlightErroresPresupuesto(err.message);
+        }
+    }
+
+    // Issue 33: parsea paths del error de Zod del backend y aplica .form-error
+    // a campos del header (cliente) o a bloques individuales del editor.
+    // El listener delegado de main.js quita la clase al editar.
+    function highlightErroresPresupuesto(msg) {
+        if (!msg) return;
+        const HEADER_FIELDS = {
+            cliente_nombre: presClienteNombre,
+            cliente_telefono: presClienteTelefono,
+            cliente_direccion: presClienteDireccion,
+            cliente_destinatario: presClienteDestinatario,
+            tipo_servicio: presTipoServicio,
+            vigencia_dias: presVigencia,
+            adelanto_porcentaje: presAdelanto,
+            introduccion: presIntroduccion,
+            notas_internas: presNotasInternas,
+        };
+        const partes = String(msg).split("; ");
+        let primero = null;
+        for (const parte of partes) {
+            const sep = parte.indexOf(": ");
+            if (sep < 0) continue;
+            const path = parte.slice(0, sep);
+            // bloques.N... → marca la card N-ésima
+            const mBloque = path.match(/^bloques\.(\d+)/);
+            if (mBloque) {
+                const idx = Number(mBloque[1]);
+                const cards = presBloquesList.querySelectorAll(".pres-bloque-card");
+                const card = cards[idx];
+                if (card) {
+                    card.classList.add("form-error");
+                    if (!primero) primero = card;
+                }
+                continue;
+            }
+            const el = HEADER_FIELDS[path];
+            if (el) {
+                el.classList.add("form-error");
+                if (!primero) primero = el;
+            }
+        }
+        if (primero && primero.scrollIntoView) {
+            primero.scrollIntoView({ behavior: "smooth", block: "center" });
+            try { primero.focus({ preventScroll: true }); } catch { /* noop */ }
         }
     }
 
