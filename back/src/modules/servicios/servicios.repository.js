@@ -287,14 +287,17 @@ async function validarUsuarioAsignable(usuario) {
 
 async function buscarNotaPorNumero(numero_nota) {
   const pool = await getPool();
+  // JOIN con servicios para incluir tipo_servicio (Issue 29 cierre Fase 2.10).
   const r = await pool
     .request()
     .input('numero_nota', sql.NVarChar(20), numero_nota)
     .query(`
-      SELECT id, numero_cliente, nombre_cliente, telefono, validacion,
-             conceptos, total, estado, fecha, numero_nota
-      FROM dbo.notas
-      WHERE numero_nota = @numero_nota
+      SELECT n.id, n.numero_cliente, n.nombre_cliente, n.telefono, n.validacion,
+             n.conceptos, n.total, n.estado, n.fecha, n.numero_nota,
+             s.tipo_servicio
+      FROM dbo.notas n
+      LEFT JOIN dbo.servicios s ON s.numero_nota = n.numero_nota
+      WHERE n.numero_nota = @numero_nota
     `);
   return r.recordset[0] || null;
 }

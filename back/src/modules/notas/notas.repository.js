@@ -5,27 +5,32 @@ const { sql, getPool } = require('../../shared/db/pool');
 
 async function buscarPorClienteValidacion(cliente, validacion) {
   const pool = await getPool();
+  // JOIN con servicios para traer tipo_servicio (Issue 29 cierre Fase 2.10).
+  // Nota: dbo.notas no tiene la columna; se hereda lógicamente del servicio
+  // que generó la nota al finalizar.
   const result = await pool
     .request()
     .input('cliente', sql.NVarChar(50), cliente)
     .input('validacion', sql.NVarChar(50), validacion)
     .query(`
       SELECT TOP 1
-        id,
-        numero_cliente,
-        nombre_cliente,
-        numero_nota,
-        validacion,
-        telefono,
-        fecha,
-        conceptos,
-        total,
-        estado
-      FROM dbo.notas
-      WHERE LTRIM(RTRIM(CAST(numero_cliente AS NVARCHAR(50)))) = @cliente
+        n.id,
+        n.numero_cliente,
+        n.nombre_cliente,
+        n.numero_nota,
+        n.validacion,
+        n.telefono,
+        n.fecha,
+        n.conceptos,
+        n.total,
+        n.estado,
+        s.tipo_servicio
+      FROM dbo.notas n
+      LEFT JOIN dbo.servicios s ON s.numero_nota = n.numero_nota
+      WHERE LTRIM(RTRIM(CAST(n.numero_cliente AS NVARCHAR(50)))) = @cliente
         AND (
-              LTRIM(RTRIM(CAST(validacion   AS NVARCHAR(50)))) = @validacion
-           OR LTRIM(RTRIM(CAST(numero_nota AS NVARCHAR(50)))) = @validacion
+              LTRIM(RTRIM(CAST(n.validacion   AS NVARCHAR(50)))) = @validacion
+           OR LTRIM(RTRIM(CAST(n.numero_nota  AS NVARCHAR(50)))) = @validacion
         )
     `);
   return result.recordset[0] || null;

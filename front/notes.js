@@ -93,7 +93,9 @@
             date: formatFecha(data.fecha),
             name: nombreSafe,
             phone: telMasked,
-            service: "Nota de servicio",
+            // Issue 29: usa tipo_servicio del backend (heredado vía JOIN
+            // notas LEFT JOIN servicios). Fallback al label genérico.
+            service: data.tipo_servicio || "Nota de servicio",
             message: typeof data.conceptos === "string" ? data.conceptos : "",
             items: parseConceptos(data.conceptos, data.total)
         };

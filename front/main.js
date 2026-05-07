@@ -1144,7 +1144,7 @@
             date: fechaStr,
             name: d.nombre_cliente || "Cliente",
             phone: d.telefono || "—",
-            service: "Nota de servicio",
+            service: d.tipo_servicio || "Nota de servicio",
             message: conceptosTxt,
             items,
         };

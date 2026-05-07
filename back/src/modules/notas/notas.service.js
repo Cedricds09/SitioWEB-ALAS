@@ -30,6 +30,7 @@ async function buscar(cliente, validacion) {
     conceptos: row.conceptos,
     total: Number(row.total),
     estado: row.estado,
+    tipo_servicio: row.tipo_servicio || null,
   };
 
   console.log(`[NOTAS] OK cliente=${cliente} total=${respuesta.total} estado=${respuesta.estado}`);
