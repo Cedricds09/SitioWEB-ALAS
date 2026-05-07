@@ -32,12 +32,14 @@
         if (isNaN(d.getTime())) return String(f);
         return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
     }
+    // Issue 34: alinear con CSS (.toast.success / .toast.error). Antes usaba
+    // clase "ok" que no existía en el stylesheet → toasts sin feedback visual.
     function toast(msg, kind) {
         const t = document.getElementById("toast");
         if (!t) { console.log("[TOAST]", msg); return; }
         t.querySelector(".toast-msg").textContent = msg;
-        t.classList.remove("ok", "error");
-        t.classList.add("show", kind === "error" ? "error" : "ok");
+        t.classList.remove("success", "error");
+        t.classList.add("show", kind === "error" ? "error" : "success");
         clearTimeout(toast._t);
         toast._t = setTimeout(() => t.classList.remove("show"), 3500);
     }
@@ -681,7 +683,7 @@
                 });
                 state.currentPres.asignado_a = body.data.asignado_a;
                 state.currentPres.asignado_a_nombre = body.data.asignado_a_nombre || null;
-                toast(newId ? "Reasignado." : "Desasignado.", "ok");
+                toast(newId ? "Reasignado." : "Desasignado.", "success");
                 loadList();
             } catch (err) {
                 toast("Error al reasignar: " + err.message, "error");
@@ -1066,13 +1068,13 @@
                     method: "POST",
                     body: JSON.stringify(payload),
                 });
-                toast("Presupuesto creado.", "ok");
+                toast("Presupuesto creado.", "success");
             } else {
                 body = await api("/api/presupuestos/" + p.id, {
                     method: "PUT",
                     body: JSON.stringify(payload),
                 });
-                toast("Cambios guardados.", "ok");
+                toast("Cambios guardados.", "success");
             }
             state.currentPres = body.data;
             state.currentPres.bloques = (state.currentPres.bloques || []).map(normalizarBloqueDesdeBackend);
@@ -1204,7 +1206,7 @@
                 body: JSON.stringify({ estado: nuevoEstado }),
             });
             state.currentPres.estado = body.data.estado;
-            toast(`Estado: ${body.data.estado}.`, "ok");
+            toast(`Estado: ${body.data.estado}.`, "success");
             renderEditor();
             loadList();
         } catch (err) {
@@ -1217,7 +1219,7 @@
         if (!p.id) return;
         try {
             const body = await api("/api/presupuestos/" + p.id + "/convertir", { method: "POST" });
-            toast(body.mensaje || "Convertido.", "ok");
+            toast(body.mensaje || "Convertido.", "success");
             state.currentPres.estado = "convertido";
             renderEditor();
             loadList();
@@ -1232,7 +1234,7 @@
         if (!confirm(`¿Eliminar presupuesto ${p.numero_presupuesto}? No se puede deshacer desde aquí.`)) return;
         try {
             await api("/api/presupuestos/" + p.id, { method: "DELETE" });
-            toast("Presupuesto eliminado.", "ok");
+            toast("Presupuesto eliminado.", "success");
             closeModal(presEditorBack);
             loadList();
         } catch (err) {
