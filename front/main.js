@@ -89,6 +89,40 @@
     const yearEl = document.getElementById("year");
     if (yearEl) yearEl.textContent = new Date().getFullYear();
 
+    // Issue 31 cierre: traduce paths Zod del backend ("nombre_cliente: msg; conceptos: msg")
+    // a labels human-readable. Cubre los campos de svcForm/editServicio/editUser/userForm.
+    const FIELD_LABELS_FRONT = {
+        nombre_cliente: "Nombre del cliente",
+        telefono: "Teléfono",
+        direccion: "Dirección",
+        conceptos: "Descripción del trabajo",
+        tipo_servicio: "Tipo de servicio",
+        total: "Total",
+        tecnico_asignado: "Técnico asignado",
+        usuario: "Usuario",
+        password: "Contraseña",
+        rol: "Rol",
+        ajuste: "Ajuste",
+        resolucion: "Resolución",
+        cliente: "Cliente",
+        validacion: "Validación",
+    };
+    function traducirErrorBackend(msg) {
+        if (!msg) return "Error.";
+        const partes = String(msg).split("; ");
+        const traducidas = partes.map((parte) => {
+            const sep = parte.indexOf(": ");
+            if (sep < 0) return parte;
+            const path = parte.slice(0, sep);
+            const detalle = parte.slice(sep + 2);
+            const label = FIELD_LABELS_FRONT[path] || path;
+            return `${label}: ${detalle}`;
+        });
+        // Si hay múltiples campos faltantes con el mismo mensaje, agruparlos.
+        const bullets = traducidas.length > 1 ? "\n• " + traducidas.join("\n• ") : traducidas[0];
+        return traducidas.length > 1 ? `Por favor revisa:${bullets}` : bullets;
+    }
+
     // Filtra a solo dígitos en cualquier input type=tel del documento.
     // El backend valida estricto 10 dígitos (Issue 25); este listener evita
     // que el usuario teclee espacios/guiones/paréntesis y que el form falle.
@@ -754,7 +788,7 @@
             if (tp) tp.textContent = money(0);
             listar();
         } catch (err) {
-            toast(err.message, "error");
+            toast(traducirErrorBackend(err.message), "error");
         } finally {
             svcSubmit.disabled = false;
             svcSubmit.textContent = original;
