@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Pre-commit hook ALAS — bloquea credenciales obvias en cambios staged.
+# Instalado por back/scripts/install-git-hooks.sh.
+#
+# Detecta patrones comunes en las LÍNEAS AÑADIDAS por este commit:
+#   - Anthropic API keys (sk-ant-...)
+#   - OpenAI / generic API keys (sk-...)
+#   - Password admin conocido (con obfuscación regex para que el hook no se auto-detecte)
+#   - DB_PASSWORD / SESSION_SECRET con valor literal (no env var)
+#
+# Falsos positivos: usa "git commit --no-verify" SOLO si verificaste dos veces.
+
+set -u
+
+# Nota: patrones con char classes "[x]" para evitar auto-match al commitear el hook.
+# El patrón "J[o]lp26Alas" (con corchetes) matchea la cadena literal del password
+# real, pero el patrón mismo no se detecta a sí mismo cuando vive en este archivo
+# (porque su texto tiene corchetes, no la cadena cruda).
+PATTERNS_RAW='
+sk-ant-[A-Za-z0-9_-]{10,}
+sk-[A-Za-z0-9]{20,}
+J[o]lp26Alas
+DB_PASSWORD[[:space:]]*=[[:space:]]*[^$[:space:]"]
+SESSION_SECRET[[:space:]]*=[[:space:]]*[^$[:space:]"]
+ANTHROPIC_API_KEY[[:space:]]*=[[:space:]]*[^$[:space:]"]
+'
+
+ADDED=$(git diff --cached -U0 --no-color --diff-filter=ACM 2>/dev/null | grep '^+' | grep -v '^+++')
+
+if [ -z "$ADDED" ]; then
+  exit 0
+fi
+
+FOUND=0
+while IFS= read -r pat; do
+  [ -z "$pat" ] && continue
+  matches=$(printf '%s\n' "$ADDED" | grep -E -- "$pat" || true)
+  if [ -n "$matches" ]; then
+    if [ "$FOUND" -eq 0 ]; then
+      echo "❌ pre-commit: posible credencial detectada en cambios staged." >&2
+      echo "" >&2
+    fi
+    FOUND=1
+    echo "  patrón: $pat" >&2
+    printf '%s\n' "$matches" | head -5 | sed 's/^/    /' >&2
+    echo "" >&2
+  fi
+done <<< "$PATTERNS_RAW"
+
+if [ "$FOUND" -eq 1 ]; then
+  echo "Bypass intencional: git commit --no-verify" >&2
+  echo "Pero verifica DOS VECES antes de hacerlo." >&2
+  exit 1
+fi
+
+exit 0

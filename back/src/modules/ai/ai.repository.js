@@ -24,6 +24,23 @@ async function countLastHour(tx) {
 }
 
 /**
+ * Cuenta generaciones de UN usuario en la última hora (exitosas + fallidas).
+ * Usado por el circuit breaker per-user.
+ */
+async function countLastHourByUser(userId, tx) {
+  const reqDb = await makeRequest(tx);
+  const r = await reqDb
+    .input('uid', sql.Int, userId)
+    .query(`
+      SELECT COUNT(*) AS total
+      FROM dbo.ai_generations
+      WHERE user_id = @uid
+        AND created_at >= DATEADD(HOUR, -1, SYSUTCDATETIME())
+    `);
+  return Number(r.recordset[0]?.total) || 0;
+}
+
+/**
  * Inserta una fila de tracking. Llamado tanto en éxito como en fallo.
  * @param {object} data
  *   - user_id            INT NOT NULL
@@ -62,5 +79,6 @@ async function registrarGeneracion(data, tx) {
 
 module.exports = {
   countLastHour,
+  countLastHourByUser,
   registrarGeneracion,
 };

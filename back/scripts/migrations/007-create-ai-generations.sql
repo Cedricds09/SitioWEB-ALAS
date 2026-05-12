@@ -2,6 +2,15 @@
 -- Tracking por generación de IA: tokens, costo, modelo, modo, exitoso/fallido.
 -- Alimenta el circuit breaker (>50 generaciones/hora globales → 429).
 -- Idempotente. Aplicar manualmente con SSMS o sqlcmd.
+--
+-- Decisión: FKs sin ON DELETE explícito (default NO ACTION).
+-- Significa que borrar hard un usuario o presupuesto con filas aquí fallará.
+-- Por qué está bien hoy: toda la app usa soft-delete (activo=0). Nunca se hace
+-- DELETE FROM real, así que NO ACTION jamás dispara.
+-- Cuándo reconsiderar: si llega un caso de "derecho al olvido" (LFPDPPP/GDPR)
+-- o limpieza de datos legacy. La opción más razonable sería migrar user_id y
+-- presupuesto_id a NULLable y cambiar a ON DELETE SET NULL — así se conserva
+-- el registro histórico de costo/tokens aunque se pierda el link al titular.
 
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ai_generations')
 BEGIN

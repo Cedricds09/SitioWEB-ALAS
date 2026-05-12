@@ -1,6 +1,18 @@
 // back/src/modules/ai/pricing.js
-// Claude Haiku 4.5 pricing (per million tokens, USD)
-// Source: anthropic.com/pricing, as of May 2026
+// Claude Haiku 4.5 pricing (per million tokens, USD).
+//
+// ⚠️ DRIFT WARNING — verificar y actualizar cada ~6 meses, o cuando Anthropic
+//    anuncie nueva familia de modelos / cambios de precio.
+//
+// Source of truth: https://www.anthropic.com/pricing
+// Última verificación: 2026-05-11 (Fase 3 backend).
+//
+// Si estos números quedan desactualizados, el campo dbo.ai_generations.costo_estimado_usd
+// pierde precisión — los reportes internos de costo IA quedarían sesgados.
+// El sistema NO falla si los precios bajan/suben; solo la estimación se desvía.
+//
+// Si cambias de modelo (ej. claude-haiku-5-x cuando salga), actualiza también
+// estas constantes — son específicas a Haiku 4.5.
 const PRICING = {
   INPUT_NORMAL: 1.00,      // $1 / M tokens
   INPUT_CACHE_WRITE: 1.25, // $1.25 / M tokens (first time caching)
