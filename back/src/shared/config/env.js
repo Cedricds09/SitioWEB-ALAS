@@ -20,6 +20,16 @@ if (String(process.env.SESSION_SECRET).length < 16) {
   process.exit(1);
 }
 
+// Anthropic — requerido para el módulo de IA (Fase 3).
+if (!process.env.ANTHROPIC_API_KEY || String(process.env.ANTHROPIC_API_KEY).trim() === '') {
+  console.error('[ENV] Falta ANTHROPIC_API_KEY en .env (requerida por el módulo IA).');
+  process.exit(1);
+}
+if (!String(process.env.ANTHROPIC_API_KEY).startsWith('sk-ant-')) {
+  console.error('[ENV] ANTHROPIC_API_KEY tiene formato inválido (debe iniciar con sk-ant-).');
+  process.exit(1);
+}
+
 const env = Object.freeze({
   NODE_ENV: process.env.NODE_ENV || 'development',
   PORT: parseInt(process.env.PORT, 10) || 3000,
@@ -33,6 +43,9 @@ const env = Object.freeze({
   SESSION_SECRET: process.env.SESSION_SECRET,
 
   GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY || '',
+
+  ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+  ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001',
 });
 
 module.exports = env;

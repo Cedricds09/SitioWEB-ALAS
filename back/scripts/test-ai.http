@@ -1,0 +1,39 @@
+
+### ALAS — Primera prueba real del módulo IA
+### Solo Caso 1: como admin, generar bloques desde descripción.
+
+@host = http://localhost:3000
+@adminUser = REPLACE_ME
+@adminPass = REPLACE_ME
+@presId = 0
+
+
+# ==============================================================
+# PASO 1 — Login admin
+# Esperado: 200 OK con { ok: true, data: { uid: 1, ... } }
+# ==============================================================
+POST {{host}}/api/admin/login
+Content-Type: application/json
+
+{
+  "usuario": "{{adminUser}}",
+  "password": "{{adminPass}}"
+}
+
+###
+
+# ==============================================================
+# PASO 2 — Llamada real a la IA
+# Esperado: 200 OK con bloques en español estilo Adán
+# Tarda 3-8 segundos
+# ==============================================================
+POST {{host}}/api/ai/sugerir-bloques
+Content-Type: application/json
+
+{
+  "presupuesto_id": {{presId}},
+  "modo": "generar_inicial",
+  "descripcion_inicial": "Buenas tardes, necesito una cotización para mi casa. Tengo una fuga de gas en la cocina, creo que es por la manguera del calentador que ya tiene años. También quiero que revise la llave de paso de la estufa porque me parece que no es la correcta para gas, es como una llave normal de agua. Mi calentador es marca Calorex y nunca le he dado mantenimiento, tiene 4 años. Vivo en Coyoacán."
+}
+
+###

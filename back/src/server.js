@@ -19,6 +19,7 @@ const clientesRouter = require('./modules/clientes/clientes.routes');
 const usuariosRouter = require('./modules/usuarios/usuarios.routes');
 const serviciosRouter = require('./modules/servicios/servicios.routes');
 const presupuestosRouter = require('./modules/presupuestos/presupuestos.routes');
+const aiRouter = require('./modules/ai/ai.routes');
 
 const app = express();
 const PORT = env.PORT;
@@ -62,6 +63,9 @@ app.use('/api/clientes', requireAuth, clientesRouter);
 
 // Presupuestos — autenticación interna del propio router
 app.use('/api/presupuestos', presupuestosRouter);
+
+// IA (Fase 3) — autenticación interna del propio router
+app.use('/api/ai', aiRouter);
 
 // Panel admin → sirve main.html (la SPA detecta /admin y muestra el panel)
 app.get('/admin', (_req, res) => {
