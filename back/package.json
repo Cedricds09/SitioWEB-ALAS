@@ -17,6 +17,7 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "packageManager": "pnpm@11.1.1",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
     "bcryptjs": "^2.4.3",
