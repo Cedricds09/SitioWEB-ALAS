@@ -185,7 +185,10 @@ function generarPresupuestoPdf(res, p) {
       doc.font('Helvetica').fontSize(10).fillColor(TEXT);
       arr.forEach((g) => {
         ensureSpace(13 * PT);
-        doc.text('✓  ' + String(g), M + 4 * PT, y, { width: W - M * 2 - 4 * PT });
+        // Issue 5: limpia caracteres extraños al inicio (', ", -, espacios)
+        // que aparecían como artefacto al renderizar la línea.
+        const textoLimpio = String(g).replace(/^['"\-\s]+/, '').trim();
+        doc.text('✓  ' + textoLimpio, M + 4 * PT, y, { width: W - M * 2 - 4 * PT });
         y = doc.y + 1 * PT;
       });
       y += 6 * PT;
@@ -222,11 +225,14 @@ function generarPresupuestoPdf(res, p) {
       let subSec = 0;
       for (const it of items) {
         ensureSpace(13 * PT);
-        const desc = String(it.descripcion || '') + (it.es_opcional ? '  (opcional)' : '');
+        // Issue 4: strict check (true|1) para evitar falsos positivos si BIT
+        // viene como string "0"/"1" del driver.
+        const esOpc = it && (it.es_opcional === true || it.es_opcional === 1);
+        const desc = String(it.descripcion || '') + (esOpc ? '  (opcional)' : '');
         const total = (Number(it.cantidad) || 0) * (Number(it.precio_unitario) || 0);
-        if (!it.es_opcional) subSec += total;
+        if (!esOpc) subSec += total;
 
-        const fontStyle = it.es_opcional ? 'Helvetica-Oblique' : 'Helvetica';
+        const fontStyle = esOpc ? 'Helvetica-Oblique' : 'Helvetica';
         doc.font(fontStyle);
         const descH = doc.heightOfString(desc, { width: W - M * 2 - 130 * PT });
         const rowH = Math.max(11 * PT, descH + 3 * PT);
@@ -281,10 +287,13 @@ function generarPresupuestoPdf(res, p) {
   // dentro de algún bloque seccion_items. Protección contractual: deja claro
   // que opcionales NO están incluidos en el TOTAL y requieren autorización
   // por escrito + costo adicional.
+  // Issue 4 (re-fix): comparación estricta para evitar falsos positivos si el
+  // driver mssql devuelve la columna BIT como string "0"/"1" o el JSON viene
+  // serializado con string boolean (todos truthy en JS, lo que disparaba el
+  // párrafo siempre). Aceptamos true literal o 1 numérico únicamente.
+  const _esOpcional = (v) => v === true || v === 1;
   const hayOpcionales = bloques.some(
-    (b) => b.tipo === 'seccion_items'
-      && Array.isArray(b.items)
-      && b.items.some((it) => it.es_opcional),
+    (b) => Array.isArray(b.items) && b.items.some((it) => it && _esOpcional(it.es_opcional)),
   );
   if (hayOpcionales) {
     ensureSpace(34 * PT);

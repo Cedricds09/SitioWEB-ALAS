@@ -1625,19 +1625,34 @@
         }
         if (aiSuggestPreview) aiSuggestPreview.innerHTML = html;
 
-        // Configurar botón Aplicar según modo
+        // Configurar botón Aplicar según modo.
+        // Issue 1: ocultar el botón completo si NO hay nada que aplicar.
+        // Ej. modo mejorar sin mejoras/items_nuevos (sólo notas_al_admin).
+        const hayPropuestas = mode === "generar_inicial"
+            ? bloques.length > 0
+            : (mejoras.length > 0 || itemsNuevos.length > 0);
+
         if (aiSuggestApply) {
-            if (mode === "generar_inicial") {
-                aiSuggestApply.textContent = "Aplicar bloques";
-                aiSuggestApply.disabled = bloques.length === 0;
+            if (!hayPropuestas) {
+                aiSuggestApply.hidden = true;
             } else {
-                aiSuggestApply.textContent = "Aplicar seleccionados";
-                // En mejorar/agregar inicia disabled — se habilita cuando hay al menos un check.
-                aiSuggestApply.disabled = true;
+                aiSuggestApply.hidden = false;
+                if (mode === "generar_inicial") {
+                    aiSuggestApply.textContent = "Aplicar bloques";
+                    aiSuggestApply.disabled = false;
+                } else {
+                    aiSuggestApply.textContent = "Aplicar seleccionados";
+                    // Inicia disabled — se habilita cuando hay al menos un check.
+                    aiSuggestApply.disabled = true;
+                }
             }
         }
 
         setAiState("result");
+
+        // setAiState pone aiSuggestApply.hidden = false si state=result; lo re-ocultamos
+        // si correspondía (Issue 1). Orden importa: este reset DESPUÉS de setAiState.
+        if (aiSuggestApply && !hayPropuestas) aiSuggestApply.hidden = true;
     }
 
     // POST /api/ai/sugerir-bloques con timeout 15s.
@@ -1651,10 +1666,22 @@
         openModal(aiSuggestBack);
         setAiState("loading");
 
-        // descripcion_inicial: dejamos que el backend resuelva el fallback a
-        // notas_internas. Si el modo es generar_inicial y notas_internas viene
-        // vacío, el backend responderá 400 (mapeado en mapAiErrorMsg).
         const body = { presupuesto_id: p.id, modo };
+
+        // Issue 3: en generar_inicial mandamos descripcion_inicial desde
+        // notas_internas si tiene contenido. El backend hace su propio fallback,
+        // pero mandarlo desde acá garantiza que la solicitud original del
+        // cliente llegue al modelo aunque venga con prefijo "[Solicitud del cliente]".
+        // Stripeamos el prefijo aquí también (mismo behavior que el backend).
+        if (modo === "generar_inicial") {
+            const SOLICITUD_PREFIX = "[Solicitud del cliente]\n";
+            const raw = (p.notas_internas || "").trim();
+            let desc = raw;
+            if (desc.startsWith(SOLICITUD_PREFIX)) {
+                desc = desc.slice(SOLICITUD_PREFIX.length).trim();
+            }
+            if (desc.length >= 10) body.descripcion_inicial = desc;
+        }
 
         // Timeout 15s via AbortController.
         const ctrl = new AbortController();

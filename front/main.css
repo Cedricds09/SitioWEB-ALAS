@@ -2659,6 +2659,9 @@ body.modal-open { overflow: hidden; }
     justify-content: flex-end;
 }
 .ai-suggest-foot .btn { min-width: 140px; }
+/* Lección 11: .btn tiene display:inline-block que vence al [hidden] del UA.
+   Force display:none cuando hidden=true (Issue 1: botón Aplicar cuando no hay propuestas). */
+.ai-suggest-foot .btn[hidden] { display: none; }
 
 /* Estados (loading / error / result) */
 .ai-suggest-state {
