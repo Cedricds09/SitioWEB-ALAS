@@ -1725,5 +1725,11 @@
 
     usuariosRefresh.addEventListener("click", loadUsuarios);
 
+    // Fase 4A: presupuestos.js dispara este evento tras convertir un presupuesto
+    // a servicio. Refresca la lista de servicios para que el nuevo aparezca.
+    document.addEventListener("alas:servicios-refresh", () => {
+        if (typeof listar === "function") listar("post-convertir-presupuesto");
+    });
+
     checkSession();
 })();

@@ -1068,13 +1068,13 @@
             buttons.push({ label: "Marcar aprobado", primary: true, action: () => ensureSavedThen("Marcar aprobado", () => cambiarEstado("aprobado")) });
             buttons.push({ label: "Marcar rechazado", danger: true, action: () => cambiarEstado("rechazado") });
         } else if (p.estado === "aprobado" && esResponsable) {
-            // Issue 42: la conversión real a servicio queda diferida a Fase 4.
-            // Por ahora el endpoint solo cambia estado a 'convertido'. Tooltip +
-            // confirm explícito para evitar confusión de expectativas.
+            // Fase 4A: conversión real implementada. Crea servicio + asigna técnico
+            // + linkea servicio_id al presupuesto + cambia estado a 'convertido',
+            // todo dentro de una transacción.
             buttons.push({
-                label: "Convertir a servicio (beta)",
+                label: "Convertir a servicio",
                 primary: true,
-                title: "Función en desarrollo — Fase 4. Hoy solo marca como convertido; no crea el servicio automáticamente.",
+                title: "Crea el servicio en estado PENDIENTE con los datos del presupuesto y lo asigna al técnico responsable.",
                 action: () => ensureSavedThen("Convertir a servicio", () => convertirAServicioConAviso()),
             });
         }
@@ -1098,11 +1098,13 @@
         });
     }
 
-    // Issue 42: wrapper de convertirAServicio con confirm explicativo.
+    // Fase 4A: confirm explicativo antes de convertir. La operación es
+    // irreversible (no hay UI para "des-convertir") y crea trabajo facturable.
     async function convertirAServicioConAviso() {
         const ok = window.confirm(
-            "Esta función aún no crea el servicio automáticamente. Solo marcará el " +
-            "presupuesto como convertido (Fase 4 hará la generación real). ¿Continuar?"
+            "Esto creará un servicio nuevo en estado PENDIENTE con los datos del " +
+            "presupuesto y lo asignará al técnico responsable. El presupuesto " +
+            "quedará en estado 'convertido' (no editable). ¿Continuar?"
         );
         if (!ok) return;
         return convertirAServicio();
@@ -1342,9 +1344,18 @@
         if (!p.id) return;
         try {
             const body = await api("/api/presupuestos/" + p.id + "/convertir", { method: "POST" });
-            toast(body.mensaje || "Convertido.", "success");
-            state.currentPres.estado = "convertido";
-            renderEditor();
+            // Backend devuelve { ok, data: { servicio_id, numero_cliente, tecnico_asignado, mensaje } }
+            const data = body.data || {};
+            const msg = data.mensaje
+                || (data.numero_cliente
+                    ? `✅ Servicio ${data.numero_cliente} creado y asignado a ${data.tecnico_asignado || '—'}.`
+                    : "Convertido.");
+            toast(msg, "success");
+            // Pedir al dashboard de servicios que refresque la lista — sigue
+            // el patrón existente alas:session-ready (CustomEvent en document).
+            document.dispatchEvent(new CustomEvent("alas:servicios-refresh"));
+            // Cerrar editor (presupuesto convertido ya no es editable).
+            closeModal(presEditorBack);
             loadList();
         } catch (err) {
             toast("Error: " + err.message, "error");

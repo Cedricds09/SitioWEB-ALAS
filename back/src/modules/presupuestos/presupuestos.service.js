@@ -2,6 +2,8 @@
 // Sin SQL crudo, sin Express. Llama al repository y lanza errores tipados.
 
 const repo = require('./presupuestos.repository');
+const serviciosRepo = require('../servicios/servicios.repository');
+const usuariosRepo = require('../usuarios/usuarios.repository');
 const { withTransaction } = require('../../shared/db/transaction');
 const {
   NotFoundError,
@@ -531,31 +533,157 @@ async function reasignar(id, asignadoA, sesion) {
   return result;
 }
 
+// ============================================================
+// Construye el resumen breve (texto plano, sin markdown) que va al campo
+// `conceptos` del servicio. Diseñado para que el técnico vea de un vistazo
+// qué trabajo viene del presupuesto, sin que el servicio se infle con todo
+// el texto narrativo.
+//
+// Formato:
+//   Línea 1: "{Tipo} — {Cliente}"  (omite "{Tipo} —" si tipo_servicio es null)
+//   Líneas 2..N: títulos de bloques. Para seccion_items: "{titulo}: it1, it2, it3 y N más"
+//   Última línea: "Total: ${total}"
+//
+// Reglas:
+//   - Bloques tipo `garantias`: se omiten (no relevantes para la ejecución).
+//   - Bloques sin título (intro de texto, viñetas sin header): se omiten.
+//   - Items por seccion_items: máximo 3 visibles, resto resumido como "y N más".
+//   - Items con es_opcional=true marcados con " (opcional)".
+//   - Máximo 10 líneas totales (header + 8 body + total).
+// ============================================================
+const TIPO_SERVICIO_LABEL = {
+  plomeria: 'Plomería',
+  electrica: 'Eléctrica',
+  gas: 'Gas',
+  pintura: 'Pintura',
+  soldadura: 'Soldadura',
+  mantenimiento_integral: 'Mantenimiento integral',
+};
+
+function _buildConceptosDeBloques(p) {
+  const cliente = (p.cliente_nombre || '').trim();
+  const tipoLabel = p.tipo_servicio
+    ? (TIPO_SERVICIO_LABEL[p.tipo_servicio] || p.tipo_servicio)
+    : null;
+  const header = tipoLabel ? `${tipoLabel} — ${cliente}` : cliente;
+
+  const bodyLines = [];
+  for (const b of (p.bloques || [])) {
+    if (b.tipo === TIPO_BLOQUE.GARANTIAS) continue;
+    if (!b.titulo) continue;
+
+    if (b.tipo === TIPO_BLOQUE.SECCION_ITEMS) {
+      const items = Array.isArray(b.items) ? b.items : [];
+      const top3 = items.slice(0, 3).map((it) => {
+        const opc = it.es_opcional ? ' (opcional)' : '';
+        const desc = (it.descripcion || '').trim();
+        const descCorta = desc.length > 60 ? desc.slice(0, 57) + '...' : desc;
+        return `${descCorta}${opc}`;
+      });
+      const more = items.length > 3 ? ` y ${items.length - 3} más` : '';
+      bodyLines.push(`${b.titulo}: ${top3.join(', ')}${more}`);
+    } else {
+      bodyLines.push(b.titulo);
+    }
+  }
+
+  const MAX_BODY = 8;
+  if (bodyLines.length > MAX_BODY) bodyLines.length = MAX_BODY;
+
+  const totalNum = Number(p.total_general) || 0;
+  const totalStr = `$${totalNum.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  return [header, ...bodyLines, `Total: ${totalStr}`].join('\n');
+}
+
 async function convertirAServicio(id, sesion) {
-  const p = await repo.buscarPorIdPlano(id);
-  if (!p || !p.activo) throw new NotFoundError('Presupuesto no encontrado.');
-  _validarPropiedad(p, sesion);
+  // Fase 4A: conversión real a servicio.
+  // Permisos: admin convierte cualquier presupuesto aprobado.
+  // Técnico convierte SOLO si es el responsable asignado (asignado_a === uid).
+  // (Consistente con el resto del módulo presupuestos: el técnico asignado
+  // tiene autonomía sobre todo el ciclo de vida de su presupuesto.)
+  return await withTransaction(async (tx) => {
+    // 1) Cargar presupuesto completo (con bloques + items) y validar.
+    const p = await repo.buscarPorIdCompleto(id, tx);
+    if (!p) throw new NotFoundError('Presupuesto no encontrado.');
 
-  if (p.estado !== ESTADO_PRESUPUESTO.APROBADO) {
-    throw new ConflictError(
-      `Solo se puede convertir un presupuesto en estado aprobado (actual: ${p.estado}).`,
-    );
-  }
-  // Issue 36v2: admin O técnico responsable puede convertir.
-  const esResponsable = sesion.rol === ROL.ADMIN
-    || (sesion.rol === ROL.TECNICO && Number(p.asignado_a) === Number(sesion.uid));
-  if (!esResponsable) {
-    throw new ForbiddenError('Convertir a servicio requiere ser admin o el técnico asignado.');
-  }
+    // 2) Permisos: admin OR técnico asignado.
+    if (sesion.rol !== ROL.ADMIN) {
+      if (Number(p.asignado_a) !== Number(sesion.uid)) {
+        throw new ForbiddenError(
+          'Solo el técnico asignado o un admin puede convertir este presupuesto.',
+        );
+      }
+    }
 
-  await repo.cambiarEstado(id, ESTADO_PRESUPUESTO.CONVERTIDO);
-  console.log('[PRES] convertido id=', id, '(generación de servicio pendiente Fase 4)');
+    // 3) Idempotencia: si ya fue convertido, devolver 409 con info útil.
+    if (p.servicio_id != null) {
+      let existingCl = '(desconocido)';
+      try {
+        const existing = await serviciosRepo.buscarPorId(p.servicio_id, {}, tx);
+        if (existing && existing.numero_cliente) existingCl = existing.numero_cliente;
+      } catch { /* noop */ }
+      throw new ConflictError(`Este presupuesto ya fue convertido. Servicio: ${existingCl}.`);
+    }
 
-  return {
-    ok: true,
-    mensaje: 'Conversión registrada. Generación del servicio completo pendiente para Fase 4.',
-    presupuesto_id: id,
-  };
+    // 4) Validar estado.
+    if (p.estado !== ESTADO_PRESUPUESTO.APROBADO) {
+      throw new ConflictError(
+        `Solo se puede convertir un presupuesto en estado aprobado (actual: ${p.estado}).`,
+      );
+    }
+
+    // 5) Construir resumen breve para el campo `conceptos` del servicio.
+    const conceptos = _buildConceptosDeBloques(p);
+
+    // 6) Resolver técnico. Heredar del presupuesto si asignado_a tiene valor;
+    // si no, autoasignar (mismo patrón que servicios.crear).
+    let tecnicoUsuario = null;
+    if (p.asignado_a != null) {
+      const u = await usuariosRepo.buscarPorId(p.asignado_a, tx);
+      tecnicoUsuario = (u && u.usuario) || null;
+    }
+    if (!tecnicoUsuario) {
+      tecnicoUsuario = await serviciosRepo.asignarTecnicoAuto(tx);
+    }
+
+    // 7) Resolver numero_cliente. Heredar del presupuesto si ya tiene;
+    // si no, generar el siguiente CL-XXXX (mismo consecutivo que servicios).
+    let numeroCliente = p.numero_cliente;
+    if (!numeroCliente) {
+      numeroCliente = await serviciosRepo.nextNumeroCliente(tx);
+    }
+
+    // 8) INSERT en servicios.
+    const servicio = await serviciosRepo.crearServicio({
+      numero_cliente: numeroCliente,
+      nombre_cliente: p.cliente_nombre,
+      telefono: p.cliente_telefono ?? null,
+      direccion: p.cliente_direccion ?? null,
+      lat: null,
+      lng: null,
+      conceptos,
+      tipo_servicio: p.tipo_servicio ?? null,
+      total: Number(p.total_general) || 0,
+      tecnico_asignado: tecnicoUsuario,
+    }, tx);
+
+    // 9) UPDATE presupuesto: link al servicio + estado convertido.
+    await repo.actualizarHeader(id, { servicio_id: servicio.id }, tx);
+    await repo.cambiarEstado(id, ESTADO_PRESUPUESTO.CONVERTIDO, tx);
+
+    console.log(`[PRES] convertido id=${id} → servicio.id=${servicio.id} (${numeroCliente}) tecnico=${tecnicoUsuario}`);
+
+    return {
+      ok: true,
+      data: {
+        servicio_id: servicio.id,
+        numero_cliente: numeroCliente,
+        tecnico_asignado: tecnicoUsuario,
+        mensaje: `Presupuesto convertido. Servicio ${numeroCliente} creado y asignado a ${tecnicoUsuario}.`,
+      },
+    };
+  });
 }
 
 // ============================================================
