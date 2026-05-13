@@ -8,7 +8,9 @@ const { AppError } = require('../errors/AppError');
 function errorMiddleware(err, req, res, next) {
   if (err instanceof AppError) {
     if (!res.headersSent) {
-      res.status(err.statusCode).json({ ok: false, error: err.message });
+      const body = { ok: false, error: err.message, code: err.code };
+      if (err.details) body.details = err.details;
+      res.status(err.statusCode).json(body);
     }
     return;
   }

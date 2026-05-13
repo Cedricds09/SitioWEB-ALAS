@@ -75,14 +75,25 @@ const bloqueSchema = z.discriminatedUnion('tipo', [
 // MEJORAS / ITEMS_NUEVOS sub-schemas
 // ============================================================
 
+// Tolerante a string→number: Claude a veces devuelve IDs como strings
+// ("12" en vez de 12) o con prefijo no numérico ("item_12"). Lo coercionamos
+// agresivamente y validamos el resultado como entero positivo.
+const idTolerantSchema = z.union([z.number(), z.string()])
+  .transform((v) => {
+    if (typeof v === 'number') return v;
+    const m = String(v).match(/\d+/);
+    return m ? parseInt(m[0], 10) : NaN;
+  })
+  .pipe(z.number().int().positive());
+
 const mejoraSchema = z.object({
-  item_id: z.number().int().positive(),
+  item_id: idTolerantSchema,
   descripcion_original: z.string(),
   descripcion_mejorada: z.string().min(3).max(500)
 });
 
 const itemNuevoSchema = z.object({
-  bloque_id_destino: z.number().int().positive(),
+  bloque_id_destino: idTolerantSchema,
   descripcion: z.string().min(3).max(500),
   cantidad: z.null(),
   precio_unitario: z.null(),

@@ -2405,6 +2405,9 @@ body.modal-open { overflow: hidden; }
     color: var(--color-silver-1);
     align-self: start;
 }
+/* Bug B fix — lección #11: display:inline-flex vencía a [hidden] del UA,
+   el tag morado se veía aunque hidden=true. Force display:none cuando hidden. */
+.pres-cliente-tag[hidden] { display: none; }
 .pres-cliente-tag button {
     background: transparent;
     border: none;
@@ -2558,3 +2561,259 @@ body.modal-open { overflow: hidden; }
     .pres-editor-section-title { font-size: 0.75rem; }
 }
 
+/* =====================================================
+   FASE 3 — UI del módulo IA
+   ===================================================== */
+
+/* Contenedor de acciones bajo lista de bloques: "+ Agregar" + "✨ Generar con IA" */
+.pres-bloques-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-top: 0.8rem;
+    align-items: center;
+}
+.pres-bloques-actions[hidden] { display: none; }
+.pres-ai-suggest-btn[hidden] { display: none; }
+
+/* Modal selector de modo (cuando ya hay bloques) */
+.ai-modo-options {
+    display: grid;
+    gap: 0.6rem;
+    margin: 0.8rem 0 1rem;
+}
+.ai-modo-option {
+    display: block;
+    cursor: pointer;
+}
+.ai-modo-option input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+.ai-modo-card {
+    display: block;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-bg-card);
+    transition: border-color 0.15s, background 0.15s;
+}
+.ai-modo-card strong {
+    display: block;
+    color: var(--color-silver-1);
+    font-size: 0.95rem;
+    margin-bottom: 0.25rem;
+}
+.ai-modo-card small {
+    display: block;
+    color: var(--color-silver-3);
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+.ai-modo-option:hover .ai-modo-card {
+    border-color: rgba(106, 60, 255, 0.5);
+}
+.ai-modo-option input:checked + .ai-modo-card {
+    border-color: var(--color-purple);
+    background: var(--color-purple-soft);
+}
+
+/* Modal IA — estructura head/body/foot con scroll interno (Bug 5 fix) */
+.ai-suggest-modal {
+    display: flex;
+    flex-direction: column;
+    height: 96vh;
+    max-height: 96vh;
+    overflow: hidden;
+    padding: 0;
+}
+.ai-suggest-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.1rem 1.4rem;
+    border-bottom: 1px solid var(--color-border);
+    background: rgba(8, 18, 50, 0.6);
+    flex-shrink: 0;
+}
+.ai-suggest-head h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--color-silver-1);
+}
+.ai-suggest-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 1.2rem 1.4rem;
+}
+.ai-suggest-foot {
+    display: flex;
+    gap: 0.6rem;
+    padding: 1rem 1.4rem;
+    border-top: 1px solid var(--color-border);
+    background: rgba(8, 18, 50, 0.6);
+    flex-shrink: 0;
+    justify-content: flex-end;
+}
+.ai-suggest-foot .btn { min-width: 140px; }
+
+/* Estados (loading / error / result) */
+.ai-suggest-state {
+    padding: 1rem 0;
+}
+.ai-suggest-state[hidden] { display: none; }
+
+/* Spinner CSS puro */
+.ai-spinner {
+    width: 48px;
+    height: 48px;
+    margin: 1rem auto;
+    border: 3px solid rgba(140, 150, 190, 0.2);
+    border-top-color: var(--color-purple);
+    border-radius: 50%;
+    animation: ai-spinner-spin 0.8s linear infinite;
+}
+@keyframes ai-spinner-spin {
+    to { transform: rotate(360deg); }
+}
+.ai-suggest-loading-text {
+    text-align: center;
+    color: var(--color-silver-2);
+    font-size: 0.95rem;
+}
+.ai-suggest-loading-text small {
+    display: block;
+    color: var(--color-silver-3);
+    font-size: 0.8rem;
+    margin-top: 0.3rem;
+}
+
+.ai-suggest-error-msg {
+    color: #f87171;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: var(--radius);
+    padding: 1rem;
+    text-align: center;
+    font-size: 0.95rem;
+}
+
+.ai-suggest-meta {
+    color: var(--color-silver-2);
+    font-size: 0.9rem;
+    margin-bottom: 0.8rem;
+}
+.ai-suggest-meta strong {
+    color: var(--color-silver-1);
+}
+
+/* Recuadro azul info para notas_al_admin (per spec del usuario) */
+.ai-suggest-nota-admin {
+    background: rgba(59, 130, 246, 0.10);
+    border-left: 3px solid #93c5fd;
+    color: #93c5fd;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    margin-bottom: 1rem;
+}
+.ai-suggest-nota-admin[hidden] { display: none; }
+.ai-suggest-nota-admin strong {
+    color: #c5d9f5;
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+/* Preview de bloques propuestos por la IA (read-only) */
+.ai-suggest-preview {
+    display: grid;
+    gap: 0.75rem;
+}
+.ai-preview-bloque {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 0.85rem 1rem;
+    background: var(--color-bg-card);
+}
+.ai-preview-bloque-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+.ai-preview-tipo-badge {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.15rem 0.5rem;
+    border-radius: 6px;
+    background: var(--color-purple-soft);
+    color: #c5b4ff;
+    font-weight: 600;
+}
+.ai-preview-titulo {
+    color: var(--color-silver-1);
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+.ai-preview-body {
+    color: var(--color-silver-2);
+    font-size: 0.88rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+.ai-preview-items {
+    display: grid;
+    gap: 0.3rem;
+    margin-top: 0.4rem;
+}
+.ai-preview-item {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--color-silver-2);
+}
+.ai-preview-item-opt {
+    font-size: 0.7rem;
+    color: var(--color-silver-3);
+    background: rgba(140, 150, 190, 0.1);
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.ai-preview-vinetas {
+    margin: 0.3rem 0 0;
+    padding-left: 1.25rem;
+    color: var(--color-silver-2);
+    font-size: 0.88rem;
+}
+.ai-preview-vinetas li {
+    margin-bottom: 0.2rem;
+}
+
+/* Bloques seleccionables (modo mejorar/agregar) — label clickeable con check */
+.ai-preview-selectable {
+    cursor: pointer;
+    display: block;
+    transition: border-color 0.15s, background 0.15s;
+}
+.ai-preview-selectable:hover {
+    border-color: rgba(106, 60, 255, 0.5);
+}
+.ai-preview-selectable:has(.ai-preview-check:checked) {
+    border-color: var(--color-purple);
+    background: var(--color-purple-soft);
+}
+.ai-preview-check {
+    accent-color: var(--color-purple);
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    margin-right: 0.2rem;
+}

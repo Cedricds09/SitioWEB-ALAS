@@ -87,7 +87,7 @@ function _resolverDescripcion(bodyDesc, pres) {
 function _serializarBloquesExistentes(pres) {
   return (pres.bloques || []).map((b) => {
     const base = {
-      bloque_id: b.id,
+      bloque_id: Number(b.id),
       tipo: b.tipo,
       titulo: b.titulo || null,
     };
@@ -111,7 +111,7 @@ function _serializarBloquesExistentes(pres) {
     }
     if (b.tipo === 'seccion_items') {
       base.items = (b.items || []).map((it) => ({
-        item_id: it.id,
+        item_id: Number(it.id),
         descripcion: it.descripcion,
         cantidad: it.cantidad != null ? Number(it.cantidad) : null,
         precio_unitario: it.precio_unitario != null ? Number(it.precio_unitario) : null,
@@ -296,6 +296,38 @@ async function sugerirBloques(input, sesion) {
     throw new AppError('La IA devolvió contenido no parseable.', 500, 'AI_INVALID_JSON');
   }
 
+  // 7a) Pre-sanitización: Claude a veces inventa mejoras sin item_id o
+  // items_nuevos sin bloque_id_destino (vio observado: 5 de 7 mejoras con
+  // item_id null/undefined). Las descartamos silenciosamente antes de validar
+  // — son propuestas que no se pueden aplicar al no referenciar nada real.
+  function _hasValidId(v) {
+    if (v == null) return false;
+    if (typeof v === 'number') return Number.isInteger(v) && v > 0;
+    if (typeof v === 'string') {
+      const m = v.match(/\d+/);
+      if (!m) return false;
+      const n = parseInt(m[0], 10);
+      return Number.isInteger(n) && n > 0;
+    }
+    return false;
+  }
+  if (raw && Array.isArray(raw.mejoras)) {
+    const before = raw.mejoras.length;
+    raw.mejoras = raw.mejoras.filter((m) => m && _hasValidId(m.item_id));
+    const dropped = before - raw.mejoras.length;
+    if (dropped > 0) {
+      console.warn(`[AI][SANITIZE] pres=${presupuesto_id} descartadas ${dropped}/${before} mejoras sin item_id válido`);
+    }
+  }
+  if (raw && Array.isArray(raw.items_nuevos)) {
+    const before = raw.items_nuevos.length;
+    raw.items_nuevos = raw.items_nuevos.filter((it) => it && _hasValidId(it.bloque_id_destino));
+    const dropped = before - raw.items_nuevos.length;
+    if (dropped > 0) {
+      console.warn(`[AI][SANITIZE] pres=${presupuesto_id} descartados ${dropped}/${before} items_nuevos sin bloque_id_destino válido`);
+    }
+  }
+
   // 7) Validar con Zod del archivo provisto (defense layer #2).
   const validation = validateAiResponse(raw);
   if (!validation.ok) {
@@ -310,7 +342,14 @@ async function sugerirBloques(input, sesion) {
       errorMsg: 'schema_validation_error',
     });
     trackingDone = true;
-    throw new AppError('La IA devolvió un formato inválido.', 500, 'AI_INVALID_SCHEMA');
+    // Exponemos los paths al cliente (no contienen PII, solo nombres de campo)
+    // para diagnóstico desde el frontend sin requerir acceso a logs del server.
+    throw new AppError(
+      'La IA devolvió un formato inválido.',
+      500,
+      'AI_INVALID_SCHEMA',
+      { failedPaths },
+    );
   }
 
   // 8) Coherencia: el modo retornado debe coincidir con el solicitado.

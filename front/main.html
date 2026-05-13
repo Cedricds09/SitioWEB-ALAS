@@ -897,7 +897,10 @@
                 <main class="pres-editor-bloques">
                     <h4 class="pres-editor-section-title">Bloques del presupuesto</h4>
                     <div id="presBloquesList" class="pres-bloques-list"></div>
-                    <button type="button" class="btn btn-ghost pres-add-bloque-btn" id="presAddBloqueBtn">+ Agregar bloque</button>
+                    <div class="pres-bloques-actions">
+                        <button type="button" class="btn btn-ghost pres-add-bloque-btn" id="presAddBloqueBtn">+ Agregar bloque</button>
+                        <button type="button" class="btn btn-primary pres-ai-suggest-btn" id="aiSuggestBtn" hidden>✨ Generar con IA</button>
+                    </div>
                 </main>
             </div>
             <footer class="pres-editor-foot">
@@ -946,6 +949,79 @@
             <div class="modal-actions">
                 <button type="button" class="btn btn-ghost" id="presTipoBlCancel">Cancelar</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal selector de modo IA (cuando ya hay bloques) -->
+    <div id="aiModoBack" class="modal-back" role="dialog" aria-modal="true" aria-labelledby="aiModoTitle">
+        <div class="modal">
+            <h3 id="aiModoTitle">✨ ¿Cómo quieres usar la IA?</h3>
+            <p class="section-text" style="margin-bottom:1rem;">
+                Este presupuesto ya tiene bloques. Elige cómo quieres que la IA intervenga.
+            </p>
+
+            <div class="ai-modo-options">
+                <label class="ai-modo-option">
+                    <input type="radio" name="ai-modo-choice" value="mejorar" />
+                    <div class="ai-modo-card">
+                        <strong>Mejorar descripciones existentes</strong>
+                        <small>La IA propone redacciones más claras de los items que ya escribiste y sugiere items nuevos opcionales. Precios y cantidades NO se tocan.</small>
+                    </div>
+                </label>
+                <label class="ai-modo-option">
+                    <input type="radio" name="ai-modo-choice" value="agregar" />
+                    <div class="ai-modo-card">
+                        <strong>Solo agregar items nuevos al final</strong>
+                        <small>Sin tocar nada de lo que ya escribiste. Los items propuestos son opcionales y los apruebas tú.</small>
+                    </div>
+                </label>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn btn-ghost" id="aiModoCancel">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="aiModoContinue" disabled>Continuar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal sugerencia IA (Fase 3) -->
+    <div id="aiSuggestBack" class="modal-back" role="dialog" aria-modal="true" aria-labelledby="aiSuggestTitle">
+        <div class="modal modal-fullscreen ai-suggest-modal">
+            <header class="ai-suggest-head">
+                <h3 id="aiSuggestTitle">✨ Sugerencias de IA — revisa antes de aplicar</h3>
+                <button type="button" class="btn-icon" id="aiSuggestCloseX" aria-label="Cerrar">✕</button>
+            </header>
+
+            <div class="ai-suggest-body">
+                <!-- Estado: cargando -->
+                <div id="aiSuggestLoading" class="ai-suggest-state" hidden>
+                    <div class="ai-spinner" aria-hidden="true"></div>
+                    <p class="ai-suggest-loading-text">
+                        Generando sugerencia con IA…
+                        <small>Tarda entre 3 y 10 segundos. No cierres esta ventana.</small>
+                    </p>
+                </div>
+
+                <!-- Estado: error -->
+                <div id="aiSuggestError" class="ai-suggest-state" hidden>
+                    <p class="ai-suggest-error-msg" role="alert"></p>
+                </div>
+
+                <!-- Estado: resultado -->
+                <div id="aiSuggestResult" class="ai-suggest-state" hidden>
+                    <p class="section-text ai-suggest-meta">
+                        <strong>Tipo detectado:</strong> <span id="aiSuggestTipoServ">—</span> ·
+                        <strong>Propuestas:</strong> <span id="aiSuggestCount">0</span>
+                    </p>
+                    <div id="aiSuggestNotaAdmin" class="ai-suggest-nota-admin" hidden></div>
+                    <div id="aiSuggestPreview" class="ai-suggest-preview"></div>
+                </div>
+            </div>
+
+            <footer class="ai-suggest-foot">
+                <button type="button" class="btn btn-ghost" id="aiSuggestClose">Cerrar</button>
+                <button type="button" class="btn btn-primary" id="aiSuggestApply" hidden>Aplicar</button>
+            </footer>
         </div>
     </div>
 

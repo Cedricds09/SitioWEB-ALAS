@@ -76,7 +76,15 @@
         isDirty: false,          // hay cambios sin guardar en el editor
     };
 
-    function markDirty() { state.isDirty = true; }
+    // Bug 4: bandera que bloquea markDirty durante el render del editor.
+    // Algunos browsers pueden disparar input/change al popular campos
+    // programáticamente o por restauración de autofill. Sin esta guarda, el
+    // banner "cambios sin guardar" aparecía sin que el usuario tocara nada.
+    let _renderingEditor = false;
+    function markDirty() {
+        if (_renderingEditor) return;
+        state.isDirty = true;
+    }
     function clearDirty() { state.isDirty = false; }
     function confirmDiscardIfDirty() {
         if (!state.isDirty) return true;
@@ -169,6 +177,25 @@
     // Tipo bloque selector
     const presTipoBlBack = $("presTipoBlBack");
     const presTipoBlCancel = $("presTipoBlCancel");
+
+    // ===== Fase 3 — IA =====
+    const aiSuggestBtn = $("aiSuggestBtn");
+    // Modal selector de modo (cuando ya hay bloques)
+    const aiModoBack = $("aiModoBack");
+    const aiModoCancel = $("aiModoCancel");
+    const aiModoContinue = $("aiModoContinue");
+    // Modal preview de sugerencia
+    const aiSuggestBack = $("aiSuggestBack");
+    const aiSuggestLoading = $("aiSuggestLoading");
+    const aiSuggestError = $("aiSuggestError");
+    const aiSuggestResult = $("aiSuggestResult");
+    const aiSuggestTipoServ = $("aiSuggestTipoServ");
+    const aiSuggestCount = $("aiSuggestCount");
+    const aiSuggestNotaAdmin = $("aiSuggestNotaAdmin");
+    const aiSuggestPreview = $("aiSuggestPreview");
+    const aiSuggestClose = $("aiSuggestClose");
+    const aiSuggestCloseX = $("aiSuggestCloseX");
+    const aiSuggestApply = $("aiSuggestApply");
 
     // Si los elementos no existen, salir silenciosamente.
     if (!presSection) return;
@@ -366,6 +393,13 @@
         }
         renderEditor();
         openModal(presEditorBack);
+        // Bug 6: el editor a veces abría con scroll al fondo cuando el contenido
+        // anterior estaba scrolleado o por restauración del browser. Reset explícito.
+        if (presEditorBack) {
+            presEditorBack.scrollTop = 0;
+            const inner = presEditorBack.querySelector(".modal, .modal-fullscreen");
+            if (inner) inner.scrollTop = 0;
+        }
     }
 
     function normalizarBloqueDesdeBackend(b) {
@@ -473,7 +507,23 @@
         return sameUser && p.estado === "borrador";
     }
 
+    // Reglas para mostrar el botón "✨ Generar con IA" — coinciden con las
+    // validaciones del backend (ai.service.js):
+    //   - presupuesto debe existir (id != null)
+    //   - estado IN (solicitud, borrador)
+    //   - admin O técnico asignado (NO admin override aquí: backend devolvería 409
+    //     si estado no es solicitud/borrador, así que ni siquiera mostramos botón)
+    function canUseAi(p) {
+        if (!state.sesion || !p || p.id == null) return false;
+        if (p.estado !== "solicitud" && p.estado !== "borrador") return false;
+        if (state.sesion.rol === "admin") return true;
+        return Number(p.asignado_a) === Number(state.sesion.uid);
+    }
+
     function renderEditor() {
+        // Bug 4: bandera para que markDirty NO se active por eventos que dispare
+        // el browser al popular inputs programáticamente durante este render.
+        _renderingEditor = true;
         const p = state.currentPres;
         const editable = isEditable(p);
 
@@ -517,6 +567,8 @@
         ];
         inputs.forEach((el) => { el.disabled = !editable; });
         presAddBloqueBtn.hidden = !editable;
+        // Botón IA: visible solo si admin/asignado + estado solicitud/borrador.
+        if (aiSuggestBtn) aiSuggestBtn.hidden = !canUseAi(p);
 
         // Dropdown de reasignación (solo admin)
         renderAsignadoDropdown(p);
@@ -530,6 +582,10 @@
 
         renderBloques();
         renderFooter(editable);
+
+        // Bug 4: libera la guarda tras un tick. Cualquier evento síncrono que
+        // dispare el browser (autofill, restauración) ya pasó y NO marcó dirty.
+        setTimeout(() => { _renderingEditor = false; }, 0);
     }
 
     function bindMapsAutocompleteOnDireccion() {
@@ -629,17 +685,19 @@
         const p = state.currentPres;
         if (!p) return;
         p.numero_cliente = sel.numero_cliente;
-        // Auto-llenar campos vacíos. Si admin ya escribió algo, se respeta.
-        if (!presClienteNombre.value || presClienteNombre.value.trim() === "") {
-            presClienteNombre.value = sel.nombre || "";
-            p.cliente_nombre = sel.nombre || "";
+        // Click explícito en autocomplete = intent claro de usar ESE cliente.
+        // Sobreescribimos los campos sin importar si tenían contenido previo.
+        // (Antes había guards "if empty" pero rompían UX cuando admin cambiaba
+        // de cliente en un presupuesto ya con datos.)
+        if (sel.nombre) {
+            presClienteNombre.value = sel.nombre;
+            p.cliente_nombre = sel.nombre;
         }
-        if (!presClienteTelefono.value || presClienteTelefono.value.trim() === "") {
-            presClienteTelefono.value = sel.telefono || "";
-            p.cliente_telefono = sel.telefono || "";
+        if (sel.telefono) {
+            presClienteTelefono.value = sel.telefono;
+            p.cliente_telefono = sel.telefono;
         }
-        // Issue 40: autollenar dirección si llega del backend y el campo está vacío.
-        if (sel.direccion && (!presClienteDireccion.value || presClienteDireccion.value.trim() === "")) {
+        if (sel.direccion) {
             presClienteDireccion.value = sel.direccion;
             p.cliente_direccion = sel.direccion;
         }
@@ -681,13 +739,24 @@
         presAsignadoSelect.innerHTML = opciones.join("");
         presAsignadoSelect.value = p.asignado_a != null ? String(p.asignado_a) : "";
 
-        // En modo nuevo (sin id), no se puede reasignar todavía: deshabilitar.
-        presAsignadoSelect.disabled = p.id == null;
+        // Bug 2: antes el dropdown se deshabilitaba para presupuestos nuevos
+        // (p.id == null) porque /reasignar requiere id. Ahora permitimos
+        // selección: guardamos la elección localmente en state.currentPres.asignado_a
+        // y al primer guardado (POST) hacemos /reasignar inmediato.
+        presAsignadoSelect.disabled = false;
 
         presAsignadoSelect.onchange = async () => {
-            if (p.id == null) return;
             const v = presAsignadoSelect.value;
             const newId = v === "" ? null : parseInt(v, 10);
+
+            // Modo nuevo: solo guardar localmente, sin llamada al backend.
+            if (p.id == null) {
+                state.currentPres.asignado_a = newId;
+                state.currentPres._asignadoPendiente = true; // bandera para post-save
+                return;
+            }
+
+            // Modo existente: llamada inmediata a /reasignar.
             try {
                 const body = await api(`/api/presupuestos/${p.id}/reasignar`, {
                     method: "POST",
@@ -1108,6 +1177,21 @@
                     body: JSON.stringify(payload),
                 });
                 toast("Presupuesto creado.", "success");
+
+                // Bug 2: si admin eligió técnico mientras estaba en modo nuevo,
+                // ahora que ya hay id real, persistir esa asignación.
+                if (p._asignadoPendiente && p.asignado_a != null && body.data && body.data.id) {
+                    try {
+                        const r2 = await api(`/api/presupuestos/${body.data.id}/reasignar`, {
+                            method: "POST",
+                            body: JSON.stringify({ asignado_a: p.asignado_a }),
+                        });
+                        body.data.asignado_a = r2.data.asignado_a;
+                        body.data.asignado_a_nombre = r2.data.asignado_a_nombre || null;
+                    } catch (errR) {
+                        toast("Creado, pero falló asignar técnico: " + errR.message, "error");
+                    }
+                }
             } else {
                 body = await api("/api/presupuestos/" + p.id, {
                     method: "PUT",
@@ -1373,5 +1457,472 @@
         state.currentPres.bloques.push(nuevo);
         renderBloques();
         recalcLocal();
+    }
+
+    /* =====================================================
+       FASE 3 — Generador de bloques con IA (Feature B + C)
+       ===================================================== */
+
+    const TIPO_LABEL_AI = {
+        texto: "Cuerpo",
+        lista_vinetas: "Lista",
+        garantias: "Garantías",
+        apartado_cerrado: "Apartado cerrado",
+        seccion_items: "Sección con items",
+    };
+
+    // Datos de la última sugerencia (para aplicar después de revisar).
+    let _aiLast = { mode: null, data: null };
+
+    // --- Estado del modal preview (loading | error | result) ---
+    function setAiState(name) {
+        if (aiSuggestLoading) aiSuggestLoading.hidden = name !== "loading";
+        if (aiSuggestError)   aiSuggestError.hidden   = name !== "error";
+        if (aiSuggestResult)  aiSuggestResult.hidden  = name !== "result";
+        // Apply button visible solo en estado "result".
+        if (aiSuggestApply)   aiSuggestApply.hidden   = name !== "result";
+    }
+
+    function showAiError(msg) {
+        if (!aiSuggestError) return;
+        const el = aiSuggestError.querySelector(".ai-suggest-error-msg");
+        if (el) el.textContent = msg;
+        setAiState("error");
+    }
+
+    function closeAiPreview() {
+        closeModal(aiSuggestBack);
+        setAiState(null);
+        _aiLast = { mode: null, data: null };
+        if (aiSuggestApply) {
+            aiSuggestApply.disabled = false;
+            aiSuggestApply.textContent = "Aplicar";
+        }
+    }
+
+    // Tabla de mensajes por status/code (per spec).
+    function mapAiErrorMsg(status, code) {
+        if (status === 400) return "Falta descripción inicial. Escríbela en \"Notas internas\" y vuelve a intentar.";
+        if (status === 403) return "No tienes permiso para usar IA en este presupuesto.";
+        if (status === 404) return "Presupuesto no encontrado o sin acceso.";
+        if (status === 409) return "Este presupuesto no puede editarse en su estado actual.";
+        if (status === 429 && code === "AI_USER_RATE_LIMIT") return "Has alcanzado tu límite por hora de uso de IA. Intenta más tarde.";
+        if (status === 429) return "Uso elevado detectado. Intenta en unos minutos.";
+        if (status === 502) return "IA no disponible. Intenta de nuevo.";
+        if (status >= 500)  return "Error interno al generar. Intenta de nuevo.";
+        return "Error al contactar la IA. Intenta de nuevo.";
+    }
+
+    // Extrae viñetas/garantías de un bloque devuelto por la IA.
+    // El bloque puede traer la lista en `vinetas`/`garantias` (array directo,
+    // como lo devuelve el schema) o serializado en `contenido_texto`.
+    function readArrayField(b, field) {
+        if (Array.isArray(b[field])) return b[field];
+        if (typeof b.contenido_texto === "string" && b.contenido_texto.startsWith("[")) {
+            try {
+                const parsed = JSON.parse(b.contenido_texto);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch { return []; }
+        }
+        return [];
+    }
+
+    function renderAiBloqueCard(b) {
+        const tipoBadge = `<span class="ai-preview-tipo-badge">${escape(TIPO_LABEL_AI[b.tipo] || b.tipo)}</span>`;
+        const tit = b.titulo ? `<span class="ai-preview-titulo">${escape(b.titulo)}</span>` : "";
+        let body = "";
+
+        if (b.tipo === "texto" || b.tipo === "apartado_cerrado") {
+            body = `<div class="ai-preview-body">${escape(b.contenido_texto || "")}</div>`;
+        } else if (b.tipo === "lista_vinetas") {
+            const arr = readArrayField(b, "vinetas");
+            body = `<ul class="ai-preview-vinetas">${arr.map((v) => `<li>${escape(v)}</li>`).join("")}</ul>`;
+        } else if (b.tipo === "garantias") {
+            const arr = readArrayField(b, "garantias");
+            body = `<ul class="ai-preview-vinetas">${arr.map((v) => `<li>${escape(v)}</li>`).join("")}</ul>`;
+        } else if (b.tipo === "seccion_items") {
+            const items = Array.isArray(b.items) ? b.items : [];
+            body = `<div class="ai-preview-items">${items.map((it) => `
+                <div class="ai-preview-item">
+                    <span>${escape(it.descripcion || "")}</span>
+                    ${it.es_opcional ? '<span class="ai-preview-item-opt">opcional</span>' : ""}
+                </div>
+            `).join("")}</div>`;
+        }
+
+        return `
+            <div class="ai-preview-bloque">
+                <div class="ai-preview-bloque-head">${tipoBadge}${tit}</div>
+                ${body}
+            </div>
+        `;
+    }
+
+    // Render items_nuevos con checkbox (modo agregar/mejorar — opt-in).
+    function renderAiItemsNuevos(items) {
+        return items.map((it, idx) => `
+            <label class="ai-preview-bloque ai-preview-selectable">
+                <div class="ai-preview-bloque-head">
+                    <input type="checkbox" class="ai-preview-check" data-kind="item_nuevo" data-idx="${idx}" />
+                    <span class="ai-preview-tipo-badge">Item nuevo</span>
+                    <span class="ai-preview-titulo">→ bloque ${it.bloque_id_destino}</span>
+                </div>
+                <div class="ai-preview-item">
+                    <span>${escape(it.descripcion || "")}</span>
+                    <span class="ai-preview-item-opt">opcional</span>
+                </div>
+            </label>
+        `).join("");
+    }
+
+    // Render mejoras con checkbox.
+    function renderAiMejoras(mejoras) {
+        return mejoras.map((m, idx) => `
+            <label class="ai-preview-bloque ai-preview-selectable">
+                <div class="ai-preview-bloque-head">
+                    <input type="checkbox" class="ai-preview-check" data-kind="mejora" data-idx="${idx}" />
+                    <span class="ai-preview-tipo-badge">Mejora</span>
+                    <span class="ai-preview-titulo">item #${m.item_id}</span>
+                </div>
+                <div class="ai-preview-body" style="color: var(--color-silver-3); text-decoration: line-through;">${escape(m.descripcion_original || "")}</div>
+                <div class="ai-preview-body" style="margin-top: 0.4rem;">${escape(m.descripcion_mejorada || "")}</div>
+            </label>
+        `).join("");
+    }
+
+    function renderAiPreview(data, mode) {
+        _aiLast = { mode, data };
+
+        if (aiSuggestTipoServ) aiSuggestTipoServ.textContent = data.tipo_servicio_detectado || "—";
+
+        const bloques = Array.isArray(data.bloques) ? data.bloques : [];
+        const mejoras = Array.isArray(data.mejoras) ? data.mejoras : [];
+        const itemsNuevos = Array.isArray(data.items_nuevos) ? data.items_nuevos : [];
+        const totalPropuestas = bloques.length + mejoras.length + itemsNuevos.length;
+        if (aiSuggestCount) aiSuggestCount.textContent = totalPropuestas;
+
+        if (aiSuggestNotaAdmin) {
+            if (data.notas_al_admin) {
+                aiSuggestNotaAdmin.hidden = false;
+                aiSuggestNotaAdmin.innerHTML = `
+                    <strong>ℹ️ Nota de la IA para el administrador:</strong>
+                    ${escape(data.notas_al_admin)}
+                `;
+            } else {
+                aiSuggestNotaAdmin.hidden = true;
+            }
+        }
+
+        let html = "";
+        if (mode === "generar_inicial" && bloques.length) {
+            html += bloques.map(renderAiBloqueCard).join("");
+        }
+        if (mejoras.length) html += renderAiMejoras(mejoras);
+        if (itemsNuevos.length) html += renderAiItemsNuevos(itemsNuevos);
+
+        if (!html) {
+            html = `<div class="pres-empty">La IA no generó propuestas. Revisa la nota al admin arriba.</div>`;
+        }
+        if (aiSuggestPreview) aiSuggestPreview.innerHTML = html;
+
+        // Configurar botón Aplicar según modo
+        if (aiSuggestApply) {
+            if (mode === "generar_inicial") {
+                aiSuggestApply.textContent = "Aplicar bloques";
+                aiSuggestApply.disabled = bloques.length === 0;
+            } else {
+                aiSuggestApply.textContent = "Aplicar seleccionados";
+                // En mejorar/agregar inicia disabled — se habilita cuando hay al menos un check.
+                aiSuggestApply.disabled = true;
+            }
+        }
+
+        setAiState("result");
+    }
+
+    // POST /api/ai/sugerir-bloques con timeout 15s.
+    async function fetchAiSuggestion(modo) {
+        const p = state.currentPres;
+        if (!p || p.id == null) {
+            showAiError("Guarda el presupuesto antes de usar IA.");
+            return;
+        }
+
+        openModal(aiSuggestBack);
+        setAiState("loading");
+
+        // descripcion_inicial: dejamos que el backend resuelva el fallback a
+        // notas_internas. Si el modo es generar_inicial y notas_internas viene
+        // vacío, el backend responderá 400 (mapeado en mapAiErrorMsg).
+        const body = { presupuesto_id: p.id, modo };
+
+        // Timeout 15s via AbortController.
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 15000);
+
+        try {
+            const res = await fetch("/api/ai/sugerir-bloques", {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+                signal: ctrl.signal,
+            });
+            clearTimeout(timer);
+
+            let payload = null;
+            try { payload = await res.json(); } catch { /* respuesta sin body */ }
+
+            if (!res.ok) {
+                const code = payload && payload.code;
+                showAiError(mapAiErrorMsg(res.status, code));
+                return;
+            }
+            if (!payload || !payload.ok || !payload.data) {
+                showAiError("Respuesta inesperada del servidor.");
+                return;
+            }
+            renderAiPreview(payload.data, modo);
+        } catch (err) {
+            clearTimeout(timer);
+            if (err && err.name === "AbortError") {
+                showAiError("La IA tardó demasiado. Intenta de nuevo.");
+            } else {
+                showAiError("Error al contactar la IA. Intenta de nuevo.");
+                console.error("[AI] fetch error:", err);
+            }
+        }
+    }
+
+    /* ---------- Event handlers IA ---------- */
+
+    // Click en "✨ Generar con IA":
+    //   - Si presupuesto NO tiene bloques: ir directo a generar_inicial.
+    //   - Si tiene bloques: abrir modal selector de modo.
+    aiSuggestBtn && aiSuggestBtn.addEventListener("click", () => {
+        if (!state.currentPres) return;
+        const bloques = state.currentPres.bloques || [];
+        if (bloques.length === 0) {
+            fetchAiSuggestion("generar_inicial");
+        } else {
+            // Reset selección + estado del botón Continuar
+            const radios = aiModoBack ? aiModoBack.querySelectorAll('input[name="ai-modo-choice"]') : [];
+            radios.forEach((r) => { r.checked = false; });
+            if (aiModoContinue) aiModoContinue.disabled = true;
+            openModal(aiModoBack);
+        }
+    });
+
+    // Enable Continue cuando se selecciona una opción.
+    aiModoBack && aiModoBack.addEventListener("change", (e) => {
+        if (e.target && e.target.name === "ai-modo-choice") {
+            if (aiModoContinue) aiModoContinue.disabled = false;
+        }
+    });
+
+    aiModoCancel && aiModoCancel.addEventListener("click", () => closeModal(aiModoBack));
+    aiModoBack && aiModoBack.addEventListener("click", (e) => {
+        if (e.target === aiModoBack) closeModal(aiModoBack);
+    });
+
+    aiModoContinue && aiModoContinue.addEventListener("click", () => {
+        const sel = aiModoBack && aiModoBack.querySelector('input[name="ai-modo-choice"]:checked');
+        if (!sel) return;
+        closeModal(aiModoBack);
+        fetchAiSuggestion(sel.value);
+    });
+
+    aiSuggestClose && aiSuggestClose.addEventListener("click", closeAiPreview);
+    aiSuggestCloseX && aiSuggestCloseX.addEventListener("click", closeAiPreview);
+    aiSuggestBack && aiSuggestBack.addEventListener("click", (e) => {
+        if (e.target === aiSuggestBack) closeAiPreview();
+    });
+
+    // Habilita botón Aplicar cuando hay al menos un checkbox marcado (modo mejorar/agregar).
+    aiSuggestPreview && aiSuggestPreview.addEventListener("change", (e) => {
+        if (!e.target || !e.target.classList.contains("ai-preview-check")) return;
+        if (!_aiLast.mode || _aiLast.mode === "generar_inicial") return;
+        const anyChecked = !!aiSuggestPreview.querySelector(".ai-preview-check:checked");
+        if (aiSuggestApply) aiSuggestApply.disabled = !anyChecked;
+    });
+
+    aiSuggestApply && aiSuggestApply.addEventListener("click", () => {
+        if (!_aiLast.data || !_aiLast.mode) return;
+        applySuggestion(_aiLast.mode, _aiLast.data);
+    });
+
+    // Escape cierra los modales IA.
+    document.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape") return;
+        if (aiSuggestBack && aiSuggestBack.classList.contains("show")) closeAiPreview();
+        else if (aiModoBack && aiModoBack.classList.contains("show")) closeModal(aiModoBack);
+    });
+
+    /* ---------- Aplicación de sugerencias al presupuesto (Feature C) ---------- */
+
+    // Coerciona los nulls que la IA emite (cantidad/precio_unitario/subtotal)
+    // a defaults aceptados por el backend (cantidad:1, precio_unitario:0, subtotal:0).
+    function _aiBloqueToBackend(b) {
+        const tipo = b.tipo;
+        if (tipo === "texto") {
+            return { tipo, contenido_texto: b.contenido_texto || "" };
+        }
+        if (tipo === "lista_vinetas") {
+            return { tipo, vinetas: Array.isArray(b.vinetas) ? b.vinetas : [] };
+        }
+        if (tipo === "garantias") {
+            return { tipo, garantias: Array.isArray(b.garantias) ? b.garantias : [] };
+        }
+        if (tipo === "apartado_cerrado") {
+            return {
+                tipo,
+                titulo: b.titulo || "",
+                contenido_texto: b.contenido_texto || "",
+                subtotal: b.subtotal != null ? Number(b.subtotal) : 0,
+            };
+        }
+        if (tipo === "seccion_items") {
+            const items = Array.isArray(b.items) ? b.items : [];
+            return {
+                tipo,
+                titulo: b.titulo || "",
+                items: items.map((it) => ({
+                    descripcion: it.descripcion || "",
+                    cantidad: it.cantidad != null ? Number(it.cantidad) : 1,
+                    precio_unitario: it.precio_unitario != null ? Number(it.precio_unitario) : 0,
+                    es_opcional: !!it.es_opcional,
+                })),
+            };
+        }
+        return null;
+    }
+
+    // Busca a qué bloque pertenece un item_id en el presupuesto actual.
+    function _findBloqueIdForItem(itemId) {
+        const bloques = state.currentPres && state.currentPres.bloques || [];
+        for (const b of bloques) {
+            if (Array.isArray(b.items)) {
+                for (const it of b.items) {
+                    if (Number(it.id) === Number(itemId)) return b.id;
+                }
+            }
+        }
+        return null;
+    }
+
+    // Recarga el presupuesto actual desde el backend y re-renderiza el editor.
+    async function _reloadCurrentEditor() {
+        const id = state.currentPres && state.currentPres.id;
+        if (!id) return;
+        try {
+            const body = await api("/api/presupuestos/" + id);
+            state.currentPres = body.data;
+            state.currentPres.bloques = (state.currentPres.bloques || []).map(normalizarBloqueDesdeBackend);
+            renderEditor();
+            loadList();
+        } catch (err) {
+            toast("Sugerencias aplicadas, pero falló recargar: " + err.message, "error");
+        }
+    }
+
+    async function applySuggestion(mode, data) {
+        const p = state.currentPres;
+        if (!p || p.id == null) {
+            toast("Guarda el presupuesto antes de aplicar.", "error");
+            return;
+        }
+        if (!aiSuggestApply) return;
+
+        // Estado visual de "aplicando".
+        aiSuggestApply.disabled = true;
+        aiSuggestApply.textContent = "Aplicando…";
+
+        try {
+            if (mode === "generar_inicial") {
+                const bloques = (data.bloques || [])
+                    .map(_aiBloqueToBackend)
+                    .filter(Boolean);
+                if (!bloques.length) {
+                    toast("No hay bloques que aplicar.", "error");
+                    aiSuggestApply.disabled = false;
+                    aiSuggestApply.textContent = "Aplicar bloques";
+                    return;
+                }
+                await api("/api/presupuestos/" + p.id, {
+                    method: "PUT",
+                    body: JSON.stringify({ bloques }),
+                });
+                closeAiPreview();
+                await _reloadCurrentEditor();
+                toast("✨ Bloques aplicados. Agrega los precios antes de enviar.", "success");
+                return;
+            }
+
+            // mejorar / agregar — iterar selección
+            const checks = aiSuggestPreview ? aiSuggestPreview.querySelectorAll(".ai-preview-check:checked") : [];
+            const mejorasIdx = [];
+            const itemsIdx = [];
+            checks.forEach((c) => {
+                const idx = Number(c.dataset.idx);
+                if (c.dataset.kind === "mejora") mejorasIdx.push(idx);
+                else if (c.dataset.kind === "item_nuevo") itemsIdx.push(idx);
+            });
+
+            const mejoras = mejorasIdx.map((i) => (data.mejoras || [])[i]).filter(Boolean);
+            const itemsNuevos = itemsIdx.map((i) => (data.items_nuevos || [])[i]).filter(Boolean);
+
+            let okMejoras = 0, failMejoras = 0;
+            for (const m of mejoras) {
+                const bloqueId = _findBloqueIdForItem(m.item_id);
+                if (!bloqueId) { failMejoras++; continue; }
+                try {
+                    await api(`/api/presupuestos/${p.id}/bloques/${bloqueId}/items/${m.item_id}`, {
+                        method: "PUT",
+                        body: JSON.stringify({ descripcion: m.descripcion_mejorada }),
+                    });
+                    okMejoras++;
+                } catch (errM) {
+                    failMejoras++;
+                    console.error("[AI][APPLY] mejora falló item=", m.item_id, errM);
+                }
+            }
+
+            let okItems = 0, failItems = 0;
+            for (const it of itemsNuevos) {
+                try {
+                    await api(`/api/presupuestos/${p.id}/bloques/${it.bloque_id_destino}/items`, {
+                        method: "POST",
+                        body: JSON.stringify({
+                            descripcion: it.descripcion,
+                            cantidad: 1,
+                            precio_unitario: 0,
+                            es_opcional: true,
+                        }),
+                    });
+                    okItems++;
+                } catch (errI) {
+                    failItems++;
+                    console.error("[AI][APPLY] item nuevo falló bloque=", it.bloque_id_destino, errI);
+                }
+            }
+
+            const totalOk = okMejoras + okItems;
+            const totalFail = failMejoras + failItems;
+            if (totalFail === 0) {
+                closeAiPreview();
+                await _reloadCurrentEditor();
+                toast(`✨ Aplicadas ${totalOk} sugerencia(s).`, "success");
+            } else {
+                aiSuggestApply.disabled = false;
+                aiSuggestApply.textContent = "Reintentar";
+                toast(`Aplicadas ${totalOk}, fallaron ${totalFail}. Revisa consola.`, "error");
+                // Si al menos una pasó, refresca silenciosamente para sincronizar estado.
+                if (totalOk > 0) await _reloadCurrentEditor();
+            }
+        } catch (err) {
+            aiSuggestApply.disabled = false;
+            aiSuggestApply.textContent = mode === "generar_inicial" ? "Aplicar bloques" : "Aplicar seleccionados";
+            toast("Error al aplicar: " + (err.message || err), "error");
+        }
     }
 })();
