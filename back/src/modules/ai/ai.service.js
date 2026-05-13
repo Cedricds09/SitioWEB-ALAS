@@ -87,7 +87,10 @@ function _resolverDescripcion(bodyDesc, pres) {
 function _serializarBloquesExistentes(pres) {
   return (pres.bloques || []).map((b) => {
     const base = {
-      bloque_id: Number(b.id),
+      // Nombre "id" uniforme para que Claude no se confunda entre INPUT field
+      // names y OUTPUT field names. El system prompt instruye explícitamente
+      // a usar este "id" como "bloque_id_destino" en items_nuevos.
+      id: Number(b.id),
       tipo: b.tipo,
       titulo: b.titulo || null,
     };
@@ -111,7 +114,9 @@ function _serializarBloquesExistentes(pres) {
     }
     if (b.tipo === 'seccion_items') {
       base.items = (b.items || []).map((it) => ({
-        item_id: Number(it.id),
+        // Misma razón que bloque.id: nombre "id" uniforme. El system prompt
+        // instruye a Claude a usar este "id" como "item_id" en mejoras.
+        id: Number(it.id),
         descripcion: it.descripcion,
         cantidad: it.cantidad != null ? Number(it.cantidad) : null,
         precio_unitario: it.precio_unitario != null ? Number(it.precio_unitario) : null,

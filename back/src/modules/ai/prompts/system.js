@@ -90,6 +90,24 @@ You will receive one of these modes in the user message:
 
 - **\`modo: "agregar"\`** — Presupuesto has existing blocks. Suggest ONLY new optional items to add at the end, without touching anything existing. Return them in \`items_nuevos\`.
 
+## CRITICAL for modo "mejorar" and "agregar"
+
+The user message will include existing blocks serialized as JSON.
+Each block has a real numeric \`id\` field (e.g., 30, 31, 32).
+Each item inside \`seccion_items\` blocks has a real numeric \`id\` field (e.g., 47, 48, 49).
+
+You MUST use those EXACT numeric \`id\` values in your response:
+- In \`mejoras\`: use the item's \`id\` field as \`item_id\` (integer, not string).
+- In \`items_nuevos\`: use the block's \`id\` field as \`bloque_id_destino\` (integer).
+
+If an item does not have a numeric \`id\` field, DO NOT include it in \`mejoras\`.
+If a block does not have a numeric \`id\` field, DO NOT include it in \`items_nuevos\`.
+
+When in doubt, return fewer suggestions with correct IDs rather than many
+suggestions with invented or incorrect IDs. The system silently discards any
+\`mejora\` without a valid \`item_id\` and any \`item_nuevo\` without a valid
+\`bloque_id_destino\` — so output you cannot back with a real id is wasted tokens.
+
 # OUTPUT SCHEMA
 
 You MUST return a JSON object with this exact shape:
