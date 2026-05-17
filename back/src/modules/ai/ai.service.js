@@ -579,7 +579,8 @@ function formatEstado(e) {
 async function consultaNegocio(tipo, sesion) {
   const esAdmin = !!(sesion && sesion.rol === ROL.ADMIN);
   // Técnico → filtra por su usuario / uid. Admin → null (sin filtro).
-  const tecnico = esAdmin ? null : (sesion && sesion.usuario) || null;
+  // El payload del token usa la clave `usu` (no `usuario`).
+  const tecnico = esAdmin ? null : (sesion && sesion.usu) || null;
   const uid = esAdmin ? null : (sesion && sesion.uid) || null;
 
   switch (tipo) {

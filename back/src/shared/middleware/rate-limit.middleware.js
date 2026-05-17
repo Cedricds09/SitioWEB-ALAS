@@ -1,7 +1,7 @@
 // Rate limiters reutilizables.
-// Aplicar SOLO a endpoints públicos (sin auth) para mitigar spam y bots.
+// Públicos: mitigan spam/bots y enumeración. Autenticados: limitan abuso por usuario.
 
-const rateLimit = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 
 // Solicitudes públicas de cotización: 5 requests por IP cada 10 minutos.
 const publicSolicitudLimiter = rateLimit({
@@ -41,8 +41,58 @@ const resenaVerificarLimiter = rateLimit({
   },
 });
 
+// Login admin (A1): 5 intentos por IP cada 15 minutos — frena fuerza bruta.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 min
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  // No contar los logins exitosos: solo penaliza intentos fallidos.
+  skipSuccessfulRequests: true,
+  message: {
+    ok: false,
+    error: 'Demasiados intentos de acceso. Intenta de nuevo en unos minutos.',
+  },
+});
+
+// Consulta pública de notas (A2): 10 requests por IP cada 10 minutos —
+// frena enumeración de pares cliente/nota.
+const notasLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 min
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    ok: false,
+    error: 'Demasiadas consultas. Intenta de nuevo más tarde.',
+  },
+});
+
+// Consultas de negocio del asistente (B2): 30 requests por usuario cada hora.
+// La clave es el uid de sesión (el endpoint corre tras requireAuth).
+const consultaNegocioLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hora
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Clave por usuario; si no hay sesión, fallback a IP con el helper de
+  // express-rate-limit (normaliza IPv6 — evita ERR_ERL_KEY_GEN_IPV6).
+  keyGenerator: (req) => {
+    const uid = req.session && req.session.uid;
+    if (uid) return `uid:${uid}`;
+    return ipKeyGenerator(req.ip);
+  },
+  message: {
+    ok: false,
+    error: 'Demasiadas consultas. Intenta de nuevo más tarde.',
+  },
+});
+
 module.exports = {
   publicSolicitudLimiter,
   resenaPublicLimiter,
   resenaVerificarLimiter,
+  loginLimiter,
+  notasLimiter,
+  consultaNegocioLimiter,
 };

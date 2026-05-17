@@ -6,6 +6,7 @@ const ctrl = require('./ai.controller');
 const validate = require('../../shared/middleware/validate.middleware');
 const { requireAuth } = require('../../shared/middleware/auth.middleware');
 const asyncHandler = require('../../shared/middleware/async-handler');
+const { consultaNegocioLimiter } = require('../../shared/middleware/rate-limit.middleware');
 const S = require('./ai.schema');
 
 // Todas las rutas requieren sesión.
@@ -27,6 +28,7 @@ router.post(
 // Consultas de negocio — datos reales de la DB, sin Claude API.
 router.post(
   '/consulta-negocio',
+  consultaNegocioLimiter,
   validate({ body: S.consultaNegocioSchema }),
   asyncHandler(ctrl.consultaNegocio),
 );

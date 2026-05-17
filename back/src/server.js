@@ -5,6 +5,7 @@ const env = require('./shared/config/env'); // valida y aborta si falta algo cr�
 
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const path = require('path');
 
 const { getPool } = require('./shared/db/pool');
@@ -31,7 +32,44 @@ const PORT = env.PORT;
 // front/ vive a la altura del repo: back/src/server.js -> ../../front
 const FRONT_DIR = path.join(__dirname, '..', '..', 'front');
 
-app.use(cors({ origin: true, credentials: true }));
+// No revelar el stack en headers.
+app.disable('x-powered-by');
+
+// Headers de seguridad (helmet) + CSP a medida del frontend:
+// Google Maps (JS API + embed), CDN de jspdf/qrious y los estáticos propios.
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        'default-src': ["'self'"],
+        'script-src': [
+          "'self'",
+          'https://cdnjs.cloudflare.com',
+          'https://maps.googleapis.com',
+          'https://maps.gstatic.com',
+        ],
+        'style-src': ["'self'", "'unsafe-inline'"],
+        'img-src': ["'self'", 'data:', 'https:'],
+        'font-src': ["'self'", 'data:'],
+        'connect-src': ["'self'", 'https://maps.googleapis.com'],
+        'frame-src': ['https://www.google.com', 'https://maps.google.com'],
+        'worker-src': ["'self'", 'blob:'],
+        'object-src': ["'none'"],
+        'base-uri': ["'self'"],
+        // Eliminado: rompería los estáticos http en desarrollo local.
+        'upgrade-insecure-requests': null,
+      },
+    },
+  }),
+);
+
+// CORS: en desarrollo refleja cualquier origen; en producción solo el
+// configurado en ALLOWED_ORIGIN (sin valor → se rechazan los cross-origin).
+const corsOrigin = env.NODE_ENV === 'production'
+  ? (env.ALLOWED_ORIGIN || false)
+  : true;
+app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json());
 
 app.use((req, _res, next) => {

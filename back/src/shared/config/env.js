@@ -15,8 +15,8 @@ if (missing.length) {
   process.exit(1);
 }
 
-if (String(process.env.SESSION_SECRET).length < 16) {
-  console.error('[ENV] SESSION_SECRET debe tener al menos 16 caracteres.');
+if (String(process.env.SESSION_SECRET).length < 32) {
+  console.error('[ENV] SESSION_SECRET debe tener al menos 32 caracteres.');
   process.exit(1);
 }
 
@@ -41,6 +41,10 @@ const env = Object.freeze({
   DB_NAME: process.env.DB_NAME,
 
   SESSION_SECRET: process.env.SESSION_SECRET,
+
+  // Origen permitido para CORS en producción (ej. https://alas.com.mx).
+  // En desarrollo se ignora (CORS abierto). Sin valor en prod → CORS se cierra.
+  ALLOWED_ORIGIN: process.env.ALLOWED_ORIGIN || '',
 
   GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY || '',
 

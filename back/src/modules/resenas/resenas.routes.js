@@ -35,9 +35,10 @@ publicRouter.post(
 publicRouter.get('/publicas', asyncHandler(ctrl.listarPublicas));
 
 // ===== Router ADMIN — montado en /api/admin/resenas (requireAuth al montar) =====
+// La moderación de reseñas es exclusiva de admin (incluido el listado).
 const adminRouter = express.Router();
 
-adminRouter.get('/', asyncHandler(ctrl.listarAdmin));
+adminRouter.get('/', requireAdmin, asyncHandler(ctrl.listarAdmin));
 
 adminRouter.put(
   '/:id',
