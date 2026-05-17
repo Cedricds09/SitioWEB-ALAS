@@ -635,6 +635,10 @@
         `;
     }
 
+    // FIX 2 — estado del colapso de servicios activos (en memoria, persiste
+    // entre re-renders mientras viva la sesión; no usa localStorage).
+    let svcActivosExpandido = false;
+
     function renderServicios(rows, container, opts = {}) {
         const showCount = opts.showCount !== false;
         const allowAjuste = opts.allowAjuste !== false;
@@ -644,12 +648,7 @@
             container.innerHTML = `<div class="svc-empty">${escape(opts.emptyMsg || "Sin servicios.")}</div>`;
             return;
         }
-        container.innerHTML = `
-            ${showCount ? `<div class="svc-toolbar" style="margin-bottom:1rem;">
-                <span class="svc-count">${rows.length} ${rows.length === 1 ? "servicio" : "servicios"}</span>
-            </div>` : ""}
-            <div class="svc-list">
-                ${rows.map((r) => {
+        const articulosHTML = rows.map((r) => {
                     const terminado = String(r.estado).toUpperCase() === "TERMINADO";
                     return `
                     <article class="svc-item">
@@ -722,9 +721,41 @@
                             </div>
                         </div>
                     </article>
-                `; }).join("")}
-            </div>
+                `; });
+
+        // FIX 2 — si la lista es colapsable y hay más de 3, se muestran 3 y
+        // el resto va en un contenedor con transición de max-height.
+        const colapsar = opts.collapsible && articulosHTML.length > 3;
+        const visiblesHTML = colapsar ? articulosHTML.slice(0, 3) : articulosHTML;
+        const ocultosHTML = colapsar ? articulosHTML.slice(3) : [];
+
+        container.innerHTML = `
+            ${showCount ? `<div class="svc-toolbar" style="margin-bottom:1rem;">
+                <span class="svc-count">${rows.length} ${rows.length === 1 ? "servicio" : "servicios"}</span>
+            </div>` : ""}
+            <div class="svc-list">${visiblesHTML.join("")}</div>
+            ${ocultosHTML.length ? `<div class="svc-extra"><div class="svc-list">${ocultosHTML.join("")}</div></div>` : ""}
+            ${ocultosHTML.length ? `<button type="button" class="svc-toggle-more"></button>` : ""}
         `;
+
+        // Colapso: aplica el estado en memoria y cablea el botón.
+        const toggleMore = container.querySelector(".svc-toggle-more");
+        const extra = container.querySelector(".svc-extra");
+        if (toggleMore && extra) {
+            const ocultosN = ocultosHTML.length;
+            const aplicarColapso = () => {
+                extra.classList.toggle("is-open", svcActivosExpandido);
+                toggleMore.textContent = svcActivosExpandido
+                    ? "Ocultar ▲"
+                    : `Ver ${ocultosN} servicio${ocultosN === 1 ? "" : "s"} más ▼`;
+            };
+            aplicarColapso();
+            toggleMore.addEventListener("click", () => {
+                svcActivosExpandido = !svcActivosExpandido;
+                aplicarColapso();
+            });
+        }
+
         container.querySelectorAll(".svc-fin").forEach((b) =>
             b.addEventListener("click", () => finalizar(parseInt(b.dataset.id, 10), b))
         );
@@ -809,7 +840,7 @@
             const empty = estadoFiltro === "TERMINADO"
                 ? (scope === "mine" ? "No tienes servicios finalizados." : "Sin servicios finalizados.")
                 : (scope === "mine" ? "No tienes servicios asignados." : "Sin servicios activos por el momento.");
-            renderServicios(body.data, svcList, { emptyMsg: empty });
+            renderServicios(body.data, svcList, { emptyMsg: empty, collapsible: true });
         } catch (err) {
             svcList.innerHTML = `<div class="svc-empty error">Error: ${escape(err.message)}</div>`;
         }
@@ -915,12 +946,33 @@
     const svcTelefonoInput = document.querySelector('#svcForm [name="telefono"]');
     const svcDireccionInput = document.querySelector('#svcForm [name="direccion"]');
 
+    // FIX 3 — línea informativa del número de cliente bajo el campo "Nombre".
+    // Cliente existente → "Número de cliente: CL-XXXX". Cliente nuevo → aviso gris.
+    function actualizarClienteIdInfo() {
+        const info = document.getElementById("svcClienteIdInfo");
+        if (!info) return;
+        const num = svcNumeroHidden && svcNumeroHidden.value.trim();
+        if (num) {
+            info.classList.remove("is-nuevo");
+            info.innerHTML = `Número de cliente: <strong>${escape(num)}</strong>`;
+        } else {
+            info.classList.add("is-nuevo");
+            info.textContent = "Número de cliente: se generará al guardar (ej. CL-0042)";
+        }
+    }
+    actualizarClienteIdInfo();
+    if (svcForm) {
+        // El reset nativo limpia el hidden después del evento: difiere la lectura.
+        svcForm.addEventListener("reset", () => setTimeout(actualizarClienteIdInfo, 0));
+    }
+
     let svcClienteTimer = null;
     if (svcNombreInput && svcClienteResults) {
         svcNombreInput.addEventListener("input", () => {
             // Si user re-escribe el nombre, desvincula el numero_cliente para no
             // mandar uno viejo al backend.
             if (svcNumeroHidden && svcNumeroHidden.value) svcNumeroHidden.value = "";
+            actualizarClienteIdInfo();
             const q = svcNombreInput.value.trim();
             clearTimeout(svcClienteTimer);
             if (q.length < 2) {
@@ -983,6 +1035,7 @@
     function svcSeleccionarCliente(sel) {
         if (svcNombreInput && sel.nombre) svcNombreInput.value = sel.nombre;
         if (svcNumeroHidden) svcNumeroHidden.value = sel.numero_cliente || "";
+        actualizarClienteIdInfo();
         if (svcTelefonoInput && sel.telefono && !svcTelefonoInput.value.trim()) {
             svcTelefonoInput.value = sel.telefono;
         }

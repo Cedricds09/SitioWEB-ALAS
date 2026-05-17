@@ -733,8 +733,8 @@ img { max-width: 100%; display: block; }
 /* ---------- WHATSAPP FLOTANTE ---------- */
 .wa-float {
     position: fixed;
-    right: 1.5rem;
-    bottom: 1.5rem;
+    right: 24px;
+    bottom: 24px;
     width: 58px;
     height: 58px;
     border-radius: 50%;
@@ -744,7 +744,8 @@ img { max-width: 100%; display: block; }
     align-items: center;
     justify-content: center;
     box-shadow: 0 10px 30px rgba(37, 211, 102, 0.4);
-    z-index: 30;
+    /* Menor que el chatbot (.asist-btn = 9999) para no encimarse sobre él. */
+    z-index: 999;
     transition: transform 0.25s ease, box-shadow 0.25s ease;
     animation: waPulse 2.5s ease-in-out infinite;
 }
@@ -2819,4 +2820,348 @@ body.modal-open { overflow: hidden; }
     height: 18px;
     cursor: pointer;
     margin-right: 0.2rem;
+}
+
+/* =====================================================
+   RESEÑAS — formulario público + moderación admin (Fase 6)
+   ===================================================== */
+
+/* ----- Alta de reseña (sitio público) ----- */
+.resena-cta {
+    text-align: center;
+    margin-top: 2rem;
+}
+.resena-form-wrap {
+    position: relative;
+    max-width: 560px;
+    margin: 1.5rem auto 0;
+}
+.resena-close {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    z-index: 2;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-mid);
+    color: var(--color-silver-2);
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.resena-close:hover {
+    background: var(--color-purple-soft);
+    color: var(--color-silver-1);
+}
+.resena-form {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 1.8rem;
+}
+.resena-form-title {
+    color: var(--color-silver-1);
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 0 0 1.2rem;
+}
+.resena-counter {
+    display: block;
+    text-align: right;
+    color: var(--color-silver-3);
+    font-size: 0.78rem;
+    margin-top: 0.3rem;
+}
+.resena-msg {
+    font-size: 0.9rem;
+    margin: 0.4rem 0 0.8rem;
+    padding: 0.7rem 0.9rem;
+    border-radius: 8px;
+}
+.resena-msg.error {
+    color: #ffb4b4;
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.resena-msg.success {
+    color: #8de7a8;
+    background: rgba(40, 200, 110, 0.12);
+    border: 1px solid rgba(40, 200, 110, 0.32);
+    text-align: center;
+}
+
+/* ----- Moderación (panel admin) ----- */
+.resenas-section {
+    margin-top: 1.5rem;
+}
+.resenas-admin-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+.resena-admin-empty {
+    color: var(--color-silver-3);
+    font-size: 0.9rem;
+    padding: 1.2rem;
+    text-align: center;
+}
+.resena-admin-card {
+    background: var(--color-bg-mid);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.2rem;
+}
+.resena-admin-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem;
+    margin-bottom: 0.6rem;
+}
+.resena-estado {
+    text-transform: capitalize;
+    font-size: 0.74rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+}
+.resena-estado.pendiente {
+    background: rgba(255, 193, 7, 0.10);
+    color: #ffd97a;
+    border: 1px solid rgba(255, 193, 7, 0.28);
+}
+.resena-estado.aprobada {
+    background: rgba(40, 200, 110, 0.10);
+    color: #8de7a8;
+    border: 1px solid rgba(40, 200, 110, 0.32);
+}
+.resena-estado.rechazada {
+    background: rgba(239, 68, 68, 0.10);
+    color: #ffb4b4;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.resena-admin-fecha {
+    color: var(--color-silver-3);
+    font-size: 0.8rem;
+}
+.resena-admin-nombre {
+    color: var(--color-silver-1);
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin: 0 0 0.35rem;
+}
+.resena-admin-meta {
+    color: var(--color-silver-3);
+    font-weight: 400;
+    font-size: 0.85rem;
+}
+.resena-admin-texto {
+    color: var(--color-silver-2);
+    font-size: 0.9rem;
+    line-height: 1.6;
+    margin: 0;
+    font-style: italic;
+}
+.resena-admin-actions {
+    display: flex;
+    gap: 0.6rem;
+    margin-top: 0.9rem;
+}
+.resena-admin-actions .btn {
+    padding: 0.45rem 0.9rem;
+    font-size: 0.85rem;
+}
+
+/* ----- Cotización: nota de visita de diagnóstico ----- */
+.quote-actions {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.quote-visita-nota {
+    flex: 1 1 280px;
+    margin: 0;
+    background: rgba(106, 60, 255, 0.10);
+    border-left: 3px solid var(--color-purple);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: var(--color-silver-2);
+}
+
+/* =====================================================
+   CARRUSEL DE RESEÑAS (Fase 6 — FIX 6)
+   ===================================================== */
+.carrusel {
+    margin-top: 1rem;
+}
+.carrusel-wrapper {
+    position: relative;
+    overflow: hidden;
+}
+.carrusel-track {
+    display: flex;
+    transition: transform 0.4s ease;
+}
+.carrusel-slide {
+    flex: 0 0 100%;
+    box-sizing: border-box;
+    padding: 0 0.75rem;
+}
+@media (min-width: 768px) {
+    .carrusel-slide { flex-basis: 33.333%; }
+}
+.carrusel-slide .testimonial {
+    height: 100%;
+}
+
+/* Flechas */
+.carrusel-prev,
+.carrusel-next {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 40px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(106, 60, 255, 0.7);
+    color: #fff;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease;
+}
+.carrusel-prev { left: 8px; }
+.carrusel-next { right: 8px; }
+.carrusel-prev:hover,
+.carrusel-next:hover {
+    background: var(--color-purple);
+}
+
+/* Dots */
+.carrusel-dots {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 1.2rem;
+}
+.carrusel-dot {
+    width: 8px;
+    height: 8px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+    transition: background 0.15s ease, width 0.15s ease, height 0.15s ease;
+}
+.carrusel-dot.is-active {
+    width: 10px;
+    height: 10px;
+    background: var(--color-purple);
+}
+
+/* Modo estático: 3 reseñas o menos → sin flechas ni dots, cards centradas */
+.carrusel.is-static .carrusel-track {
+    transition: none;
+    transform: none !important;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1.5rem;
+}
+.carrusel.is-static .carrusel-slide {
+    flex: 0 1 320px;
+    padding: 0;
+}
+.carrusel.is-static .carrusel-prev,
+.carrusel.is-static .carrusel-next,
+.carrusel.is-static .carrusel-dots {
+    display: none;
+}
+
+/* Mobile: flechas más pequeñas */
+@media (max-width: 480px) {
+    .carrusel-prev,
+    .carrusel-next {
+        width: 32px;
+        height: 32px;
+        font-size: 1.2rem;
+    }
+}
+
+/* =====================================================
+   COLAPSO DE SERVICIOS ACTIVOS (Fase 6 — FIX 2)
+   ===================================================== */
+.svc-extra {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.35s ease;
+}
+.svc-extra.is-open {
+    max-height: 6000px;
+}
+.svc-toggle-more {
+    display: block;
+    width: 100%;
+    margin-top: 0.9rem;
+    padding: 0.6rem 1rem;
+    background: var(--color-purple-soft);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    color: var(--color-silver-1);
+    font-size: 0.88rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+.svc-toggle-more:hover {
+    background: rgba(106, 60, 255, 0.28);
+}
+
+/* Línea informativa del número de cliente (FIX 3) */
+.svc-cliente-id-info {
+    margin: 0.35rem 0 0;
+    font-size: 0.82rem;
+    color: var(--color-silver-2);
+}
+.svc-cliente-id-info.is-nuevo {
+    color: var(--color-silver-3);
+}
+.svc-cliente-id-info strong {
+    color: var(--color-purple);
+}
+
+/* Texto de reseña expandible en moderación admin (FIX 5) */
+.resena-admin-texto.is-collapsible {
+    cursor: pointer;
+}
+.resena-admin-texto.is-collapsible::after {
+    content: " ▾ ver más";
+    font-style: normal;
+    font-size: 0.8rem;
+    color: var(--color-purple);
+}
+.resena-admin-texto.is-collapsible.is-expanded::after {
+    content: " ▴ ver menos";
+}
+
+/* Estado vacío del carrusel de reseñas (sin reseñas aprobadas) */
+.carrusel-vacio {
+    width: 100%;
+    margin: 0;
+    padding: 2rem 1rem;
+    text-align: center;
+    color: var(--color-silver-3);
+    font-size: 0.95rem;
 }

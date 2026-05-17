@@ -20,6 +20,10 @@ const usuariosRouter = require('./modules/usuarios/usuarios.routes');
 const serviciosRouter = require('./modules/servicios/servicios.routes');
 const presupuestosRouter = require('./modules/presupuestos/presupuestos.routes');
 const aiRouter = require('./modules/ai/ai.routes');
+const {
+  publicRouter: resenasPublicRouter,
+  adminRouter: resenasAdminRouter,
+} = require('./modules/resenas/resenas.routes');
 
 const app = express();
 const PORT = env.PORT;
@@ -54,8 +58,14 @@ app.use('/api/admin', authRouter);
 // Gestión de usuarios (rol admin validado dentro del router)
 app.use('/api/admin/usuarios', requireAuth, usuariosRouter);
 
+// Moderación de reseñas — sesión admin (requireAdmin en el PUT del router)
+app.use('/api/admin/resenas', requireAuth, resenasAdminRouter);
+
 // Notas públicas (consulta cliente)
 app.use('/api/notas', notasRouter);
+
+// Reseñas públicas (alta validada + listado de aprobadas)
+app.use('/api/resenas', resenasPublicRouter);
 
 // Servicios y clientes — protegidos por sesión admin
 app.use('/api/servicios', requireAuth, serviciosRouter);

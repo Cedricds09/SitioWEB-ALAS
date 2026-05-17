@@ -89,11 +89,13 @@
     /* ---------- DOM (creado al cargar) ---------- */
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    // Avatar del bot (logo del chatbot ALAS).
+    // Avatar del bot (logo del chatbot ALAS). Se usa en el header, en cada
+    // burbuja del bot y como icono del botón flotante (globo).
     const BOT_AVATAR = "imagenes/logo-chatbot-alas.png";
+    const BTN_ICON = `<img class="asist-btn-icon" src="${BOT_AVATAR}" alt="Asistente" />`;
 
     const html = `
-        <button type="button" class="asist-btn" id="asistBtn" aria-label="Asistente" hidden>💬</button>
+        <button type="button" class="asist-btn" id="asistBtn" aria-label="Asistente" hidden>${BTN_ICON}</button>
         <div class="asist-panel" id="asistPanel" role="dialog" aria-modal="false" aria-labelledby="asistHeadTitle">
             <header class="asist-head">
                 <img class="asist-head-avatar" src="${BOT_AVATAR}" alt="Asistente ALAS" />
@@ -210,7 +212,7 @@
     function cerrar() {
         state.abierto = false;
         panel.classList.remove("show");
-        btn.textContent = "💬";
+        btn.innerHTML = BTN_ICON;
     }
 
     function toggle() {

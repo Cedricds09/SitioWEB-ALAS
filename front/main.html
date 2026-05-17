@@ -212,8 +212,9 @@
                     <textarea name="message" rows="4" required placeholder="Describe brevemente el trabajo"></textarea>
                 </label>
 
-                <div class="form-actions">
+                <div class="form-actions quote-actions">
                     <button type="submit" class="btn btn-primary">Enviar por WhatsApp</button>
+                    <p class="quote-visita-nota">ℹ️ Nota: En caso de requerir visita de diagnóstico a domicilio, esta tendrá un costo según la distancia. Dicho costo será descontado del total del servicio en caso de realizarse el trabajo.</p>
                 </div>
             </form>
         </div>
@@ -288,42 +289,86 @@
             <p class="eyebrow">Testimonios</p>
             <h2 class="section-title">Lo que dicen nuestros clientes</h2>
 
-            <div class="testimonials-grid">
-                <article class="testimonial">
-                    <div class="quote-mark">&ldquo;</div>
-                    <p class="testimonial-text">Llegaron a tiempo, hicieron el trabajo limpio y me explicaron todo. Es la primera vez que un servicio así me deja tranquila. Ya los recomendé con mis vecinos.</p>
-                    <div class="testimonial-author">
-                        <div class="author-avatar">MG</div>
-                        <div>
-                            <div class="author-name">María G.</div>
-                            <div class="author-meta">Benito Juárez · Plomería</div>
-                        </div>
-                    </div>
-                </article>
+            <!-- Carrusel de reseñas. resenas.js llena #carruselTrack desde la DB.
+                 Sin reseñas aprobadas → muestra un estado vacío. -->
+            <div class="carrusel" id="resenasCarrusel">
+                <div class="carrusel-wrapper">
+                    <button type="button" class="carrusel-prev" id="carruselPrev" aria-label="Reseña anterior">&lsaquo;</button>
+                    <div class="carrusel-track" id="carruselTrack"></div>
+                    <button type="button" class="carrusel-next" id="carruselNext" aria-label="Reseña siguiente">&rsaquo;</button>
+                </div>
+                <div class="carrusel-dots" id="carruselDots"></div>
+            </div>
 
-                <article class="testimonial">
-                    <div class="quote-mark">&ldquo;</div>
-                    <p class="testimonial-text">Resolvieron una fuga de gas el mismo día que llamé. Profesionales, honestos y el precio fue justo. Desde entonces son nuestros técnicos de cabecera.</p>
-                    <div class="testimonial-author">
-                        <div class="author-avatar">CR</div>
-                        <div>
-                            <div class="author-name">Carlos R.</div>
-                            <div class="author-meta">Coyoacán · Gas LP</div>
-                        </div>
-                    </div>
-                </article>
+            <!-- Alta de reseña (clientes verificados) -->
+            <div class="resena-cta">
+                <button type="button" class="btn btn-ghost" id="resenaToggleBtn">¿Eres cliente? Deja tu opinión</button>
+            </div>
 
-                <article class="testimonial">
-                    <div class="quote-mark">&ldquo;</div>
-                    <p class="testimonial-text">Remodelamos todo el baño con ellos. Cumplieron los tiempos, respetaron el presupuesto y el acabado quedó impecable. Cero excusas.</p>
-                    <div class="testimonial-author">
-                        <div class="author-avatar">LS</div>
-                        <div>
-                            <div class="author-name">Laura S.</div>
-                            <div class="author-meta">Del Valle · Remodelación</div>
-                        </div>
+            <div class="resena-form-wrap" id="resenaFormWrap" hidden>
+                <button type="button" class="resena-close" id="resenaCloseBtn" aria-label="Cerrar formulario">&times;</button>
+                <!-- Paso 1 — verificación -->
+                <form class="form resena-form" id="resenaVerifyForm" novalidate>
+                    <h3 class="resena-form-title">Verifica que eres cliente</h3>
+                    <div class="form-row">
+                        <label>
+                            <span>Número de cliente</span>
+                            <input type="text" name="numero_cliente" id="resenaCliente" required
+                                   placeholder="CL-0000" pattern="CL-\d{4}" autocomplete="off" />
+                        </label>
+                        <label>
+                            <span>Teléfono <small>(10 dígitos)</small></span>
+                            <input type="tel" name="telefono" id="resenaTelefono" required
+                                   maxlength="10" inputmode="numeric" pattern="\d{10}"
+                                   placeholder="5500000000" autocomplete="off" />
+                        </label>
                     </div>
-                </article>
+                    <p class="resena-msg error" id="resenaVerifyMsg" role="alert" hidden></p>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary" id="resenaVerifyBtn">Verificar</button>
+                    </div>
+                </form>
+
+                <!-- Paso 2 — reseña -->
+                <form class="form resena-form" id="resenaSubmitForm" novalidate hidden>
+                    <h3 class="resena-form-title">Cuéntanos tu experiencia</h3>
+                    <label>
+                        <span>Tu nombre <small>(como quieres aparecer)</small></span>
+                        <input type="text" name="nombre_display" id="resenaNombre" required
+                               minlength="2" maxlength="100" placeholder="María G." autocomplete="off" />
+                    </label>
+                    <label>
+                        <span>Tu colonia o alcaldía <small>(opcional)</small></span>
+                        <input type="text" name="colonia" id="resenaColonia"
+                               maxlength="100" placeholder="Benito Juárez" autocomplete="off" />
+                    </label>
+                    <label>
+                        <span>Tipo de servicio recibido <small>(opcional)</small></span>
+                        <select name="tipo_servicio" id="resenaTipo">
+                            <option value="">— Sin especificar —</option>
+                            <option value="plomeria">Plomería</option>
+                            <option value="electrica">Electricidad</option>
+                            <option value="gas">Gas</option>
+                            <option value="pintura">Pintura</option>
+                            <option value="soldadura">Soldadura</option>
+                            <option value="mantenimiento_integral">Mantenimiento integral</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span>Tu reseña</span>
+                        <textarea name="texto" id="resenaTexto" rows="4" required
+                                  minlength="20" maxlength="1000"
+                                  placeholder="Cuéntanos cómo fue tu experiencia con ALAS…"></textarea>
+                        <span class="resena-counter" id="resenaCounter">0 / 1000</span>
+                    </label>
+                    <p class="resena-msg error" id="resenaSubmitMsg" role="alert" hidden></p>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary" id="resenaSubmitBtn">Enviar reseña</button>
+                    </div>
+                </form>
+
+                <!-- Éxito -->
+                <p class="resena-msg success" id="resenaSuccessMsg" hidden>¡Gracias! Tu reseña fue recibida y la publicaremos pronto.</p>
             </div>
         </div>
     </section>
@@ -449,6 +494,7 @@
                                     <input type="hidden" name="numero_cliente" id="svcNumeroCliente" />
                                     <div id="svcClienteResults" class="pres-cliente-results" hidden></div>
                                 </label>
+                                <p class="svc-cliente-id-info is-nuevo" id="svcClienteIdInfo">Número de cliente: se generará al guardar (ej. CL-0042)</p>
                                 <p class="form-hint">Si el cliente ya existe, sus datos se llenarán automáticamente. Si no, el número de cliente se genera al guardar (<code>CL-0001</code>).</p>
                                 <label>
                                     <span>Teléfono <small>(10 dígitos)</small></span>
@@ -623,6 +669,22 @@
                                 <div id="userList"></div>
                             </div>
 
+                        </div>
+                    </article>
+                </section>
+
+                <!-- ============ RESEÑAS (moderación — solo admin) ============ -->
+                <section class="resenas-section" id="resenasSection" hidden>
+                    <article class="card dash-card">
+                        <header class="dash-card-head">
+                            <div>
+                                <h3>Reseñas de clientes</h3>
+                                <span class="dash-card-sub" id="resenaPendTag" hidden>⭐ <span id="resenaPendCount">0</span> reseña(s) pendiente(s)</span>
+                            </div>
+                            <button type="button" class="btn-icon" id="resenasRefresh" title="Recargar">↻ Recargar</button>
+                        </header>
+                        <div class="dash-card-body">
+                            <div id="resenasAdminList" class="resenas-admin-list"></div>
                         </div>
                     </article>
                 </section>
@@ -1037,6 +1099,7 @@
     <script src="pdf.js"></script>
     <script src="notes.js"></script>
     <script src="presupuestos.js"></script>
+    <script src="resenas.js"></script>
     <link rel="stylesheet" href="asistente.css" />
     <script src="asistente.js"></script>
 </body>

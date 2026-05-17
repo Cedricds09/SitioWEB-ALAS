@@ -16,6 +16,33 @@ const publicSolicitudLimiter = rateLimit({
   // Trust proxy se setea a nivel app si el deploy va detrás de reverse proxy.
 });
 
+// Alta de reseñas públicas: 3 requests por IP cada hora (anti-spam).
+const resenaPublicLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hora
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    ok: false,
+    error: 'Demasiadas reseñas enviadas. Intenta de nuevo más tarde.',
+  },
+});
+
+// Verificación de cliente (paso 1 del formulario): tope más holgado para
+// permitir reintentos legítimos, pero acotado para frenar enumeración.
+const resenaVerificarLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hora
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    ok: false,
+    error: 'Demasiados intentos. Intenta de nuevo más tarde.',
+  },
+});
+
 module.exports = {
   publicSolicitudLimiter,
+  resenaPublicLimiter,
+  resenaVerificarLimiter,
 };

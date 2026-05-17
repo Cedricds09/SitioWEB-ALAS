@@ -28,6 +28,14 @@
     box-shadow: 0 8px 32px rgba(106, 60, 255, 0.6);
 }
 .asist-btn[hidden] { display: none; }
+/* Icono del botón flotante: el logo del chatbot llena el círculo. */
+.asist-btn-icon {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+}
 
 /* Panel del chat */
 .asist-panel {
