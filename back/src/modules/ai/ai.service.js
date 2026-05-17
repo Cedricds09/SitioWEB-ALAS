@@ -566,7 +566,84 @@ async function chatPresupuesto(input, sesion) {
   };
 }
 
+// ============================================================
+// Consultas de negocio — datos reales de la DB, sin Claude API ($0).
+// Admin ve todo; técnico solo lo suyo (servicios por tecnico_asignado,
+// presupuestos por asignado_a). Respuestas en español, tono directo.
+// ============================================================
+
+function formatEstado(e) {
+  return String(e || '').toLowerCase().replace(/_/g, ' ');
+}
+
+async function consultaNegocio(tipo, sesion) {
+  const esAdmin = !!(sesion && sesion.rol === ROL.ADMIN);
+  // Técnico → filtra por su usuario / uid. Admin → null (sin filtro).
+  const tecnico = esAdmin ? null : (sesion && sesion.usuario) || null;
+  const uid = esAdmin ? null : (sesion && sesion.uid) || null;
+
+  switch (tipo) {
+    case 'activos': {
+      const r = await repo.negocioActivos({ tecnico });
+      const total = Number(r.total) || 0;
+      if (!total) return { respuesta: 'No tienes servicios activos. ✅' };
+      const pend = Number(r.pendientes) || 0;
+      const proc = Number(r.en_proceso) || 0;
+      return {
+        respuesta: `Tienes ${total} servicio(s) activo(s): ${pend} pendiente(s) y ${proc} en proceso.`,
+      };
+    }
+
+    case 'urgentes': {
+      const rows = await repo.negocioUrgentes({ tecnico });
+      if (!rows.length) {
+        return { respuesta: 'No tienes servicios activos pendientes. ✅' };
+      }
+      const lineas = rows
+        .map((s) => `- ${s.numero_cliente} ${s.nombre_cliente} — ${s.dias} día(s) en ${formatEstado(s.estado)}`)
+        .join('\n');
+      return { respuesta: `Los más urgentes (sin cerrar):\n${lineas}` };
+    }
+
+    case 'sin_presupuesto': {
+      const total = Number((await repo.negocioSinPresupuesto({ tecnico })).total) || 0;
+      if (!total) {
+        return { respuesta: 'Todos tus servicios activos tienen presupuesto. ✅' };
+      }
+      return { respuesta: `${total} servicio(s) activo(s) no tienen presupuesto asignado.` };
+    }
+
+    case 'sin_cerrar': {
+      const rows = await repo.negocioSinCerrar({ tecnico });
+      if (!rows.length) {
+        return { respuesta: 'No hay servicios demorados. ✅' };
+      }
+      const lineas = rows
+        .map((s) => `- ${s.numero_cliente} ${s.nombre_cliente} — ${s.dias} día(s)`)
+        .join('\n');
+      return { respuesta: `Servicios en proceso hace más de 7 días:\n${lineas}` };
+    }
+
+    case 'presupuestos_pendientes': {
+      const r = await repo.negocioPresupuestosPendientes({ uid });
+      const total = Number(r.total) || 0;
+      if (!total) {
+        return { respuesta: 'No hay presupuestos pendientes de respuesta. ✅' };
+      }
+      const borr = Number(r.borradores) || 0;
+      const enviados = Number(r.enviados) || 0;
+      return {
+        respuesta: `Tienes ${total} presupuesto(s) sin respuesta del cliente:\n${borr} en borrador y ${enviados} enviados.`,
+      };
+    }
+
+    default:
+      throw new ValidationError('Tipo de consulta no válido.');
+  }
+}
+
 module.exports = {
   sugerirBloques,
   chatPresupuesto,
+  consultaNegocio,
 };

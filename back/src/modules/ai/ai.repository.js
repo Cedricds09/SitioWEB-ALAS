@@ -77,8 +77,123 @@ async function registrarGeneracion(data, tx) {
   return r.recordset[0];
 }
 
+// ============================================================
+// Consultas de negocio (sin Claude API — queries SQL directas).
+// El filtro por técnico llega resuelto desde el service:
+//   - servicios: { tecnico } = usuario (NVARCHAR) o null (admin → todo).
+//   - presupuestos: { uid } = id de usuario (INT) o null (admin → todo).
+// ============================================================
+
+// CONSULTA 1 — servicios activos (totales por estado).
+async function negocioActivos({ tecnico }) {
+  const pool = await getPool();
+  const reqDb = pool.request();
+  let filtro = '';
+  if (tecnico) {
+    reqDb.input('tec', sql.NVarChar(50), tecnico);
+    filtro = ' AND tecnico_asignado = @tec';
+  }
+  const r = await reqDb.query(`
+    SELECT
+      COUNT(*) AS total,
+      SUM(CASE WHEN estado='PENDIENTE' THEN 1 ELSE 0 END) AS pendientes,
+      SUM(CASE WHEN estado='EN_PROCESO' THEN 1 ELSE 0 END) AS en_proceso
+    FROM dbo.servicios
+    WHERE activo=1 AND estado IN ('PENDIENTE','EN_PROCESO')${filtro}
+  `);
+  return r.recordset[0];
+}
+
+// CONSULTA 2 — servicios más antiguos sin cerrar (TOP 5).
+async function negocioUrgentes({ tecnico }) {
+  const pool = await getPool();
+  const reqDb = pool.request();
+  let filtro = '';
+  if (tecnico) {
+    reqDb.input('tec', sql.NVarChar(50), tecnico);
+    filtro = ' AND tecnico_asignado = @tec';
+  }
+  const r = await reqDb.query(`
+    SELECT TOP 5
+      numero_cliente, nombre_cliente, estado, fecha_inicio,
+      DATEDIFF(DAY, fecha_inicio, GETDATE()) AS dias
+    FROM dbo.servicios
+    WHERE activo=1 AND estado IN ('PENDIENTE','EN_PROCESO')${filtro}
+    ORDER BY fecha_inicio ASC
+  `);
+  return r.recordset;
+}
+
+// CONSULTA 3 — servicios activos sin presupuesto asociado.
+async function negocioSinPresupuesto({ tecnico }) {
+  const pool = await getPool();
+  const reqDb = pool.request();
+  let filtro = '';
+  if (tecnico) {
+    reqDb.input('tec', sql.NVarChar(50), tecnico);
+    filtro = ' AND s.tecnico_asignado = @tec';
+  }
+  const r = await reqDb.query(`
+    SELECT COUNT(*) AS total
+    FROM dbo.servicios s
+    WHERE s.activo=1
+      AND s.estado IN ('PENDIENTE','EN_PROCESO')
+      AND NOT EXISTS (
+        SELECT 1 FROM dbo.presupuestos p
+        WHERE p.servicio_id = s.id AND p.activo=1
+      )${filtro}
+  `);
+  return r.recordset[0];
+}
+
+// CONSULTA 4 — servicios EN_PROCESO demorados (> 7 días, TOP 5).
+async function negocioSinCerrar({ tecnico }) {
+  const pool = await getPool();
+  const reqDb = pool.request();
+  let filtro = '';
+  if (tecnico) {
+    reqDb.input('tec', sql.NVarChar(50), tecnico);
+    filtro = ' AND tecnico_asignado = @tec';
+  }
+  const r = await reqDb.query(`
+    SELECT TOP 5
+      numero_cliente, nombre_cliente, fecha_inicio,
+      DATEDIFF(DAY, fecha_inicio, GETDATE()) AS dias
+    FROM dbo.servicios
+    WHERE activo=1 AND estado='EN_PROCESO'
+      AND DATEDIFF(DAY, fecha_inicio, GETDATE()) > 7${filtro}
+    ORDER BY fecha_inicio ASC
+  `);
+  return r.recordset;
+}
+
+// CONSULTA 5 — presupuestos sin respuesta del cliente.
+async function negocioPresupuestosPendientes({ uid }) {
+  const pool = await getPool();
+  const reqDb = pool.request();
+  let filtro = '';
+  if (uid) {
+    reqDb.input('uid', sql.Int, uid);
+    filtro = ' AND asignado_a = @uid';
+  }
+  const r = await reqDb.query(`
+    SELECT
+      COUNT(*) AS total,
+      SUM(CASE WHEN estado='borrador' THEN 1 ELSE 0 END) AS borradores,
+      SUM(CASE WHEN estado='enviado' THEN 1 ELSE 0 END) AS enviados
+    FROM dbo.presupuestos
+    WHERE activo=1 AND estado IN ('borrador','enviado')${filtro}
+  `);
+  return r.recordset[0];
+}
+
 module.exports = {
   countLastHour,
   countLastHourByUser,
   registrarGeneracion,
+  negocioActivos,
+  negocioUrgentes,
+  negocioSinPresupuesto,
+  negocioSinCerrar,
+  negocioPresupuestosPendientes,
 };

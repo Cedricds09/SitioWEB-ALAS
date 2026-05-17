@@ -69,8 +69,20 @@ const chatPresupuestoSchema = z
     }
   });
 
+// Schema del endpoint /consulta-negocio — consultas de datos sin Claude API.
+const consultaNegocioSchema = z.object({
+  tipo: z.enum([
+    'activos',
+    'urgentes',
+    'sin_presupuesto',
+    'sin_cerrar',
+    'presupuestos_pendientes',
+  ]),
+});
+
 module.exports = {
   sugerirBloquesSchema,
   chatPresupuestoSchema,
+  consultaNegocioSchema,
   MODOS,
 };

@@ -15,7 +15,14 @@ async function chatPresupuesto(req, res) {
   res.json({ ok: true, data });
 }
 
+// POST /api/ai/consulta-negocio — consultas de datos reales (sin Claude API)
+async function consultaNegocio(req, res) {
+  const data = await service.consultaNegocio(req.body.tipo, req.session || {});
+  res.json({ ok: true, data });
+}
+
 module.exports = {
   sugerirBloques,
   chatPresupuesto,
+  consultaNegocio,
 };

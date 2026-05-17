@@ -174,13 +174,13 @@
         scrollDown();
     }
 
-    function addLoadingMsg() {
+    function addLoadingMsg(texto) {
         const row = document.createElement("div");
         row.className = "asist-msg-row asist-msg-row-bot";
         row.id = "asistLoadingMsg";
         const div = document.createElement("div");
         div.className = "asist-msg asist-msg-bot";
-        div.innerHTML = '<span class="asist-spinner"></span> Generando…';
+        div.innerHTML = '<span class="asist-spinner"></span> ' + esc(texto || "Generando…");
         row.appendChild(botAvatar());
         row.appendChild(div);
         msgs.appendChild(row);
@@ -258,6 +258,7 @@
     function saludo() {
         addBotMsg("Elige una opción o escríbeme lo que necesitas:", [
             { label: "📋 Nuevo presupuesto", action: empezarPresupuesto },
+            { label: "📊 Estado del negocio", action: menuNegocio },
             { label: "🔧 Ver servicios", action: () => navegar("servicios") },
             { label: "👥 Buscar cliente", action: () => navegar("clientes") },
             { label: "📄 Consultar nota", action: () => navegar("notas") },
@@ -331,6 +332,66 @@
             addBotMsg(`Te llevo a ${target}.`);
         } else {
             addBotMsg("No encontré esa sección.");
+        }
+    }
+
+    /* ---------- Consultas de negocio (datos reales, sin Claude API) ---------- */
+    const KEYWORDS_NEGOCIO = {
+        activos: ["activos", "cuántos servicios", "mis servicios",
+                  "servicios tengo", "cuantos servicios"],
+        urgentes: ["urgentes", "más urgentes", "mas urgentes",
+                   "prioridad", "más antiguos", "mas antiguos"],
+        sin_presupuesto: ["sin presupuesto", "falta presupuesto",
+                          "no tienen presupuesto", "presupuesto falta"],
+        sin_cerrar: ["sin cerrar", "no han cerrado", "demorados",
+                     "llevan mucho", "no cierran"],
+        presupuestos_pendientes: ["presupuestos pendientes", "sin respuesta",
+                                  "esperando respuesta", "presupuestos enviados"],
+    };
+
+    // Devuelve el tipo de consulta si el texto contiene alguna keyword, o null.
+    function detectarConsultaNegocio(low) {
+        for (const tipo of Object.keys(KEYWORDS_NEGOCIO)) {
+            if (KEYWORDS_NEGOCIO[tipo].some((k) => low.includes(k))) return tipo;
+        }
+        return null;
+    }
+
+    // Submenú con las 5 consultas de negocio.
+    function menuNegocio() {
+        addUserMsg("📊 Estado del negocio");
+        addBotMsg("¿Qué quieres consultar?", [
+            { label: "📋 Servicios activos", action: () => consultarNegocio("activos", "Servicios activos") },
+            { label: "⚡ Más urgentes", action: () => consultarNegocio("urgentes", "Más urgentes") },
+            { label: "📄 Sin presupuesto", action: () => consultarNegocio("sin_presupuesto", "Sin presupuesto") },
+            { label: "⏳ Sin cerrar", action: () => consultarNegocio("sin_cerrar", "Sin cerrar") },
+            { label: "💼 Presupuestos pendientes", action: () => consultarNegocio("presupuestos_pendientes", "Presupuestos pendientes") },
+        ]);
+    }
+
+    // Consulta al backend y muestra la respuesta. `etiqueta` se usa cuando
+    // la consulta viene de un botón (para reflejar la elección del usuario).
+    async function consultarNegocio(tipo, etiqueta) {
+        if (etiqueta) addUserMsg(etiqueta);
+        addLoadingMsg("Consultando datos…");
+        try {
+            const res = await fetch("/api/ai/consulta-negocio", {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ tipo }),
+            });
+            const payload = await res.json().catch(() => ({}));
+            removeLoadingMsg();
+            if (!res.ok || !payload.ok || !payload.data) {
+                addBotMsg("No pude consultar los datos. Intenta de nuevo.");
+                return;
+            }
+            addBotMsg(payload.data.respuesta || "No pude consultar los datos. Intenta de nuevo.");
+        } catch (err) {
+            removeLoadingMsg();
+            console.error("[ASIST] consulta-negocio error:", err);
+            addBotMsg("No pude consultar los datos. Intenta de nuevo.");
         }
     }
 
@@ -537,6 +598,10 @@
         if (state.modo === null || state.paso === null) {
             addUserMsg(t);
             const low = t.toLowerCase();
+            // Consultas de negocio: se evalúan primero (algunas contienen
+            // "servicio"/"presupuesto" y se confundirían con navegación).
+            const tipoNegocio = detectarConsultaNegocio(low);
+            if (tipoNegocio) return consultarNegocio(tipoNegocio);
             if (/\b(presupuesto|cotizaci)/i.test(low)) return empezarPresupuesto();
             if (/\b(servicio)/i.test(low)) return navegar("servicios");
             if (/\b(cliente)/i.test(low)) return navegar("clientes");

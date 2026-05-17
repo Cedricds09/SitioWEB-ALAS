@@ -24,4 +24,11 @@ router.post(
   asyncHandler(ctrl.chatPresupuesto),
 );
 
+// Consultas de negocio — datos reales de la DB, sin Claude API.
+router.post(
+  '/consulta-negocio',
+  validate({ body: S.consultaNegocioSchema }),
+  asyncHandler(ctrl.consultaNegocio),
+);
+
 module.exports = router;
