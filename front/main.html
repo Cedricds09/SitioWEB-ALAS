@@ -447,7 +447,10 @@
                         </label>
                         <label>
                             <span>Contraseña</span>
-                            <input type="password" name="password" id="loginPass" required autocomplete="current-password" placeholder="••••••••" />
+                            <span class="pwd-field">
+                                <input type="password" name="password" id="loginPass" required autocomplete="current-password" placeholder="••••••••" />
+                                <button type="button" class="pwd-toggle" aria-label="Mostrar contraseña">👁</button>
+                            </span>
                         </label>
                         <div class="form-actions">
                             <button type="submit" class="btn btn-primary" id="loginSubmit">Entrar</button>
@@ -643,7 +646,10 @@
                                     </label>
                                     <label>
                                         <span>Contraseña <small>(mín. 6 caracteres)</small></span>
-                                        <input type="password" name="password" id="passNew" required autocomplete="new-password" placeholder="••••••••" minlength="6" />
+                                        <span class="pwd-field">
+                                            <input type="password" name="password" id="passNew" required autocomplete="new-password" placeholder="••••••••" minlength="6" />
+                                            <button type="button" class="pwd-toggle" aria-label="Mostrar contraseña">👁</button>
+                                        </span>
                                     </label>
                                     <label>
                                         <span>Rol</span>
@@ -846,7 +852,10 @@
             <form id="passForm" class="form" novalidate>
                 <label>
                     <span>Nueva contraseña <small>(mín. 6 caracteres)</small></span>
-                    <input type="password" id="passInput" required minlength="6" autocomplete="new-password" placeholder="••••••••" />
+                    <span class="pwd-field">
+                        <input type="password" id="passInput" required minlength="6" autocomplete="new-password" placeholder="••••••••" />
+                        <button type="button" class="pwd-toggle" aria-label="Mostrar contraseña">👁</button>
+                    </span>
                 </label>
                 <div class="modal-actions">
                     <button type="button" class="btn btn-ghost" id="passCancel">Cancelar</button>

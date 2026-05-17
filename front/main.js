@@ -935,6 +935,18 @@
     wireMoneyPreview("totalInput", "totalPreview");
     wireMoneyPreview("editTotal", "editTotalPreview");
 
+    /* ===== Toggle mostrar/ocultar contraseña ===== */
+    document.querySelectorAll(".pwd-toggle").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            const input = btn.parentElement.querySelector("input");
+            if (!input) return;
+            const visible = input.type === "text";
+            input.type = visible ? "password" : "text";
+            btn.textContent = visible ? "👁" : "🙈";
+            btn.setAttribute("aria-label", visible ? "Mostrar contraseña" : "Ocultar contraseña");
+        });
+    });
+
     /* ===== Issue 39: autocomplete cliente en svcForm =====
        Endpoint GET /api/clientes?q=...&limit=20 ya existe (Fase 2.6).
        Si admin escribe parte del nombre, mostrar dropdown con resultados.
