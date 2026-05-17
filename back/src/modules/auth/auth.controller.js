@@ -13,13 +13,32 @@ async function login(req, res) {
   res.json({ ok: true, data: { uid, usuario, rol } });
 }
 
-function logout(_req, res) {
+async function logout(req, res) {
+  // Recupera la sesión (best-effort) para revocar el token vía token_version.
+  let sess = null;
+  try {
+    sess = await getSession(req);
+  } catch {
+    sess = null;
+  }
   clearAuthCookie(res);
+  try {
+    if (sess && sess.uid != null) await service.logout(sess);
+  } catch (err) {
+    // No bloquear el logout si la revocación falla (p. ej. migración pendiente).
+    console.error('[AUTH] logout: no se pudo revocar el token:', err.message);
+  }
   res.json({ ok: true });
 }
 
-function check(req, res) {
-  const sess = getSession(req);
+async function check(req, res) {
+  let sess = null;
+  try {
+    sess = await getSession(req);
+  } catch {
+    // Token revocado / inválido / fallo de validación → no autenticado.
+    sess = null;
+  }
   res.json({
     ok: true,
     authed: !!sess,

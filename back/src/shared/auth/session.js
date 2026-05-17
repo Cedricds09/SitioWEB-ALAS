@@ -4,6 +4,7 @@
 
 const crypto = require('crypto');
 const env = require('../config/env');
+const authRepo = require('../../modules/auth/auth.repository');
 
 const COOKIE_NAME = 'alas_admin';
 const COOKIE_MAX_AGE_MS = 8 * 60 * 60 * 1000; // 8 horas
@@ -28,7 +29,14 @@ function signToken(payload) {
   return `${body}.${sig}`;
 }
 
-function verifyToken(token) {
+// Async: además de firma + expiración, valida el token_version contra la DB
+// para soportar revocación de sesiones (M3).
+// Devuelve el payload, null (token mal formado / firma inválida / expirado),
+// o LANZA error en casos que el caller debe tratar como 401:
+//   - 'Sesión revocada...'  → token_version no coincide.
+//   - 'Usuario no encontrado o inactivo' → usuario borrado / desactivado.
+//   - 'No se pudo validar la sesión.' → fallo de DB (fail closed).
+async function verifyToken(token) {
   if (!token || typeof token !== 'string') return null;
   const idx = token.lastIndexOf('.');
   if (idx <= 0) return null;
@@ -46,6 +54,39 @@ function verifyToken(token) {
   }
   if (!payload || typeof payload.exp !== 'number') return null;
   if (Date.now() > payload.exp) return null;
+
+  // --- Revocación por token_version (M3) ---
+  let tvDB;
+  try {
+    tvDB = await authRepo.getTokenVersion(payload.uid);
+  } catch (err) {
+    // Columna token_version ausente (migración 009 pendiente):
+    // degradación controlada — no se bloquea durante el deploy.
+    const msg = (err && err.message) || '';
+    if ((err && err.number === 207) || /invalid column name|token_version/i.test(msg)) {
+      console.warn('[AUTH] token_version ausente (migración 009 pendiente) — revocación inactiva temporalmente.');
+      return payload;
+    }
+    // Cualquier otro fallo de DB → fail closed: el token NO se acepta.
+    console.error('[AUTH] No se pudo validar token_version — token rechazado:', msg);
+    throw new Error('No se pudo validar la sesión.');
+  }
+
+  // Usuario inexistente o inactivo.
+  if (tvDB === null) {
+    throw new Error('Usuario no encontrado o inactivo');
+  }
+
+  // Token emitido antes de la migración (sin tv): se permite hasta que expire.
+  if (typeof payload.tv !== 'number') {
+    console.warn('[AUTH] token sin tv (emitido pre-migración) — se permite hasta expirar.');
+    return payload;
+  }
+
+  if (payload.tv !== tvDB) {
+    throw new Error('Sesión revocada. Inicia sesión de nuevo.');
+  }
+
   return payload;
 }
 
@@ -58,7 +99,8 @@ function readCookie(req, name) {
   return found ? decodeURIComponent(found.slice(name.length + 1)) : null;
 }
 
-function getSession(req) {
+// Async (verifyToken consulta la DB). Puede lanzar — ver verifyToken.
+async function getSession(req) {
   return verifyToken(readCookie(req, COOKIE_NAME));
 }
 

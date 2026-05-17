@@ -45,11 +45,9 @@ coverage/
 # JAMÁS subir nada de aquí.
 docs/
 
-# Runbooks REST Client — pueden contener creds tras la primera vez que
-# se llenan los placeholders. Se commitean UNA vez con placeholders como
-# referencia y luego se ignoran para evitar fugas accidentales.
-back/scripts/test-ai.http
-back/scripts/test-presupuestos.http
+# Runbooks REST Client — contienen credenciales/tokens reales al llenarse.
+# Se ignoran TODOS para evitar fugas accidentales de secretos a git.
+back/scripts/test-*.http
 
 # Artefactos transitorios de pruebas
 back/scripts/cookies.txt

@@ -52,7 +52,9 @@ app.use(
         'style-src': ["'self'", "'unsafe-inline'"],
         'img-src': ["'self'", 'data:', 'https:'],
         'font-src': ["'self'", 'data:'],
-        'connect-src': ["'self'", 'https://maps.googleapis.com'],
+        // cdnjs incluido para los source maps (.map) de jspdf/qrious,
+        // que el navegador pide vía connect-src.
+        'connect-src': ["'self'", 'https://maps.googleapis.com', 'https://cdnjs.cloudflare.com'],
         'frame-src': ['https://www.google.com', 'https://maps.google.com'],
         'worker-src': ["'self'", 'blob:'],
         'object-src': ["'none'"],

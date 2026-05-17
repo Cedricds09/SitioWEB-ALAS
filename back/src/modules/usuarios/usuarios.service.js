@@ -3,6 +3,7 @@
 const bcrypt = require('bcryptjs');
 
 const repo = require('./usuarios.repository');
+const authRepo = require('../auth/auth.repository');
 const { withTransaction } = require('../../shared/db/transaction');
 const {
   NotFoundError,
@@ -64,6 +65,14 @@ async function cambiarPassword(id, password) {
   const hash = bcrypt.hashSync(password, 10);
   const r = await repo.cambiarPassword(id, hash);
   if (!r) throw new NotFoundError('Usuario no encontrado.');
+
+  // Invalida todas las sesiones previas del usuario (práctica estándar al
+  // cambiar contraseña). Best-effort: no rompe si la migración 009 falta.
+  try {
+    await authRepo.incrementTokenVersion(id);
+  } catch (err) {
+    console.warn('[AUTH] token_version no incrementado tras cambio de contraseña:', err.message);
+  }
 }
 
 module.exports = {
