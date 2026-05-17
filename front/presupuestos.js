@@ -200,6 +200,13 @@
     // Si los elementos no existen, salir silenciosamente.
     if (!presSection) return;
 
+    // Fase 5: el asistente (asistente.js) dispara este evento al crear un
+    // presupuesto vía chat conversacional. Abrimos el editor con ese id.
+    document.addEventListener("alas:abrir-presupuesto", (e) => {
+        const id = e.detail && e.detail.presupuesto_id;
+        if (id) openEditor(id);
+    });
+
     /* ---------- Inicialización via evento de sesión ---------- */
     document.addEventListener("alas:session-ready", async (e) => {
         state.sesion = e.detail;

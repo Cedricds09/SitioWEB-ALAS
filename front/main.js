@@ -550,23 +550,34 @@
         clientResults.hidden = false;
     }
 
-    tabBtns.forEach((b) => {
-        b.addEventListener("click", () => {
-            tabBtns.forEach((x) => {
-                x.classList.toggle("is-active", x === b);
-                x.setAttribute("aria-selected", x === b ? "true" : "false");
-            });
-            const target = b.dataset.tab;
-            tabActive.hidden = target !== "active";
-            tabSearch.hidden = target !== "search";
-            if (target === "search") {
-                // No carga automática; estado vacío hasta que el usuario escriba
-                if (!clientSearch.value.trim() && clientHistory.hidden) {
-                    clearSearchResults();
-                }
-                clientSearch.focus();
-            }
+    // Cambia de tab de forma programática. Lo usan tanto los botones del
+    // dashboard como otros módulos (asistente.js) vía el evento alas:cambiar-tab.
+    function activarTab(target) {
+        if (target !== "active" && target !== "search") return;
+        tabBtns.forEach((x) => {
+            const on = x.dataset.tab === target;
+            x.classList.toggle("is-active", on);
+            x.setAttribute("aria-selected", on ? "true" : "false");
         });
+        tabActive.hidden = target !== "active";
+        tabSearch.hidden = target !== "search";
+        if (target === "search") {
+            // No carga automática; estado vacío hasta que el usuario escriba
+            if (!clientSearch.value.trim() && clientHistory.hidden) {
+                clearSearchResults();
+            }
+            clientSearch.focus();
+        }
+    }
+
+    tabBtns.forEach((b) => {
+        b.addEventListener("click", () => activarTab(b.dataset.tab));
+    });
+
+    // El asistente (asistente.js) dispara este evento para cambiar de tab sin
+    // simular clicks, que no siempre cambian el tab de forma fiable.
+    document.addEventListener("alas:cambiar-tab", (e) => {
+        activarTab(e.detail && e.detail.tab);
     });
 
     /* ===== Render servicios ===== */

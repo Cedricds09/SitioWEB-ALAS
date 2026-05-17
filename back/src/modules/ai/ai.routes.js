@@ -17,4 +17,11 @@ router.post(
   asyncHandler(ctrl.sugerirBloques),
 );
 
+// Fase 5 — asistente conversacional
+router.post(
+  '/chat-presupuesto',
+  validate({ body: S.chatPresupuestoSchema }),
+  asyncHandler(ctrl.chatPresupuesto),
+);
+
 module.exports = router;

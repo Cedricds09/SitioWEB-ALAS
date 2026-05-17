@@ -31,7 +31,46 @@ const sugerirBloquesSchema = z
     }
   });
 
+// Schema del endpoint /chat-presupuesto (Fase 5 — asistente conversacional).
+const chatPresupuestoSchema = z
+  .object({
+    cliente_nombre: z.preprocess(
+      (v) => (v == null ? undefined : String(v).trim()),
+      z.string().min(2).max(100),
+    ).optional(),
+    cliente_telefono: z.preprocess(
+      (v) => {
+        if (v == null) return undefined;
+        const d = String(v).replace(/\D+/g, '');
+        return d === '' ? undefined : d;
+      },
+      z.string().regex(/^\d{10}$/, 'Teléfono debe ser 10 dígitos.'),
+    ).optional(),
+    numero_cliente_existente: z.preprocess(
+      (v) => (v == null ? undefined : String(v).trim().toUpperCase()),
+      z.string().regex(/^CL-\d{1,4}$/i, 'Formato debe ser CL-XXXX.'),
+    ).optional(),
+    tipo_servicio: z.enum([
+      'plomeria', 'electrica', 'gas', 'pintura', 'soldadura', 'mantenimiento_integral',
+    ]),
+    descripcion: z.preprocess(
+      (v) => (v == null ? '' : String(v).trim()),
+      z.string().min(10).max(2000),
+    ),
+    respuestas_adicionales: z.record(z.string().max(500)).optional().default({}),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.numero_cliente_existente && !data.cliente_nombre) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Falta cliente_nombre o numero_cliente_existente.',
+        path: ['cliente_nombre'],
+      });
+    }
+  });
+
 module.exports = {
   sugerirBloquesSchema,
+  chatPresupuestoSchema,
   MODOS,
 };
