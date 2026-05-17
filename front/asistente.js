@@ -10,6 +10,8 @@
     /* ---------- Estado ---------- */
     const state = {
         abierto: false,
+        iniciado: false,      // true tras la primera apertura: el historial vive
+                              // en el DOM y persiste mientras dure la sesión.
         modo: null,           // null | 'presupuesto' | 'navegacion'
         paso: null,           // ver fasePresupuesto
         preguntaIdx: 0,
@@ -87,8 +89,8 @@
     /* ---------- DOM (creado al cargar) ---------- */
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    // Avatar del bot (logo del chatbot ALAS). El espacio del archivo va codificado.
-    const BOT_AVATAR = "imagenes/Logo%20chatboot%20ALAS.png";
+    // Avatar del bot (logo del chatbot ALAS).
+    const BOT_AVATAR = "imagenes/logo-chatbot-alas.png";
 
     const html = `
         <button type="button" class="asist-btn" id="asistBtn" aria-label="Asistente" hidden>💬</button>
@@ -199,7 +201,9 @@
         state.abierto = true;
         panel.classList.add("show");
         btn.textContent = "✕";
-        resetChat();
+        // El historial vive en el DOM: solo se inicializa la primera vez.
+        // Reabrir el panel NO borra los mensajes previos.
+        if (!state.iniciado) iniciarChat();
         setTimeout(() => input.focus(), 80);
     }
 
@@ -214,8 +218,9 @@
         else abrir();
     }
 
-    /* ---------- Reset del chat ---------- */
-    function resetChat() {
+    /* ---------- Reset / inicio del chat ---------- */
+    // Reinicia solo el estado del flujo (no toca el historial de mensajes).
+    function resetFlujo() {
         state.modo = null;
         state.paso = null;
         state.preguntaIdx = 0;
@@ -228,14 +233,28 @@
             descripcion: null,
             respuestas_adicionales: {},
         };
+    }
+
+    // Inicializa el chat: limpia el área y pinta el saludo. Solo se llama
+    // una vez por sesión (primera apertura del panel).
+    function iniciarChat() {
+        resetFlujo();
         msgs.innerHTML = "";
         const nombre = (state.sesion && state.sesion.usuario) || "usuario";
         headTitle.textContent = `Hola ${nombre} 👋`;
         saludo();
+        state.iniciado = true;
+    }
+
+    // Borra el historial por completo. Se usa al cerrar sesión.
+    function limpiarHistorial() {
+        resetFlujo();
+        msgs.innerHTML = "";
+        state.iniciado = false;
     }
 
     function saludo() {
-        addBotMsg("¿En qué te ayudo?", [
+        addBotMsg("Elige una opción o escríbeme lo que necesitas:", [
             { label: "📋 Nuevo presupuesto", action: empezarPresupuesto },
             { label: "🔧 Ver servicios", action: () => navegar("servicios") },
             { label: "👥 Buscar cliente", action: () => navegar("clientes") },
@@ -270,7 +289,6 @@
             cambiarTab("active");
             irAlDash();
             addBotMsg("Te llevo a la lista de servicios.");
-            setTimeout(cerrar, 800);
             return;
         }
 
@@ -280,7 +298,6 @@
             cambiarTab("search");
             irAlDash();
             addBotMsg("Te llevo a la búsqueda de clientes. Escribe nombre, número o teléfono.");
-            setTimeout(cerrar, 800);
             return;
         }
 
@@ -297,7 +314,6 @@
             } else {
                 addBotMsg('Te llevo a los servicios. Cambia al filtro "Finalizados" para ver las notas.');
             }
-            setTimeout(cerrar, 800);
             return;
         }
 
@@ -311,7 +327,6 @@
         if (el) {
             el.scrollIntoView({ behavior: "smooth", block: "start" });
             addBotMsg(`Te llevo a ${target}.`);
-            setTimeout(cerrar, 800);
         } else {
             addBotMsg("No encontré esa sección.");
         }
@@ -665,7 +680,12 @@
     // Reusa el mismo evento que el resto del panel admin.
     document.addEventListener("alas:session-ready", (e) => {
         state.sesion = e.detail || null;
-        if (state.sesion) mostrarBurbuja();
-        else ocultarBurbuja();
+        if (state.sesion) {
+            mostrarBurbuja();
+        } else {
+            // Cierre de sesión: borra el historial del chat.
+            limpiarHistorial();
+            ocultarBurbuja();
+        }
     });
 })();
