@@ -1,23 +1,23 @@
 // Validación Zod del módulo servicios.
-// Las preprocessing replican la coerción del código original (String().trim(), Number(), null si vacío).
+// Los preprocess replican la coerción del código original: String().trim(), Number(), null si vacío.
 
 const { z } = require('zod');
 
 // ===== Helpers =====
 
-// String requerido tras trim. Acepta null/undefined → "" → falla min(1).
+// String requerido tras trim. null/undefined se vuelve "" y falla el min(1).
 const requiredString = z.preprocess(
   (v) => (v == null ? '' : String(v).trim()),
   z.string().min(1, 'Este campo es obligatorio.'),
 );
 
-// String opcional. null/'' → undefined; resto → trim string.
+// String opcional. null/'' se vuelve undefined; el resto se trimea.
 const optionalString = z.preprocess(
   (v) => (v == null || v === '' ? undefined : String(v).trim()),
   z.string().optional(),
 );
 
-// String que admite explicitamente null (para campos como ajuste/telefono/direccion donde null = "limpiar").
+// String que admite null explícito (campos como ajuste/telefono/direccion donde null significa "limpiar").
 const nullableTrimmedString = z.preprocess(
   (v) => {
     if (v === undefined) return undefined;
@@ -28,9 +28,9 @@ const nullableTrimmedString = z.preprocess(
   z.union([z.string(), z.null()]).optional(),
 );
 
-// Teléfono: 10 dígitos exactos. Strip de no-dígitos antes de validar (defensa
-// contra espacios/guiones/paréntesis del frontend). Vacío/null → null.
-// Defensa en profundidad — la columna en BD también tiene CHECK constraint
+// Teléfono: 10 dígitos exactos. Quita no-dígitos antes de validar (defensa
+// contra espacios/guiones/paréntesis del frontend). Vacío/null se vuelve null.
+// Defensa en profundidad: la columna en BD también tiene CHECK constraint
 // (CK_servicios_telefono_formato, migración 005).
 const telefonoString = z.preprocess(
   (v) => {
@@ -45,7 +45,7 @@ const telefonoString = z.preprocess(
   ]).optional(),
 );
 
-// Número opcional con coerción defensiva. '' o no-finito → null; sino number.
+// Número opcional con coerción defensiva. '' o no-finito se vuelve null; sino number.
 const optionalNumber = z.preprocess(
   (v) => {
     if (v === undefined) return undefined;
@@ -56,7 +56,7 @@ const optionalNumber = z.preprocess(
   z.union([z.number(), z.null()]).optional(),
 );
 
-// Número monetario ≥ 0. Default 0 si no llega o es inválido (replica `Number(total) || 0`).
+// Número monetario >= 0. Default 0 si no llega o es inválido (replica `Number(total) || 0`).
 const moneyNumber = z.preprocess(
   (v) => {
     if (v == null || v === '') return 0;
@@ -66,7 +66,7 @@ const moneyNumber = z.preprocess(
   z.number({ invalid_type_error: 'Debe ser un número.' }).min(0, 'No puede ser negativo.'),
 );
 
-// Fecha programada (YYYY-MM-DD), opcional. '' o null → null.
+// Fecha programada (YYYY-MM-DD), opcional. '' o null se vuelve null.
 const fechaProgramada = z.preprocess(
   (v) => {
     if (v === undefined) return undefined;
@@ -79,7 +79,7 @@ const fechaProgramada = z.preprocess(
   ]).optional(),
 );
 
-// Hora programada (HH:MM), opcional. '' o null → null.
+// Hora programada (HH:MM), opcional. '' o null se vuelve null.
 const horaProgramada = z.preprocess(
   (v) => {
     if (v === undefined) return undefined;
@@ -170,7 +170,7 @@ const listarQuerySchema = z.object({
   mine: optionalString,
 });
 
-// Calendario: semana ISO "YYYY-WNN" opcional (sin valor → semana actual).
+// Calendario: semana ISO "YYYY-WNN" opcional. Sin valor usa la semana actual.
 const calendarioQuerySchema = z.object({
   semana: z.preprocess(
     (v) => (v == null || v === '' ? undefined : String(v).trim()),

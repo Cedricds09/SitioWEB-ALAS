@@ -1,4 +1,4 @@
-// Controller — config público para frontend.
+// Controller: config público para el frontend.
 // Sirve la API key de Maps (restringida por dominio en GCP) sin hardcodearla en el repo.
 
 const env = require('../../shared/config/env');

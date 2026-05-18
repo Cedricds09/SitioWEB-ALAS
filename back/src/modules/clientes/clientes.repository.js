@@ -1,5 +1,5 @@
-// Repository — queries SQL del módulo clientes.
-// Fuente única: tabla servicios. NO usa tabla notas.
+// Repository: queries SQL del módulo clientes.
+// Fuente única: tabla servicios. No usa la tabla notas.
 
 const { sql, getPool } = require('../../shared/db/pool');
 
@@ -7,7 +7,7 @@ async function buscar({ q, limit }) {
   const pool = await getPool();
   const reqDb = pool.request();
 
-  // limit ya viene validado por Zod (clientes.schema.js): int ∈ [1, 100], default 20.
+  // limit ya viene validado por Zod (clientes.schema.js): int entre 1 y 100, default 20.
   reqDb.input('limit', sql.Int, limit);
 
   let where = 'WHERE activo = 1';
@@ -17,8 +17,8 @@ async function buscar({ q, limit }) {
   }
 
   // Agrupado por numero_cliente para evitar duplicados.
-  // Devuelve metadata útil (conteo de servicios y fecha del último) para la UI.
-  // Issue 40: incluir `direccion` para que autocomplete del frontend la llene.
+  // Devuelve metadata útil para la UI: conteo de servicios y fecha del último.
+  // Incluye `direccion` para que el autocomplete del frontend la llene.
   const result = await reqDb.query(`
     SELECT
       numero_cliente,

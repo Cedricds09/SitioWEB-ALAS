@@ -1,4 +1,4 @@
-// Controller — capa fina entre HTTP y service.
+// Capa fina entre HTTP y el service.
 
 const service = require('./notas.service');
 

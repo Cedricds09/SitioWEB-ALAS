@@ -1,6 +1,6 @@
 (() => {
     /* =====================================================
-       SITIO PÚBLICO — WhatsApp + nav + cotización
+       SITIO PÚBLICO: WhatsApp, nav y cotización
        ===================================================== */
     const WHATSAPP_NUMBER = "525531675824";
     const DEFAULT_MESSAGE = "Hola ALAS, me gustaría solicitar una cotización.";
@@ -89,12 +89,11 @@
     const yearEl = document.getElementById("year");
     if (yearEl) yearEl.textContent = new Date().getFullYear();
 
-    /* ===== FIX 8 — prefijo CL- en inputs públicos de número de cliente ===== */
+    /* ===== FIX 8: prefijo CL- en inputs públicos de número de cliente ===== */
     function initClienteInput(inputEl) {
         if (!inputEl) return;
-        // Valor inicial con el prefijo.
         if (!inputEl.value) inputEl.value = "CL-";
-        // Al hacer focus → cursor al final (no antes del prefijo).
+        // Al hacer focus, cursor al final (no antes del prefijo).
         inputEl.addEventListener("focus", () => {
             const len = inputEl.value.length;
             inputEl.setSelectionRange(len, len);
@@ -165,8 +164,8 @@
         let primer = null;
         let count = 0;
         for (const path of paths) {
-            // Path puede ser anidado (bloques.0.contenido_texto) — para forms planos
-            // basta con el primer segmento.
+            // Path puede ser anidado (bloques.0.contenido_texto); para forms
+            // planos basta con el primer segmento.
             const top = String(path).split(".")[0];
             const el = formEl.querySelector(
                 `[name="${top}"], #${top}Input, #${top}`
@@ -295,9 +294,6 @@
         document.head.appendChild(script);
     }
 
-    // 1. Pedir config al backend
-    // 2. Si hay key → cargar script de Maps
-    // 3. Si script carga → bind autocomplete a inputs existentes
     fetch(`${_ORIGIN}/api/config`)
         .then((r) => r.json())
         .then((b) => {
@@ -313,7 +309,7 @@
         .catch((e) => console.warn("[Maps] config fetch falló:", e));
 
     /* =====================================================
-       PANEL ADMIN — solo se inicializa en /admin
+       PANEL ADMIN: solo se inicializa en /admin
        ===================================================== */
     if (window.location.pathname !== "/admin") return;
 
@@ -706,8 +702,8 @@
         `;
     }
 
-    // FIX 2 — estado del colapso de servicios activos (en memoria, persiste
-    // entre re-renders mientras viva la sesión; no usa localStorage).
+    // FIX 2: estado del colapso de servicios activos. En memoria, persiste
+    // entre re-renders mientras viva la sesión. No usa localStorage.
     let svcActivosExpandido = false;
 
     function renderServicios(rows, container, opts = {}) {
@@ -801,8 +797,8 @@
                     </article>
                 `; });
 
-        // FIX 2 — si la lista es colapsable y hay más de 3, se muestran 3 y
-        // el resto va en un contenedor con transición de max-height.
+        // FIX 2: si la lista es colapsable y hay más de 3, muestra 3 y mete
+        // el resto en un contenedor con transición de max-height.
         const colapsar = opts.collapsible && articulosHTML.length > 3;
         const visiblesHTML = colapsar ? articulosHTML.slice(0, 3) : articulosHTML;
         const ocultosHTML = colapsar ? articulosHTML.slice(3) : [];
@@ -1102,7 +1098,7 @@
     svcForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         const data = Object.fromEntries(new FormData(svcForm).entries());
-        // FormData incluye lat/lng (hidden inputs) — vacíos si no se usó autocomplete
+        // FormData incluye lat/lng (hidden inputs), vacíos si no se usó autocomplete
         svcSubmit.disabled = true;
         const original = svcSubmit.textContent;
         svcSubmit.textContent = "Creando…";
@@ -1210,8 +1206,8 @@
     const svcTelefonoInput = document.querySelector('#svcForm [name="telefono"]');
     const svcDireccionInput = document.querySelector('#svcForm [name="direccion"]');
 
-    // FIX 3 — línea informativa del número de cliente bajo el campo "Nombre".
-    // Cliente existente → "Número de cliente: CL-XXXX". Cliente nuevo → aviso gris.
+    // FIX 3: línea informativa del número de cliente bajo el campo "Nombre".
+    // Cliente existente muestra "Número de cliente: CL-XXXX". Cliente nuevo, aviso gris.
     function actualizarClienteIdInfo() {
         const info = document.getElementById("svcClienteIdInfo");
         if (!info) return;
@@ -1319,7 +1315,6 @@
         }
     });
 
-    /* ===== Finalizar ===== */
     /* ===== Finalizar con modal de resolución ===== */
     const finalizeBack = document.getElementById("finalizeBack");
     const finalizeForm = document.getElementById("finalizeForm");

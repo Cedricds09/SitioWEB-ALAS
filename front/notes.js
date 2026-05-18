@@ -1,6 +1,6 @@
 (() => {
-    // URL relativa: el fetch usa el mismo origen desde donde cargó la
-    // página → funciona en localhost, ngrok y producción sin cambios.
+    // URL relativa: el fetch usa el mismo origen donde cargó la página.
+    // Así funciona en localhost, ngrok y producción sin cambios.
     const API_BASE = "";
 
     function escape(s) {
@@ -96,8 +96,8 @@
             date: formatFecha(data.fecha),
             name: nombreSafe,
             phone: telMasked,
-            // Issue 29: usa tipo_servicio del backend (heredado vía JOIN
-            // notas LEFT JOIN servicios). Fallback al label genérico.
+            // Issue 29: usa tipo_servicio del backend (heredado vía
+            // notas LEFT JOIN servicios). Si no viene, label genérico.
             service: data.tipo_servicio || "Nota de servicio",
             message: typeof data.conceptos === "string" ? data.conceptos : "",
             items: parseConceptos(data.conceptos, data.total)
@@ -107,7 +107,7 @@
     function flashAndScroll(root) {
         root.scrollIntoView({ behavior: "smooth", block: "center" });
         root.classList.remove("flash");
-        // reinicia animación
+        // reflow forzado para reiniciar la animación
         void root.offsetWidth;
         root.classList.add("flash");
     }
@@ -124,8 +124,9 @@
         renderError("No se encontró ninguna nota con los datos proporcionados", { notFound: true });
     }
 
-    // Renderiza 1..N notas. 1-3 → todas; >3 → 3 recientes + "Ver más" +
-    // buscador en vivo (por fecha o folio) sobre las notas ya cargadas.
+    // Renderiza 1..N notas. Si son 3 o menos, las muestra todas. Si son más,
+    // muestra 3 recientes con "Ver más" y un buscador en vivo (por fecha o
+    // folio) sobre las notas ya cargadas.
     function renderNotas(dataArr) {
         const root = document.getElementById("notesResults");
         if (!root) return;

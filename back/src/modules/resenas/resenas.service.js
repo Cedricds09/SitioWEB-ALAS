@@ -1,5 +1,5 @@
-// Service — reglas de negocio del módulo resenas.
-// Sin SQL crudo, sin Express. Llama al repository y lanza errores tipados.
+// Reglas de negocio del módulo resenas.
+// Sin SQL crudo ni Express. Llama al repository y lanza errores tipados.
 
 const repo = require('./resenas.repository');
 const { NotFoundError, ConflictError } = require('../../shared/errors/AppError');
@@ -14,7 +14,7 @@ const TIPO_LABELS = {
   mantenimiento_integral: 'Mantenimiento integral',
 };
 
-// Normaliza CL-1 / cl-0001 / CL-42 → CL-0001 (uppercase, 4 dígitos).
+// Normaliza CL-1, cl-0001, CL-42 a CL-0001 (uppercase, 4 dígitos).
 function normalizarNumeroCliente(raw) {
   const m = String(raw || '').trim().match(/^CL-?(\d{1,4})$/i);
   if (!m) return String(raw || '').trim().toUpperCase();
@@ -33,7 +33,7 @@ function tipoLabel(tipo) {
 }
 
 // Paso 1 del formulario público: confirma que el cliente existe.
-// Consulta SOLO dbo.notas (igual que el módulo notas). El chequeo de
+// Solo consulta dbo.notas (igual que el módulo notas). El chequeo de
 // duplicados contra dbo.resenas ocurre al enviar la reseña, no aquí.
 async function verificarCliente(data) {
   const numero_cliente = normalizarNumeroCliente(data.numero_cliente);

@@ -1,5 +1,5 @@
-// Repository — todos los queries SQL del módulo servicios.
-// Sin req/res, sin lógica de negocio, sin Express. Solo SQL.
+// Repository: queries SQL del módulo servicios.
+// Solo SQL, nada de Express ni lógica de negocio.
 // Acepta `tx` opcional para operaciones transaccionales.
 
 const { sql, getPool } = require('../../shared/db/pool');
@@ -91,8 +91,8 @@ async function crearServicio(data, tx) {
     .input('total', sql.Decimal(12, 2), data.total)
     .input('estado', sql.NVarChar(20), ESTADO_SERVICIO.PENDIENTE)
     .input('tecnico_asignado', sql.NVarChar(50), data.tecnico_asignado)
-    // VarChar: SQL Server convierte implícitamente 'YYYY-MM-DD'→DATE y
-    // 'HH:MM'→TIME sin pasar por un JS Date (evita corrimientos de zona).
+    // VarChar a propósito: SQL Server convierte 'YYYY-MM-DD' a DATE y 'HH:MM'
+    // a TIME sin pasar por un JS Date, así evitamos corrimientos de zona.
     .input('fecha_programada', sql.VarChar(10), data.fecha_programada ?? null)
     .input('hora_programada', sql.VarChar(5), data.hora_programada ?? null)
     .query(`
@@ -133,8 +133,8 @@ async function listarServicios({ estados, tecnico }) {
   return result.recordset;
 }
 
-// Servicios activos programados en una semana (o sin programar), para el
-// calendario. tecnico=undefined → todos (admin); valor → filtra ese técnico.
+// Servicios activos programados en una semana (o sin programar) para el
+// calendario. tecnico undefined trae todos (admin); con valor filtra ese técnico.
 async function listarCalendario({ lunes, domingo, tecnico }) {
   const pool = await getPool();
   const reqDb = pool
@@ -214,7 +214,7 @@ async function actualizarServicio(id, campos) {
   if (campos.tipo_servicio !== undefined) addSet('tipo_servicio', sql.NVarChar(50), campos.tipo_servicio);
   if (campos.total !== undefined) addSet('total', sql.Decimal(12, 2), campos.total);
   if (campos.tecnico_asignado !== undefined) addSet('tecnico_asignado', sql.NVarChar(50), campos.tecnico_asignado);
-  // VarChar → SQL Server convierte 'YYYY-MM-DD'/'HH:MM' a DATE/TIME (o NULL).
+  // VarChar: SQL Server convierte 'YYYY-MM-DD'/'HH:MM' a DATE/TIME (o NULL).
   if (campos.fecha_programada !== undefined) addSet('fecha_programada', sql.VarChar(10), campos.fecha_programada);
   if (campos.hora_programada !== undefined) addSet('hora_programada', sql.VarChar(5), campos.hora_programada);
 
@@ -331,7 +331,7 @@ async function validarUsuarioAsignable(usuario) {
 
 async function buscarNotaPorNumero(numero_nota) {
   const pool = await getPool();
-  // JOIN con servicios para incluir tipo_servicio (Issue 29 cierre Fase 2.10).
+  // JOIN con servicios para traer tipo_servicio (Issue 29, Fase 2.10).
   const r = await pool
     .request()
     .input('numero_nota', sql.NVarChar(20), numero_nota)
@@ -347,13 +347,10 @@ async function buscarNotaPorNumero(numero_nota) {
 }
 
 module.exports = {
-  // consecutivos
   nextNumeroCliente,
   nextNumeroNota,
-  // asignación
   asignarTecnicoAuto,
   validarUsuarioAsignable,
-  // CRUD servicios
   crearServicio,
   listarServicios,
   listarCalendario,
@@ -365,9 +362,7 @@ module.exports = {
   actualizarAjuste,
   finalizarServicio,
   reabrirServicio,
-  // notas
   crearNotaDesdeServicio,
   buscarNotaPorNumero,
-  // re-export para uso conjunto
   ESTADOS_ACTIVOS,
 };

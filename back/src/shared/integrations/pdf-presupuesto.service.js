@@ -1,6 +1,6 @@
 // Generación del PDF de Presupuesto.
-// Replica el estilo visual del PDF de Reporte Técnico (pdf-reporte.service.js):
-// header navy + accent violeta, secciones con título + línea, total destacado.
+// Mismo estilo visual que el PDF de Reporte Técnico (pdf-reporte.service.js):
+// header navy con accent violeta, secciones con título y línea, total destacado.
 
 const path = require('path');
 const fs = require('fs');
@@ -146,7 +146,7 @@ function generarPresupuestoPdf(res, p) {
   if (p.tipo_servicio) line('Servicio:', p.tipo_servicio);
   y += 6 * PT;
 
-  // ===== Introducción (sin header — un saludo breve no necesita título) =====
+  // ===== Introducción (sin header: un saludo breve no necesita título) =====
   if (p.introduccion) {
     ensureSpace(20 * PT);
     doc.font('Helvetica').fontSize(10).fillColor(TEXT).text(p.introduccion, M, y, {
@@ -185,8 +185,8 @@ function generarPresupuestoPdf(res, p) {
       doc.font('Helvetica').fontSize(10).fillColor(TEXT);
       arr.forEach((g) => {
         ensureSpace(13 * PT);
-        // Issue 5: limpia caracteres extraños al inicio (', ", -, espacios)
-        // que aparecían como artefacto al renderizar la línea.
+        // Issue 5: limpia caracteres extraños al inicio (comillas, guiones,
+        // espacios) que aparecían como artefacto al renderizar la línea.
         const textoLimpio = String(g).replace(/^['"\-\s]+/, '').trim();
         doc.text('✓  ' + textoLimpio, M + 4 * PT, y, { width: W - M * 2 - 4 * PT });
         y = doc.y + 1 * PT;
@@ -282,15 +282,15 @@ function generarPresupuestoPdf(res, p) {
     });
   y += totalBoxH + 12 * PT;
 
-  // ===== Nota legal sobre items opcionales (Issue 35 — Fase 2.10) =====
-  // Solo se imprime si el presupuesto tiene AL MENOS un item con es_opcional = 1
-  // dentro de algún bloque seccion_items. Protección contractual: deja claro
-  // que opcionales NO están incluidos en el TOTAL y requieren autorización
-  // por escrito + costo adicional.
-  // Issue 4 (re-fix): comparación estricta para evitar falsos positivos si el
-  // driver mssql devuelve la columna BIT como string "0"/"1" o el JSON viene
-  // serializado con string boolean (todos truthy en JS, lo que disparaba el
-  // párrafo siempre). Aceptamos true literal o 1 numérico únicamente.
+  // ===== Nota legal sobre items opcionales (Issue 35, Fase 2.10) =====
+  // Solo se imprime si el presupuesto tiene al menos un item con es_opcional = 1
+  // en algún bloque seccion_items. Protección contractual: deja claro que los
+  // opcionales NO entran en el TOTAL y requieren autorización por escrito y
+  // costo adicional.
+  // Issue 4 (re-fix): comparación estricta para evitar falsos positivos. El
+  // driver mssql puede devolver el BIT como string "0"/"1", y un string es
+  // truthy en JS, lo que disparaba el párrafo siempre. Solo aceptamos true
+  // literal o 1 numérico.
   const _esOpcional = (v) => v === true || v === 1;
   const hayOpcionales = bloques.some(
     (b) => Array.isArray(b.items) && b.items.some((it) => it && _esOpcional(it.es_opcional)),
@@ -306,8 +306,8 @@ function generarPresupuestoPdf(res, p) {
     doc.font('Helvetica-Bold').fontSize(8).fillColor(TEXT);
     const noteH = doc.heightOfString(noteText, { width: noteW - padding * 2 }) + padding * 2;
     // Pintar el rect primero. fillAndStroke deja el fillColor del doc en
-    // '#fff8e1' (cremita), por eso el texto subsiguiente quedaba invisible.
-    // Re-seteamos fillColor a TEXT antes del .text() (Issue 35v2).
+    // '#fff8e1' (cremita), por eso el texto luego quedaba invisible. Hay que
+    // re-setear fillColor a TEXT antes del .text() (Issue 35v2).
     doc.rect(M, y, noteW, noteH).fillAndStroke('#fff8e1', '#d4a23b');
     doc.fillColor(TEXT).text(noteText, M + padding, y + padding, {
       width: noteW - padding * 2,

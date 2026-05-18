@@ -1,5 +1,5 @@
-// Service — reglas de negocio del módulo notas.
-// Sin SQL crudo, sin Express. Llama al repository y lanza errores tipados.
+// Reglas de negocio del módulo notas.
+// Sin SQL crudo ni Express. Llama al repository y lanza errores tipados.
 
 const repo = require('./notas.repository');
 const { NotFoundError } = require('../../shared/errors/AppError');
@@ -21,7 +21,7 @@ async function buscar(cliente, validacion) {
     throw new NotFoundError('Cliente no encontrado o datos de validación incorrectos.');
   }
 
-  // Devuelve un array de notas (1..N), ya ordenadas por fecha DESC en el repo.
+  // Array de notas, ya ordenadas por fecha DESC en el repo.
   const respuesta = rows.map((row) => ({
     id: row.numero_nota ?? row.id,
     cliente: row.numero_cliente,

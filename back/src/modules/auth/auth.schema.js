@@ -2,7 +2,7 @@
 
 const { z } = require('zod');
 
-// Mensaje único "Usuario y contraseña requeridos." — preserva contrato original.
+// Mensaje único "Usuario y contraseña requeridos." para preservar el contrato original.
 const loginSchema = z
   .object({
     usuario: z.unknown(),

@@ -1,5 +1,5 @@
 // Estados de servicios y notas. Strings exactos como están en BD.
-// No "normalizar" mayúsculas — coincide con datos existentes y queries actuales.
+// No normalizar mayúsculas: deben coincidir con los datos y queries actuales.
 
 const ESTADO_SERVICIO = Object.freeze({
   PENDIENTE: 'PENDIENTE',

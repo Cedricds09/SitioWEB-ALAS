@@ -25,13 +25,13 @@ const sugerirBloquesSchema = z
   })
   .superRefine((data, ctx) => {
     if (data.modo === 'generar_inicial' && !data.descripcion_inicial) {
-      // Nota: la regla "body wins, fallback a notas_internas" se aplica en service.
-      // Aquí solo exigimos que SI se manda, sea válido. La omisión deja al service
-      // recurrir al fallback. Si tampoco hay fallback, el service lanza 400.
+      // La regla "body gana, fallback a notas_internas" la aplica el service.
+      // Aquí solo validamos que, si viene, sea válida. Si no viene, el service
+      // usa el fallback; y si tampoco hay fallback, lanza 400.
     }
   });
 
-// Schema del endpoint /chat-presupuesto (Fase 5 — asistente conversacional).
+// Schema del endpoint /chat-presupuesto (asistente conversacional).
 const chatPresupuestoSchema = z
   .object({
     cliente_nombre: z.preprocess(
@@ -69,7 +69,7 @@ const chatPresupuestoSchema = z
     }
   });
 
-// Schema del endpoint /consulta-negocio — consultas de datos sin Claude API.
+// Schema del endpoint /consulta-negocio: consultas de datos sin Claude API.
 const consultaNegocioSchema = z.object({
   tipo: z.enum([
     'activos',
@@ -82,7 +82,7 @@ const consultaNegocioSchema = z.object({
   ]),
 });
 
-// Schema del endpoint /consulta-cliente — ficha de un cliente por su folio.
+// Schema del endpoint /consulta-cliente: ficha de un cliente por su folio.
 const consultaClienteSchema = z.object({
   numero_cliente: z.string().regex(/^CL-\d{4}$/i, 'Formato debe ser CL-XXXX.'),
 });

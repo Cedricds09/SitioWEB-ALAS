@@ -1,5 +1,5 @@
 // Validación Zod del módulo notas.
-// Mensaje preserva contrato original: faltar cualquiera de los dos da el mismo string.
+// El mensaje es el mismo si falta cualquiera de los dos (contrato original).
 
 const { z } = require('zod');
 

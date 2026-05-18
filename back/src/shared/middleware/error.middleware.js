@@ -1,6 +1,6 @@
 // Middleware final de errores. Captura todo lo que pase por next(err).
-// AppError tipado -> respuesta limpia con status correcto.
-// Resto -> log con stack + 500 genérico.
+// Un AppError tipado se traduce a respuesta limpia con su status.
+// El resto: log con stack y 500 genérico.
 
 const { AppError } = require('../errors/AppError');
 

@@ -1,11 +1,6 @@
-// back/src/modules/ai/prompts/few-shot.js
-// Real PDF examples converted to the JSON output format the model must emit.
-// These teach Claude Adán's exact style, vocabulary, and structure.
-
 const FEW_SHOT_EXAMPLES = [
   // ============================================================
-  // EXAMPLE 1 — Gas LP maintenance, multi-departamento building
-  // Real PDF: Bretaña #80-10 Col. Zacahuitzco — Dec 3 2024
+  // Ejemplo 1: Gas LP
   // ============================================================
   {
     user_input: {
@@ -100,8 +95,7 @@ const FEW_SHOT_EXAMPLES = [
   },
 
   // ============================================================
-  // EXAMPLE 2 — Single fixed-price installation
-  // Real PDF: Nicolas San Juan #304 Col. Narvarte — April 12 2026
+  // Ejemplo 2: Precio unitario
   // ============================================================
   {
     user_input: {

@@ -1,6 +1,5 @@
-// Controller — capa fina entre HTTP y service.
-// No tiene try/catch (asyncHandler lo cubre).
-// No tiene SQL ni reglas de negocio.
+// Capa fina entre HTTP y el service. Sin try/catch (lo cubre asyncHandler),
+// sin SQL ni reglas de negocio.
 
 const service = require('./presupuestos.service');
 const { generarPresupuestoPdf } = require('../../shared/integrations/pdf-presupuesto.service');
@@ -127,7 +126,7 @@ async function crearSolicitudPublica(req, res) {
 
   const result = await service.crearSolicitudPublica(req.body);
 
-  // WhatsApp pre-armado (cliente sin telefono backend → abre selector de contacto).
+  // WhatsApp pre-armado. Si no hay telefono, abre el selector de contacto.
   const tel = String(req.body.cliente_telefono || '').replace(/\D/g, '');
   const waBase = 'https://wa.me/525531675824';
   const waText = encodeURIComponent(

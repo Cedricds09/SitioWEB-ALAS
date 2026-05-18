@@ -1,5 +1,4 @@
 // Generación del PDF de "Reporte técnico de servicio".
-// Movido íntegramente desde routes/servicios.js (bloque GET /:id/reporte).
 // El controller llama a esta función pasando el response y el servicio cargado.
 
 const path = require('path');
@@ -36,13 +35,11 @@ function fmtMoney(n) {
  * @param {object} servicio - fila de dbo.servicios con todas sus columnas
  */
 function generarReporteTecnico(res, s) {
-  // ====================================================================
-  // PDF replica el estilo visual de la nota cliente (pdf.js):
-  // A4, márgenes 18mm, header navy, secciones con título + línea,
-  // pero título "REPORTE TÉCNICO", folio basado en servicio,
-  // y bloque destacado de RESOLUCIÓN.
-  // Unidades: puntos (1pt = 1/72 inch). 1mm ≈ 2.835pt.
-  // ====================================================================
+  // Mismo estilo visual que la nota cliente (pdf.js): A4, márgenes 18mm,
+  // header navy, secciones con título y línea. Cambia el título a "REPORTE
+  // TÉCNICO", el folio se basa en el servicio y agrega un bloque destacado
+  // de RESOLUCIÓN.
+  // Unidades en puntos (1pt = 1/72 inch). 1mm ~= 2.835pt.
   const PT = 2.83465;
   const W = 595.28,
     H = 841.89; // A4

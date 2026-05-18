@@ -1,4 +1,4 @@
-// Service — reglas de negocio del módulo clientes.
+// Service: reglas de negocio del módulo clientes.
 
 const repo = require('./clientes.repository');
 const serviciosRepo = require('../servicios/servicios.repository');
@@ -12,9 +12,7 @@ async function buscar({ q, limit }) {
   return data;
 }
 
-// Historial agregado de un cliente: servicios + notas + presupuestos.
-// Presupuestos se filtran por la visibilidad de rol (admin ve todo, técnico
-// ve los suyos + solicitudes huérfanas con el numero_cliente).
+
 async function historial(numero_cliente, sesion) {
   console.log('[CLIENTES] historial cliente=', numero_cliente);
 

@@ -1,6 +1,6 @@
-// Service — lógica del módulo IA.
+// Service: lógica del módulo IA.
 // Sin SQL crudo, sin Express. Llama al repository y al cliente Anthropic.
-// Tracking: cada llamada (éxito o fallo) registra fila en dbo.ai_generations.
+// Cada llamada (éxito o fallo) registra una fila en dbo.ai_generations.
 
 const {
   AppError,
@@ -31,21 +31,20 @@ const SOLICITUD_PREFIX = '[Solicitud del cliente]\n';
 // Helpers
 // ============================================================
 
-// Devuelve metadatos seguros para loguear sobre la respuesta cruda sin
-// exponer el contenido (que puede traer datos del cliente). Útil para
-// diagnosticar fallos de parse sin filtrar PII a logs.
+// Metadatos seguros para loguear la respuesta cruda sin exponer su contenido
+// (puede traer datos del cliente). Sirve para diagnosticar fallos de parse
+// sin filtrar PII a logs.
 function _safeContentSig(content) {
   if (typeof content !== 'string') return 'type=non-string';
   const len = content.length;
   // Primeros 5 chars no-blancos para detectar fences/wrappers, con
-  // espacios sustituidos por "·" para visibilidad.
+  // espacios sustituidos por "·" para que se vean.
   const start = content.trimStart().slice(0, 5).replace(/\s/g, '·');
   return `len=${len} start=${JSON.stringify(start)}`;
 }
 
-// Camina el objeto que devuelve result.error.format() de Zod y devuelve
-// solo los PATHS donde hubo errores (sin los mensajes, que pueden
-// incluir valores recibidos del cliente).
+// Recorre el objeto de result.error.format() de Zod y devuelve solo los
+// paths con error, sin los mensajes (que pueden incluir valores del cliente).
 function _zodErrorPaths(formatted, prefix = '') {
   const paths = [];
   if (!formatted || typeof formatted !== 'object') return paths;
@@ -62,9 +61,9 @@ function _zodErrorPaths(formatted, prefix = '') {
   return paths;
 }
 
-// Algunos modelos (Haiku 4.5 observado) envuelven el JSON en code fences
-// markdown a pesar de la instrucción "no markdown". Se limpian aquí como
-// defensa en profundidad. La regla en el system prompt también se reforzó.
+// Algunos modelos (visto en Haiku 4.5) envuelven el JSON en code fences
+// markdown pese a la instrucción "no markdown". Los limpiamos aquí como
+// defensa extra; la regla del system prompt también se reforzó.
 function stripJsonFences(content) {
   if (typeof content !== 'string') return content;
   let trimmed = content.trim();
@@ -89,9 +88,9 @@ function _resolverDescripcion(bodyDesc, pres) {
 function _serializarBloquesExistentes(pres) {
   return (pres.bloques || []).map((b) => {
     const base = {
-      // Nombre "id" uniforme para que Claude no se confunda entre INPUT field
-      // names y OUTPUT field names. El system prompt instruye explícitamente
-      // a usar este "id" como "bloque_id_destino" en items_nuevos.
+      // Campo "id" uniforme para que Claude no confunda los nombres de campo
+      // del input con los del output. El system prompt le dice que use este
+      // "id" como "bloque_id_destino" en items_nuevos.
       id: Number(b.id),
       tipo: b.tipo,
       titulo: b.titulo || null,
@@ -116,8 +115,8 @@ function _serializarBloquesExistentes(pres) {
     }
     if (b.tipo === 'seccion_items') {
       base.items = (b.items || []).map((it) => ({
-        // Misma razón que bloque.id: nombre "id" uniforme. El system prompt
-        // instruye a Claude a usar este "id" como "item_id" en mejoras.
+        // Misma razón que bloque.id: campo "id" uniforme. El system prompt
+        // le dice a Claude que use este "id" como "item_id" en mejoras.
         id: Number(it.id),
         descripcion: it.descripcion,
         cantidad: it.cantidad != null ? Number(it.cantidad) : null,
@@ -142,7 +141,7 @@ function _construirMensajeUsuario(modo, input, pres, descripcion) {
       descripcion_inicial: descripcion,
     };
   }
-  // mejorar / agregar — incluir bloques existentes con sus IDs
+  // mejorar / agregar: incluir bloques existentes con sus IDs
   return {
     modo,
     cliente_nombre: pres.cliente_nombre || null,
@@ -152,12 +151,12 @@ function _construirMensajeUsuario(modo, input, pres, descripcion) {
   };
 }
 
-// Mitigación de prompt injection ("spotlighting"): envolvemos el payload
-// del usuario en tags XML y recordamos al modelo, justo antes de procesar,
-// que el contenido entre tags es DATA no INSTRUCCIONES. Esto no es
-// infalible — la defensa real son las reglas inviolables del system prompt
-// y la validación Zod del output — pero baja la barra contra intentos
-// triviales de inyección por clientes maliciosos vía /api/presupuestos/solicitud.
+// Mitigación de prompt injection ("spotlighting"): envolvemos el payload del
+// usuario en tags XML y le recordamos al modelo, justo antes de procesar, que
+// el contenido entre tags es DATA, no INSTRUCCIONES. No es infalible: la
+// defensa real son las reglas inviolables del system prompt y la validación
+// Zod del output. Pero corta los intentos triviales de inyección de clientes
+// maliciosos vía /api/presupuestos/solicitud.
 function _envolverConSeparador(payload) {
   const json = JSON.stringify(payload);
   return (
@@ -176,11 +175,11 @@ function _construirMessages(mensajeReal) {
   const lastIdx = FEW_SHOT_EXAMPLES.length - 1;
   FEW_SHOT_EXAMPLES.forEach((ej, idx) => {
     messages.push({ role: 'user', content: JSON.stringify(ej.user_input) });
-    // El último assistant del few-shot lleva cache_control:ephemeral, de modo
-    // que el cache breakpoint cubra system + todos los pares few-shot. Esto
-    // garantiza que el prefijo cacheado supere el mínimo de tokens para Haiku
-    // (el system prompt solo podría quedarse corto del umbral) y activa
-    // cache_write en la primera llamada / cache_read en subsecuentes.
+    // El último assistant del few-shot lleva cache_control:ephemeral para que
+    // el cache breakpoint cubra system + todos los pares few-shot. Así el
+    // prefijo cacheado supera el mínimo de tokens de Haiku (solo el system
+    // prompt podría quedar corto) y activa cache_write en la primera llamada
+    // y cache_read en las siguientes.
     if (idx === lastIdx) {
       messages.push({
         role: 'assistant',
@@ -196,9 +195,9 @@ function _construirMessages(mensajeReal) {
       messages.push({ role: 'assistant', content: JSON.stringify(ej.assistant_output) });
     }
   });
-  // El mensaje real va envuelto con separador anti-prompt-injection.
+  // El mensaje real va envuelto con el separador anti-prompt-injection.
   // Los few-shot van como JSON crudo para que el modelo aprenda el formato
-  // de respuesta sin que el separador "contamine" la lección de estilo.
+  // sin que el separador "contamine" la lección de estilo.
   messages.push({ role: 'user', content: _envolverConSeparador(mensajeReal) });
   return messages;
 }
@@ -227,8 +226,8 @@ async function sugerirBloques(input, sesion) {
   const esAdmin = sesion.rol === ROL.ADMIN;
   const esAsignado = Number(pres.asignado_a) === Number(sesion.uid);
   if (!esAdmin && !esAsignado) {
-    // Consistencia con presupuestos.service: NO revelar existencia del
-    // recurso a usuarios sin permiso. Mismo 404 que cuando no existe el id.
+    // Igual que presupuestos.service: no revelamos que el recurso existe a
+    // quien no tiene permiso. Mismo 404 que cuando el id no existe.
     throw new NotFoundError('Presupuesto no encontrado.');
   }
 
@@ -250,9 +249,9 @@ async function sugerirBloques(input, sesion) {
   }
 
   // 3) Circuit breaker. Dos topes en cascada (fail-fast):
-  //    a) Per-user (10/hora) — protege a otros usuarios de uno que abusa.
-  //    b) Global (50/hora)   — protege el costo total del sistema.
-  // Per-user va primero para que el mensaje sea específico al que llama.
+  //    a) Por usuario (10/hora): protege a los demás de uno que abusa.
+  //    b) Global (50/hora): protege el costo total del sistema.
+  // El de usuario va primero para que el mensaje sea específico a quien llama.
   await breaker.assertBelowUserLimit(sesion.uid);
   await breaker.assertBelowLimit();
 
@@ -304,9 +303,9 @@ async function sugerirBloques(input, sesion) {
   }
 
   // 7a) Pre-sanitización: Claude a veces inventa mejoras sin item_id o
-  // items_nuevos sin bloque_id_destino (vio observado: 5 de 7 mejoras con
-  // item_id null/undefined). Las descartamos silenciosamente antes de validar
-  // — son propuestas que no se pueden aplicar al no referenciar nada real.
+  // items_nuevos sin bloque_id_destino (visto: 5 de 7 mejoras con item_id
+  // null/undefined). Las descartamos en silencio antes de validar; sin un id
+  // real no se pueden aplicar a nada.
   function _hasValidId(v) {
     if (v == null) return false;
     if (typeof v === 'number') return Number.isInteger(v) && v > 0;
@@ -349,8 +348,8 @@ async function sugerirBloques(input, sesion) {
       errorMsg: 'schema_validation_error',
     });
     trackingDone = true;
-    // Exponemos los paths al cliente (no contienen PII, solo nombres de campo)
-    // para diagnóstico desde el frontend sin requerir acceso a logs del server.
+    // Exponemos los paths al cliente (solo nombres de campo, sin PII) para
+    // poder diagnosticar desde el frontend sin acceso a los logs del server.
     throw new AppError(
       'La IA devolvió un formato inválido.',
       500,
@@ -414,7 +413,7 @@ async function _registrarFallo({ sesion, presupuesto_id, modo, usage, modelo, er
 }
 
 // ============================================================
-// Fase 5 — Asistente conversacional (chat-presupuesto)
+// Asistente conversacional (chat-presupuesto)
 // ============================================================
 
 // Transforma un bloque devuelto por la IA (con nulls en cantidad/precio)
@@ -481,7 +480,7 @@ async function _buscarClienteExistente(numeroCliente) {
  * 5) Aplica bloques (via presService.actualizar).
  * 6) Devuelve metadatos del presupuesto resultante.
  *
- * Si paso 4/5 falla, el presupuesto queda creado vacío — admin puede editar.
+ * Si el paso 4/5 falla, el presupuesto queda creado vacío y el admin lo edita.
  */
 async function chatPresupuesto(input, sesion) {
   let cliente_nombre = (input.cliente_nombre || '').trim();
@@ -502,7 +501,7 @@ async function chatPresupuesto(input, sesion) {
     throw new ValidationError('Falta nombre de cliente.');
   }
 
-  // Descripción enriquecida con respuestas estructuradas — esto va a Claude.
+  // Descripción enriquecida con las respuestas estructuradas. Esto va a Claude.
   const lines = [`Tipo de trabajo: ${input.tipo_servicio}`];
   lines.push(`Descripción del cliente: ${(input.descripcion || '').trim()}`);
   const extras = input.respuestas_adicionales || {};
@@ -535,8 +534,8 @@ async function chatPresupuesto(input, sesion) {
 
   console.log(`[AI][CHAT] presupuesto creado id=${presNuevo.id} numero=${presNuevo.numero_presupuesto}`);
 
-  // Paso 4: sugerir bloques con IA. Si falla, el presupuesto queda vacío
-  // pero ya existe — el admin puede editarlo manualmente.
+  // Paso 4: sugerir bloques con IA. Si falla, el presupuesto ya existe
+  // aunque quede vacío, y el admin puede editarlo manualmente.
   let bloquesGenerados = 0;
   try {
     const sug = await sugerirBloques({
@@ -567,8 +566,8 @@ async function chatPresupuesto(input, sesion) {
 }
 
 // ============================================================
-// Consultas de negocio — datos reales de la DB, sin Claude API ($0).
-// Admin ve todo; técnico solo lo suyo (servicios por tecnico_asignado,
+// Consultas de negocio: datos reales de la DB, sin Claude API ($0).
+// Admin ve todo; el técnico solo lo suyo (servicios por tecnico_asignado,
 // presupuestos por asignado_a). Respuestas en español, tono directo.
 // ============================================================
 
@@ -578,7 +577,7 @@ function formatEstado(e) {
 
 const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
-// 'YYYY-MM-DD' → "Lunes 19". Se parsea por partes (no new Date(str)) para
+// 'YYYY-MM-DD' a "Lunes 19". Se parsea por partes (no new Date(str)) para
 // evitar el corrimiento por zona horaria UTC.
 function nombreDia(fechaStr) {
   const [y, m, d] = String(fechaStr || '').split('-').map(Number);
@@ -587,7 +586,7 @@ function nombreDia(fechaStr) {
   return `${DIAS_SEMANA[dt.getUTCDay()]} ${d}`;
 }
 
-// 'HH:MM' (24h) → "10:00 AM". null/inválido → "Sin hora definida".
+// 'HH:MM' (24h) a "10:00 AM". null o inválido devuelve "Sin hora definida".
 function formatHora12(hhmm) {
   if (!hhmm) return 'Sin hora definida';
   const [hStr, mStr] = String(hhmm).split(':');
@@ -602,8 +601,8 @@ function formatHora12(hhmm) {
 
 async function consultaNegocio(tipo, sesion) {
   const esAdmin = !!(sesion && sesion.rol === ROL.ADMIN);
-  // Técnico → filtra por su usuario / uid. Admin → null (sin filtro).
-  // El payload del token usa la clave `usu` (no `usuario`).
+  // Técnico: filtra por su usuario / uid. Admin: null (sin filtro).
+  // El payload del token usa la clave `usu`, no `usuario`.
   const tecnico = esAdmin ? null : (sesion && sesion.usu) || null;
   const uid = esAdmin ? null : (sesion && sesion.uid) || null;
 
@@ -705,9 +704,9 @@ async function consultaNegocio(tipo, sesion) {
 }
 
 // ============================================================
-// Ficha de un cliente — datos reales de la DB, sin Claude API.
-// Admin ve todo; técnico solo clientes/servicios/presupuestos suyos.
-// Si el técnico no tiene relación con el cliente → 404 (no lo revela).
+// Ficha de un cliente: datos reales de la DB, sin Claude API.
+// Admin ve todo; el técnico solo sus clientes, servicios y presupuestos.
+// Si el técnico no tiene relación con el cliente, devuelve 404 sin revelarlo.
 // ============================================================
 async function consultaCliente(numeroCliente, sesion) {
   const esAdmin = !!(sesion && sesion.rol === ROL.ADMIN);
@@ -716,8 +715,8 @@ async function consultaCliente(numeroCliente, sesion) {
 
   const cl = String(numeroCliente || '').trim().toUpperCase();
 
-  // Datos del cliente. Para un técnico, esto ya restringe a clientes suyos:
-  // si no tiene servicios de ese cliente, no hay datos → 404.
+  // Datos del cliente. Para un técnico esto ya restringe a clientes suyos:
+  // si no tiene servicios de ese cliente, no hay datos y devuelve 404.
   const datos = await repo.clienteDatos(cl, tecnico);
   if (!datos) {
     throw new NotFoundError('No encontramos un cliente con ese número.');

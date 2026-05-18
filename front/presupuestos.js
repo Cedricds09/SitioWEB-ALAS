@@ -1,6 +1,6 @@
 /* =====================================================
-   MÓDULO PRESUPUESTOS — Frontend del panel admin.
-   Hereda estilos/patrones de main.js (modales, toast, fetch con cookies).
+   MÓDULO PRESUPUESTOS (frontend del panel admin).
+   Hereda estilos y patrones de main.js (modales, toast, fetch con cookies).
    Se inicializa al recibir el evento `alas:session-ready` desde main.js.
    ===================================================== */
 (() => {
@@ -110,13 +110,13 @@
         );
         if (!ok) return;
         await save({ keepOpen: true });
-        if (state.isDirty) return; // guardado falló — abortar
+        if (state.isDirty) return; // guardado falló, abortar
         return action();
     }
 
-    // Devuelve técnicos activos (con id) — necesita /usuarios (admin only) porque
-    // /usuarios/tecnicos no devuelve id.
-    // Cachea solo cuando la lista tiene >=1 elemento (no cachear errores transientes).
+    // Devuelve técnicos activos (con id). Usa /usuarios (admin only) porque
+    // /usuarios/tecnicos no devuelve id. Cachea solo si la lista trae >=1
+    // elemento, así no cachea errores transitorios.
     async function getTecnicos() {
         if (state.tecnicosCache && state.tecnicosCache.length) return state.tecnicosCache;
         try {
@@ -178,7 +178,7 @@
     const presTipoBlBack = $("presTipoBlBack");
     const presTipoBlCancel = $("presTipoBlCancel");
 
-    // ===== Fase 3 — IA =====
+    // ===== Fase 3: IA =====
     const aiSuggestBtn = $("aiSuggestBtn");
     // Modal selector de modo (cuando ya hay bloques)
     const aiModoBack = $("aiModoBack");
@@ -258,7 +258,6 @@
     }
 
     function renderList() {
-        // Bandeja de solicitudes (count)
         const solicitudes = state.items.filter((p) => p.estado === "solicitud").length;
         if (solicitudes > 0) {
             presBandejaTag.hidden = false;
@@ -514,7 +513,7 @@
         return sameUser && p.estado === "borrador";
     }
 
-    // Reglas para mostrar el botón "✨ Generar con IA" — coinciden con las
+    // Reglas para mostrar el botón "✨ Generar con IA". Coinciden con las
     // validaciones del backend (ai.service.js):
     //   - presupuesto debe existir (id != null)
     //   - estado IN (solicitud, borrador)
@@ -1067,7 +1066,7 @@
             buttons.push({ label: "Rechazar", danger: true, action: () => cambiarEstado("rechazado") });
         } else if (p.estado === "borrador" && editable) {
             buttons.push({ label: "Guardar", primary: true, action: () => save({ keepOpen: true }) });
-            // Issue 32: "Marcar enviado" requiere version guardada — ofrecer save first.
+            // Issue 32: "Marcar enviado" requiere version guardada, ofrecer save primero.
             buttons.push({ label: "Marcar enviado", action: () => ensureSavedThen("Marcar enviado", () => cambiarEstado("enviado")) });
             buttons.push({ label: "Eliminar", danger: true, action: () => eliminar() });
         } else if (p.estado === "enviado" && esResponsable) {
@@ -1358,8 +1357,8 @@
                     ? `✅ Servicio ${data.numero_cliente} creado y asignado a ${data.tecnico_asignado || '—'}.`
                     : "Convertido.");
             toast(msg, "success");
-            // Pedir al dashboard de servicios que refresque la lista — sigue
-            // el patrón existente alas:session-ready (CustomEvent en document).
+            // Pedir al dashboard de servicios que refresque la lista. Sigue
+            // el patrón existente de alas:session-ready (CustomEvent en document).
             document.dispatchEvent(new CustomEvent("alas:servicios-refresh"));
             // Cerrar editor (presupuesto convertido ya no es editable).
             closeModal(presEditorBack);
@@ -1478,7 +1477,7 @@
     }
 
     /* =====================================================
-       FASE 3 — Generador de bloques con IA (Feature B + C)
+       FASE 3: generador de bloques con IA (Feature B + C)
        ===================================================== */
 
     const TIPO_LABEL_AI = {
@@ -1576,7 +1575,7 @@
         `;
     }
 
-    // Render items_nuevos con checkbox (modo agregar/mejorar — opt-in).
+    // Render items_nuevos con checkbox (modo agregar/mejorar, opt-in).
     function renderAiItemsNuevos(items) {
         return items.map((it, idx) => `
             <label class="ai-preview-bloque ai-preview-selectable">
@@ -1660,7 +1659,7 @@
                     aiSuggestApply.disabled = false;
                 } else {
                     aiSuggestApply.textContent = "Aplicar seleccionados";
-                    // Inicia disabled — se habilita cuando hay al menos un check.
+                    // Inicia disabled, se habilita cuando hay al menos un check.
                     aiSuggestApply.disabled = true;
                 }
             }
@@ -1903,7 +1902,7 @@
                 return;
             }
 
-            // mejorar / agregar — iterar selección
+            // mejorar / agregar: iterar selección
             const checks = aiSuggestPreview ? aiSuggestPreview.querySelectorAll(".ai-preview-check:checked") : [];
             const mejorasIdx = [];
             const itemsIdx = [];

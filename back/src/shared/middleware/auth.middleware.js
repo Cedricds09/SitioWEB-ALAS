@@ -1,6 +1,6 @@
 // Middleware de auth.
-// requireAuth puebla req.session a partir del token de cookie.
-// requireAdmin/requireRole validan rol del usuario ya autenticado.
+// requireAuth puebla req.session desde el token de cookie.
+// requireAdmin/requireRole validan el rol del usuario ya autenticado.
 
 const { UnauthorizedError, ForbiddenError } = require('../errors/AppError');
 const ROL = require('../constants/roles');
@@ -19,7 +19,7 @@ async function requireAuth(req, _res, next) {
     if (msg.includes('Usuario no encontrado')) {
       return next(new UnauthorizedError('Sesión inválida. Inicia sesión de nuevo.'));
     }
-    // Fallo de validación (DB caída, etc.) → fail closed: no se deja pasar.
+    // Fallo de validación (DB caída, etc.): fail closed, no se deja pasar.
     console.error('[AUTH] requireAuth: no se pudo validar la sesión:', msg);
     return next(new UnauthorizedError('No se pudo validar la sesión. Intenta de nuevo.'));
   }

@@ -1,8 +1,9 @@
 /* =====================================================
-   FASE 5 — Asistente conversacional ALAS (burbuja flotante).
+   FASE 5: asistente conversacional ALAS (burbuja flotante).
    Solo se activa en /admin con sesión activa.
    Dos modos: navegación (keywords, sin API) y creación de
-   presupuesto por chat (recopila → POST /api/ai/chat-presupuesto).
+   presupuesto por chat (recopila datos y hace POST a
+   /api/ai/chat-presupuesto).
    ===================================================== */
 (() => {
     if (window.location.pathname !== "/admin") return;
@@ -25,8 +26,8 @@
             respuestas_adicionales: {},
         },
         sesion: null,
-        // Memoria del último resultado (consulta de negocio o cliente) para
-        // responder preguntas de seguimiento. Expira a los 5 minutos.
+        // Último resultado (consulta de negocio o cliente) para responder
+        // preguntas de seguimiento. Expira a los 5 minutos.
         ultimoContexto: { tipo: null, datos: null, timestamp: null },
     };
 
@@ -220,8 +221,8 @@
         btn.innerHTML = BTN_ICON;
     }
 
-    // Mobile: colapsa el panel tras navegar (NO lo cierra — el historial y el
-    // estado se conservan). La burbuja sigue visible para reabrirlo.
+    // Mobile: colapsa el panel tras navegar. No lo cierra: el historial y el
+    // estado se conservan. La burbuja sigue visible para reabrirlo.
     function minimizar() {
         panel.classList.add("is-minimized");
         btn.innerHTML = BTN_ICON;
@@ -274,7 +275,7 @@
         state.ultimoContexto = { tipo: null, datos: null, timestamp: null };
     }
 
-    // Opciones del menú principal — siempre disponibles.
+    // Opciones del menú principal, siempre disponibles.
     const MENU_OPCIONES = [
         { label: "📋 Nuevo presupuesto", action: empezarPresupuesto },
         { label: "📊 Estado del negocio", action: menuNegocio },
@@ -320,8 +321,8 @@
         );
     }
 
-    // Delay entre el mensaje del bot y la navegación: da tiempo a leerlo
-    // antes de que el panel se mueva/minimice.
+    // Delay entre el mensaje del bot y la navegación: da tiempo a leerlo antes
+    // de que el panel se mueva o minimice.
     const NAV_DELAY = 1500;
 
     function navegar(target) {
@@ -463,7 +464,7 @@
                 return;
             }
             const respuesta = payload.data.respuesta || "No pude consultar los datos. Intenta de nuevo.";
-            // Botón de navegación a la sección relevante — solo si la respuesta
+            // Botón de navegación a la sección relevante, solo si la respuesta
             // trae datos. Agenda usa el flag `tieneServicios`; el resto se
             // detecta porque las respuestas vacías terminan en "✅".
             const esAgenda = tipo === "agenda_hoy" || tipo === "agenda_semana";
@@ -503,8 +504,8 @@
         return p[0] || "";
     }
 
-    // Lleva al detalle de un servicio / presupuesto desde el chat.
-    // Mensaje primero, navegación tras NAV_DELAY (tiempo para leerlo).
+    // Lleva al detalle de un servicio desde el chat. Mensaje primero,
+    // navegación tras NAV_DELAY.
     function navegarAServicio(servicioId) {
         addBotMsg("Te llevo al servicio…");
         setTimeout(() => {
@@ -514,7 +515,7 @@
             }));
         }, NAV_DELAY);
     }
-    // Lleva al tab del calendario semanal (main.js → activarTab('calendar')).
+    // Lleva al tab del calendario semanal (main.js, activarTab('calendar')).
     function navegarACalendario() {
         addBotMsg("Te llevo al calendario…");
         setTimeout(() => {
@@ -630,7 +631,7 @@
         if (ctx.tipo === "cliente") {
             renderClienteCard(ctx.datos);
         } else {
-            // consulta_negocio: re-mostrar el resultado guardado.
+            // consulta_negocio: re-muestra el resultado guardado.
             addBotMsg(ctx.datos.respuesta || "No tengo más detalle de esa consulta.");
         }
     }
@@ -754,15 +755,15 @@
                         detail: { presupuesto_id: d.presupuesto_id },
                     }),
                 );
-                // Confirmación visible en el chat: tranquiliza al usuario si
-                // cierra el editor pensando que perdió el trabajo.
+                // Confirmación en el chat por si el usuario cierra el editor
+                // pensando que perdió el trabajo.
                 addBotMsg(
                     `✅ Listo. El presupuesto ${num} quedó guardado como borrador. ` +
                     `Si lo cierras, lo encuentras en la sección Presupuestos. ` +
                     `Agrega los precios cuando estés listo.`,
                 );
                 toastGlobal("✨ Presupuesto listo. Revisa los datos y agrega los precios.");
-                // El flujo terminó: liberar el modo para que el usuario pueda
+                // Flujo terminado: libera el modo para que el usuario pueda
                 // pedir otra cosa con texto libre.
                 state.modo = null;
                 state.paso = null;
@@ -938,10 +939,10 @@
     }
 
     /* ---------- Reconocimiento de voz (Web Speech API) ---------- */
-    // iOS expone solo webkitSpeechRecognition (a lo que ya resuelve SR) y exige
+    // iOS solo expone webkitSpeechRecognition (ya cubierto por SR) y exige
     // continuous=false. Apple limita el dictado a nivel sistema/WebKit, así que
-    // la restricción aplica a TODOS los navegadores del dispositivo, no solo
-    // Safari. Sin soporte, micBtn ya viene oculto (hidden).
+    // la restricción aplica a todos los navegadores del dispositivo, no solo
+    // Safari. Sin soporte, micBtn ya viene oculto.
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     let recognition = null;
     let recording = false;
@@ -954,7 +955,6 @@
         recognition.onresult = (e) => {
             const txt = e.results[0][0].transcript;
             input.value = txt;
-            // Auto-enviar tras dictado.
             procesarTexto(txt);
             input.value = "";
         };

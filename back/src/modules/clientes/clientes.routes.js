@@ -1,4 +1,4 @@
-// Routes del módulo clientes.
+// Rutas del módulo clientes.
 
 const router = require('express').Router();
 

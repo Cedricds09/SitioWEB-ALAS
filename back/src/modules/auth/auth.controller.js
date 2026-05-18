@@ -1,4 +1,4 @@
-// Controller — capa fina entre HTTP y service.
+// Controller: capa fina entre HTTP y service.
 
 const service = require('./auth.service');
 const {
@@ -14,7 +14,7 @@ async function login(req, res) {
 }
 
 async function logout(req, res) {
-  // Recupera la sesión (best-effort) para revocar el token vía token_version.
+  // Intenta recuperar la sesión para revocar el token vía token_version.
   let sess = null;
   try {
     sess = await getSession(req);
@@ -25,7 +25,7 @@ async function logout(req, res) {
   try {
     if (sess && sess.uid != null) await service.logout(sess);
   } catch (err) {
-    // No bloquear el logout si la revocación falla (p. ej. migración pendiente).
+    // No bloqueamos el logout si la revocación falla (ej. migración pendiente).
     console.error('[AUTH] logout: no se pudo revocar el token:', err.message);
   }
   res.json({ ok: true });
@@ -36,7 +36,7 @@ async function check(req, res) {
   try {
     sess = await getSession(req);
   } catch {
-    // Token revocado / inválido / fallo de validación → no autenticado.
+    // Token revocado, inválido o fallo de validación: no autenticado.
     sess = null;
   }
   res.json({

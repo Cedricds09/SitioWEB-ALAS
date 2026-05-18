@@ -1,11 +1,11 @@
-// back/src/modules/ai/validators.js
-// Zod schema to validate what Claude returns.
-// Defense layer #2: if Claude disobeys the inviolable rules, we reject the response.
+// Schema Zod para validar lo que devuelve Claude.
+// Capa de defensa #2: si Claude desobedece las reglas inviolables, rechazamos
+// la respuesta.
 
 const { z } = require('zod');
 
 // ============================================================
-// SHARED SUB-SCHEMAS
+// Sub-schemas compartidos
 // ============================================================
 
 const TIPOS_SERVICIO = [
@@ -19,17 +19,17 @@ const TIPOS_SERVICIO = [
 
 const MODOS = ['generar_inicial', 'mejorar', 'agregar'];
 
-// Critical: precio_unitario and cantidad MUST be null (Rule #1 — IA never sets prices)
-// If Claude tries to set a number, Zod rejects.
+// precio_unitario y cantidad deben ser null (Regla #1: la IA nunca pone
+// precios). Si Claude intenta poner un número, Zod lo rechaza.
 const itemSchema = z.object({
   descripcion: z.string().min(3).max(500),
-  cantidad: z.null(), // INVIOLABLE: must be null
-  precio_unitario: z.null(), // INVIOLABLE: must be null
+  cantidad: z.null(), // inviolable: debe ser null
+  precio_unitario: z.null(), // inviolable: debe ser null
   es_opcional: z.boolean().default(false)
 });
 
 // ============================================================
-// BLOCK SCHEMAS — discriminated union by tipo
+// Schemas de bloques: union discriminada por tipo
 // ============================================================
 
 const bloqueTextoSchema = z.object({
@@ -54,7 +54,7 @@ const bloqueApartadoCerradoSchema = z.object({
   tipo: z.literal('apartado_cerrado'),
   titulo: z.string().min(3).max(300),
   contenido_texto: z.string().min(10).max(5000),
-  subtotal: z.null() // INVIOLABLE: must be null
+  subtotal: z.null() // inviolable: debe ser null
 });
 
 const bloqueSeccionItemsSchema = z.object({
@@ -72,12 +72,12 @@ const bloqueSchema = z.discriminatedUnion('tipo', [
 ]);
 
 // ============================================================
-// MEJORAS / ITEMS_NUEVOS sub-schemas
+// Sub-schemas de mejoras / items_nuevos
 // ============================================================
 
-// Tolerante a string→number: Claude a veces devuelve IDs como strings
-// ("12" en vez de 12) o con prefijo no numérico ("item_12"). Lo coercionamos
-// agresivamente y validamos el resultado como entero positivo.
+// Tolerante a string a number: Claude a veces devuelve IDs como strings
+// ("12" en vez de 12) o con prefijo ("item_12"). Lo forzamos a número y
+// validamos el resultado como entero positivo.
 const idTolerantSchema = z.union([z.number(), z.string()])
   .transform((v) => {
     if (typeof v === 'number') return v;
@@ -97,11 +97,11 @@ const itemNuevoSchema = z.object({
   descripcion: z.string().min(3).max(500),
   cantidad: z.null(),
   precio_unitario: z.null(),
-  es_opcional: z.literal(true) // INVIOLABLE: new items proposed by AI are ALWAYS optional
+  es_opcional: z.literal(true) // inviolable: los items nuevos de la IA siempre son opcionales
 });
 
 // ============================================================
-// ROOT SCHEMA
+// Schema raíz
 // ============================================================
 
 const aiResponseSchema = z.object({

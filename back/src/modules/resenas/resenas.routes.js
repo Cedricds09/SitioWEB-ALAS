@@ -1,7 +1,7 @@
 // Routes del módulo resenas.
 // Exporta dos routers: público (alta/consulta) y admin (moderación).
-// server.js monta cada uno bajo su prefijo; el requireAuth del admin se
-// aplica al montar (igual que el módulo usuarios).
+// server.js monta cada uno bajo su prefijo. El requireAuth del admin se
+// aplica al montar, igual que en el módulo usuarios.
 
 const express = require('express');
 
@@ -12,10 +12,11 @@ const asyncHandler = require('../../shared/middleware/async-handler');
 const {
   resenaPublicLimiter,
   resenaVerificarLimiter,
+  publicReadLimiter,
 } = require('../../shared/middleware/rate-limit.middleware');
 const S = require('./resenas.schema');
 
-// ===== Router PÚBLICO — montado en /api/resenas (sin auth) =====
+// ===== Router PÚBLICO: montado en /api/resenas (sin auth) =====
 const publicRouter = express.Router();
 
 publicRouter.post(
@@ -32,10 +33,10 @@ publicRouter.post(
   asyncHandler(ctrl.crearPublica),
 );
 
-publicRouter.get('/publicas', asyncHandler(ctrl.listarPublicas));
+publicRouter.get('/publicas', publicReadLimiter, asyncHandler(ctrl.listarPublicas));
 
-// ===== Router ADMIN — montado en /api/admin/resenas (requireAuth al montar) =====
-// La moderación de reseñas es exclusiva de admin (incluido el listado).
+// ===== Router ADMIN: montado en /api/admin/resenas (requireAuth al montar) =====
+// La moderación de reseñas es exclusiva de admin, incluido el listado.
 const adminRouter = express.Router();
 
 adminRouter.get('/', requireAdmin, asyncHandler(ctrl.listarAdmin));

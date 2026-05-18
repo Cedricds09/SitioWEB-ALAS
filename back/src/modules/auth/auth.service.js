@@ -1,4 +1,4 @@
-// Service — reglas de negocio del módulo auth.
+// Service: reglas de negocio del módulo auth.
 
 const bcrypt = require('bcryptjs');
 
@@ -20,13 +20,13 @@ async function login(usuario, password) {
     throw new UnauthorizedError('Usuario o contraseña incorrectos.');
   }
 
-  // token_version actual del usuario, para incrustarlo en el token (M3).
+  // token_version actual del usuario, para incrustarlo en el token.
   let tv = 0;
   try {
     const v = await repo.getTokenVersion(u.id);
     if (typeof v === 'number') tv = v;
   } catch (err) {
-    // Columna token_version ausente (migración 009 pendiente) → tv=0.
+    // Columna token_version ausente (migración 009 pendiente): tv queda en 0.
     console.warn('[AUTH] token_version no disponible al firmar — se usa 0:', err.message);
   }
 
@@ -42,7 +42,7 @@ async function login(usuario, password) {
   return { token, uid: u.id, usuario: u.usuario, rol: u.rol };
 }
 
-// Revoca la sesión actual: incrementar token_version invalida de inmediato
+// Revoca la sesión actual. Incrementar token_version invalida de inmediato
 // el token recién usado y cualquier copia de él.
 async function logout(sesion) {
   if (sesion && sesion.uid != null) {

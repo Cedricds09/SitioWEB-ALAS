@@ -1,5 +1,5 @@
 // Rate limiters reutilizables.
-// Públicos: mitigan spam/bots y enumeración. Autenticados: limitan abuso por usuario.
+// Los públicos frenan spam/bots y enumeración; los autenticados limitan el abuso por usuario.
 
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 
@@ -41,13 +41,13 @@ const resenaVerificarLimiter = rateLimit({
   },
 });
 
-// Login admin (A1): 5 intentos por IP cada 15 minutos — frena fuerza bruta.
+// Login admin (A1): 5 intentos por IP cada 15 minutos, frena fuerza bruta.
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 min
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
-  // No contar los logins exitosos: solo penaliza intentos fallidos.
+  // No cuenta los logins exitosos: solo penaliza intentos fallidos.
   skipSuccessfulRequests: true,
   message: {
     ok: false,
@@ -55,8 +55,8 @@ const loginLimiter = rateLimit({
   },
 });
 
-// Consulta pública de notas (A2): 10 requests por IP cada 10 minutos —
-// frena enumeración de pares cliente/nota.
+// Consulta pública de notas (A2): 10 requests por IP cada 10 minutos.
+// Frena la enumeración de pares cliente/nota.
 const notasLimiter = rateLimit({
   windowMs: 10 * 60 * 1000, // 10 min
   max: 10,
@@ -76,12 +76,26 @@ const consultaNegocioLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   // Clave por usuario; si no hay sesión, fallback a IP con el helper de
-  // express-rate-limit (normaliza IPv6 — evita ERR_ERL_KEY_GEN_IPV6).
+  // express-rate-limit (normaliza IPv6, evita ERR_ERL_KEY_GEN_IPV6).
   keyGenerator: (req) => {
     const uid = req.session && req.session.uid;
     if (uid) return `uid:${uid}`;
     return ipKeyGenerator(req.ip);
   },
+  message: {
+    ok: false,
+    error: 'Demasiadas consultas. Intenta de nuevo más tarde.',
+  },
+});
+
+// Lecturas públicas de bajo riesgo (config, listado de reseñas aprobadas):
+// 60 requests por IP cada 10 minutos. Holgado para uso legítimo (una llamada
+// por carga de página), pero frena scraping y abuso del ORDER BY NEWID().
+const publicReadLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 min
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
   message: {
     ok: false,
     error: 'Demasiadas consultas. Intenta de nuevo más tarde.',
@@ -95,4 +109,5 @@ module.exports = {
   loginLimiter,
   notasLimiter,
   consultaNegocioLimiter,
+  publicReadLimiter,
 };

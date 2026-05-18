@@ -18,14 +18,13 @@ router.post(
   asyncHandler(ctrl.sugerirBloques),
 );
 
-// Fase 5 — asistente conversacional
 router.post(
   '/chat-presupuesto',
   validate({ body: S.chatPresupuestoSchema }),
   asyncHandler(ctrl.chatPresupuesto),
 );
 
-// Consultas de negocio — datos reales de la DB, sin Claude API.
+// Consultas de negocio: datos reales de la DB, sin Claude API.
 router.post(
   '/consulta-negocio',
   consultaNegocioLimiter,
@@ -33,7 +32,7 @@ router.post(
   asyncHandler(ctrl.consultaNegocio),
 );
 
-// Ficha de un cliente por folio — datos reales de la DB, sin Claude API.
+// Ficha de un cliente por folio: datos reales de la DB, sin Claude API.
 router.post(
   '/consulta-cliente',
   consultaNegocioLimiter,

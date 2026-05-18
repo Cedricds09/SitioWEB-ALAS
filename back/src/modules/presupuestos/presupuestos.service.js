@@ -1,5 +1,5 @@
-// Service — reglas de negocio del módulo presupuestos.
-// Sin SQL crudo, sin Express. Llama al repository y lanza errores tipados.
+// Reglas de negocio del módulo presupuestos.
+// Sin SQL crudo ni Express. Llama al repository y lanza errores tipados.
 
 const repo = require('./presupuestos.repository');
 const serviciosRepo = require('../servicios/servicios.repository');
@@ -114,13 +114,13 @@ async function _recalcularTotal(presupuesto_id, tx) {
       total += await repo.calcularSubtotalSeccion(b.id, tx);
     }
   }
-  total = Math.round(total * 100) / 100; // 2 decimales
+  total = Math.round(total * 100) / 100;
   await repo.actualizarTotal(presupuesto_id, total, tx);
   return total;
 }
 
-// Admin ve todo. Técnico ve los suyos (asignado_a) + solicitudes huérfanas.
-// Lanza NotFoundError (404) en lugar de Forbidden para no revelar existencia.
+// Admin ve todo. Técnico ve los suyos (asignado_a) y las solicitudes huérfanas.
+// Lanza 404 en vez de Forbidden para no revelar que el presupuesto existe.
 function _validarVisibilidad(presupuesto, sesion) {
   if (sesion.rol === ROL.ADMIN) return;
   const esSuyo = presupuesto.asignado_a === sesion.uid;
@@ -144,7 +144,7 @@ function _validarPropiedad(presupuesto, sesion) {
 }
 
 function _validarEditable(presupuesto, sesion) {
-  // Admin override: puede editar en cualquier estado (UI muestra warning).
+  // Admin puede editar en cualquier estado (la UI muestra un warning).
   if (sesion && sesion.rol === ROL.ADMIN) return;
   if (presupuesto.estado !== ESTADO_PRESUPUESTO.BORRADOR) {
     throw new ConflictError(
@@ -246,8 +246,8 @@ async function listar({ estado, mine, cliente, numero_cliente, desde, hasta }, s
     .filter(Boolean);
 
   // Visibilidad:
-  // - Técnico: SIEMPRE solo ve los suyos + solicitudes huérfanas (mine ignorado).
-  // - Admin: si mine=true filtra por sus propios; si no, ve TODO.
+  // - Técnico: siempre solo los suyos mas solicitudes huérfanas (mine se ignora).
+  // - Admin: si mine=true filtra por los suyos, si no ve todo.
   if (!isAdmin) {
     return repo.listar({
       estados,
@@ -291,7 +291,7 @@ async function actualizar(id, campos, sesion) {
     }
 
     if (Array.isArray(campos.bloques)) {
-      // Reemplaza el set completo de bloques.
+      // Reemplaza todo el set de bloques.
       await repo.eliminarBloquesDePresupuesto(id, tx);
       let nextOrden = 1;
       for (const b of campos.bloques) {
@@ -371,7 +371,7 @@ async function actualizarBloque(presupuesto_id, bloque_id, campos, sesion) {
       if (campos.contenido_texto !== undefined) updateData.contenido_texto = campos.contenido_texto;
       if (campos.subtotal !== undefined) updateData.subtotal = campos.subtotal;
     } else if (b.tipo === TIPO_BLOQUE.SECCION_ITEMS) {
-      // Solo titulo/orden — items se manejan por sus propios endpoints.
+      // Solo titulo/orden. Los items van por sus propios endpoints.
     }
 
     if (Object.keys(updateData).length) {
@@ -482,13 +482,11 @@ async function cambiarEstado(id, nuevoEstado, sesion) {
 
   _validarTransicion(p.estado, nuevoEstado);
 
-  // Permisos por destino (Issue 36v2):
-  // - aprobado / convertido: admin O técnico responsable (asignado_a === uid).
-  //   _validarPropiedad ya restringió que el técnico vea el presupuesto si es
-  //   suyo o solicitud huérfana, pero aquí queremos permitir explícitamente
-  //   al técnico asignado aprobar/rechazar/convertir su propio presupuesto.
-  // - enviado / rechazado: cualquier propietario (admin, técnico responsable,
-  //   o solicitud huérfana) — _validarPropiedad ya cubre esto.
+  // Permisos por estado destino:
+  // - aprobado/convertido: admin o técnico responsable (asignado_a === uid).
+  //   Aquí lo permitimos explícitamente para que el técnico asignado pueda
+  //   aprobar/rechazar/convertir su propio presupuesto.
+  // - enviado/rechazado: cualquier propietario. _validarPropiedad ya lo cubre.
   const requiereAdminOResponsable = [ESTADO_PRESUPUESTO.APROBADO, ESTADO_PRESUPUESTO.CONVERTIDO];
   if (requiereAdminOResponsable.includes(nuevoEstado)) {
     const esResponsable = sesion.rol === ROL.ADMIN
@@ -534,22 +532,21 @@ async function reasignar(id, asignadoA, sesion) {
 }
 
 // ============================================================
-// Construye el resumen breve (texto plano, sin markdown) que va al campo
-// `conceptos` del servicio. Diseñado para que el técnico vea de un vistazo
-// qué trabajo viene del presupuesto, sin que el servicio se infle con todo
-// el texto narrativo.
+// Arma el resumen breve en texto plano que va al campo `conceptos` del
+// servicio, para que el técnico vea de un vistazo qué trabajo viene del
+// presupuesto sin cargar todo el texto narrativo.
 //
 // Formato:
-//   Línea 1: "{Tipo} — {Cliente}"  (omite "{Tipo} —" si tipo_servicio es null)
-//   Líneas 2..N: títulos de bloques. Para seccion_items: "{titulo}: it1, it2, it3 y N más"
-//   Última línea: "Total: ${total}"
+//   Linea 1: "{Tipo}: {Cliente}" (omite el tipo si tipo_servicio es null)
+//   Lineas 2..N: títulos de bloques. seccion_items: "{titulo}: it1, it2, it3 y N más"
+//   Última linea: "Total: ${total}"
 //
 // Reglas:
-//   - Bloques tipo `garantias`: se omiten (no relevantes para la ejecución).
-//   - Bloques sin título (intro de texto, viñetas sin header): se omiten.
-//   - Items por seccion_items: máximo 3 visibles, resto resumido como "y N más".
-//   - Items con es_opcional=true marcados con " (opcional)".
-//   - Máximo 10 líneas totales (header + 8 body + total).
+//   - Bloques tipo garantias: se omiten (no aplican a la ejecución).
+//   - Bloques sin título: se omiten.
+//   - seccion_items: máximo 3 items visibles, el resto como "y N más".
+//   - Items con es_opcional=true se marcan con " (opcional)".
+//   - Máximo 10 lineas (header + 8 body + total).
 // ============================================================
 const TIPO_SERVICIO_LABEL = {
   plomeria: 'Plomería',
@@ -597,17 +594,15 @@ function _buildConceptosDeBloques(p) {
 }
 
 async function convertirAServicio(id, sesion) {
-  // Fase 4A: conversión real a servicio.
-  // Permisos: admin convierte cualquier presupuesto aprobado.
-  // Técnico convierte SOLO si es el responsable asignado (asignado_a === uid).
-  // (Consistente con el resto del módulo presupuestos: el técnico asignado
-  // tiene autonomía sobre todo el ciclo de vida de su presupuesto.)
+  // Conversión real a servicio.
+  // Admin convierte cualquier presupuesto aprobado. El técnico solo si es el
+  // responsable asignado (asignado_a === uid), igual que en el resto del módulo.
   return await withTransaction(async (tx) => {
-    // 1) Cargar presupuesto completo (con bloques + items) y validar.
+    // Cargar presupuesto completo (con bloques e items) y validar.
     const p = await repo.buscarPorIdCompleto(id, tx);
     if (!p) throw new NotFoundError('Presupuesto no encontrado.');
 
-    // 2) Permisos: admin OR técnico asignado.
+    // Permisos: admin o técnico asignado.
     if (sesion.rol !== ROL.ADMIN) {
       if (Number(p.asignado_a) !== Number(sesion.uid)) {
         throw new ForbiddenError(
@@ -616,7 +611,7 @@ async function convertirAServicio(id, sesion) {
       }
     }
 
-    // 3) Idempotencia: si ya fue convertido, devolver 409 con info útil.
+    // Idempotencia: si ya fue convertido, devolver 409 con info útil.
     if (p.servicio_id != null) {
       let existingCl = '(desconocido)';
       try {
@@ -626,18 +621,18 @@ async function convertirAServicio(id, sesion) {
       throw new ConflictError(`Este presupuesto ya fue convertido. Servicio: ${existingCl}.`);
     }
 
-    // 4) Validar estado.
+    // Validar estado.
     if (p.estado !== ESTADO_PRESUPUESTO.APROBADO) {
       throw new ConflictError(
         `Solo se puede convertir un presupuesto en estado aprobado (actual: ${p.estado}).`,
       );
     }
 
-    // 5) Construir resumen breve para el campo `conceptos` del servicio.
+    // Resumen breve para el campo `conceptos` del servicio.
     const conceptos = _buildConceptosDeBloques(p);
 
-    // 6) Resolver técnico. Heredar del presupuesto si asignado_a tiene valor;
-    // si no, autoasignar (mismo patrón que servicios.crear).
+    // Resolver técnico: hereda el del presupuesto si tiene asignado_a,
+    // si no autoasigna (mismo patrón que servicios.crear).
     let tecnicoUsuario = null;
     if (p.asignado_a != null) {
       const u = await usuariosRepo.buscarPorId(p.asignado_a, tx);
@@ -647,14 +642,14 @@ async function convertirAServicio(id, sesion) {
       tecnicoUsuario = await serviciosRepo.asignarTecnicoAuto(tx);
     }
 
-    // 7) Resolver numero_cliente. Heredar del presupuesto si ya tiene;
-    // si no, generar el siguiente CL-XXXX (mismo consecutivo que servicios).
+    // Resolver numero_cliente: hereda el del presupuesto si ya tiene,
+    // si no genera el siguiente CL-XXXX (mismo consecutivo que servicios).
     let numeroCliente = p.numero_cliente;
     if (!numeroCliente) {
       numeroCliente = await serviciosRepo.nextNumeroCliente(tx);
     }
 
-    // 8) INSERT en servicios.
+    // INSERT en servicios.
     const servicio = await serviciosRepo.crearServicio({
       numero_cliente: numeroCliente,
       nombre_cliente: p.cliente_nombre,
@@ -668,7 +663,7 @@ async function convertirAServicio(id, sesion) {
       tecnico_asignado: tecnicoUsuario,
     }, tx);
 
-    // 9) UPDATE presupuesto: link al servicio + estado convertido.
+    // UPDATE presupuesto: link al servicio y estado convertido.
     await repo.actualizarHeader(id, { servicio_id: servicio.id }, tx);
     await repo.cambiarEstado(id, ESTADO_PRESUPUESTO.CONVERTIDO, tx);
 
@@ -687,11 +682,11 @@ async function convertirAServicio(id, sesion) {
 }
 
 // ============================================================
-// Solicitud pública (formulario web — sin sesión)
+// Solicitud pública (formulario web, sin sesión)
 // ============================================================
 
 async function crearSolicitudPublica(input) {
-  // Honeypot: si llega lleno, ignorar silenciosamente (anti-bot).
+  // Honeypot anti-bot: si llega lleno, ignorar en silencio.
   if (input.honeypot && input.honeypot.length > 0) {
     console.log('[PRES][PUB] honeypot disparado — solicitud descartada silenciosamente');
     return { ignorada: true };
@@ -708,13 +703,13 @@ async function crearSolicitudPublica(input) {
       throw new ValidationError('No hay un usuario admin disponible para asignar solicitudes.');
     }
 
-    // Autoasignación: primer técnico activo (NULL si no hay técnicos).
+    // Autoasignar al primer técnico activo (NULL si no hay técnicos).
     const tecnicoId = await repo.getPrimerTecnicoDisponible(tx);
 
     const numero_presupuesto = await repo.nextNumeroPresupuesto(tx);
 
-    // descripcion_inicial → notas_internas (solo el admin la verá al atender).
-    // introduccion queda vacía hasta que admin la elabore.
+    // La descripcion_inicial va a notas_internas (solo el admin la ve al
+    // atender). La introduccion queda vacía hasta que el admin la elabore.
     const notasInternas = `[Solicitud del cliente]\n${input.descripcion_inicial}`;
 
     const header = await repo.crearHeader(

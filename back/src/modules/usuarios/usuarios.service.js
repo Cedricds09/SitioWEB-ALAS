@@ -1,4 +1,4 @@
-// Service — reglas de negocio del módulo usuarios.
+// Service: reglas de negocio del módulo usuarios.
 
 const bcrypt = require('bcryptjs');
 
@@ -27,9 +27,8 @@ async function crear({ usuario, password, rol, telefono }) {
   return repo.crear({ usuario, hash, rol, telefono: telefono ?? null });
 }
 
-// Edita un usuario.
-// `cambios` solo contiene campos a modificar.
-// `currentUid` evita auto-desactivación / auto-degradación del admin actual.
+// Edita un usuario. `cambios` solo trae los campos a modificar.
+// `currentUid` evita que el admin se desactive o se quite el rol a sí mismo.
 async function editar(id, cambios, currentUid) {
   if (currentUid === id) {
     if (cambios.activo === false) {
@@ -66,8 +65,8 @@ async function cambiarPassword(id, password) {
   const r = await repo.cambiarPassword(id, hash);
   if (!r) throw new NotFoundError('Usuario no encontrado.');
 
-  // Invalida todas las sesiones previas del usuario (práctica estándar al
-  // cambiar contraseña). Best-effort: no rompe si la migración 009 falta.
+  // Invalida las sesiones previas del usuario, como es estándar al cambiar
+  // contraseña. Best-effort: no rompe si falta la migración 009.
   try {
     await authRepo.incrementTokenVersion(id);
   } catch (err) {

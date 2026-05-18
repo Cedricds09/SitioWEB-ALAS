@@ -1,5 +1,5 @@
-// Entry point del backend ALAS (post-refactor).
-// La carga de env (que valida variables al arrancar) ocurre antes de cualquier otra cosa.
+// Entry point del backend ALAS.
+// La carga de env (valida variables al arrancar) va antes que todo lo demás.
 
 const env = require('./shared/config/env'); // valida y aborta si falta algo crítico
 
@@ -36,7 +36,7 @@ const FRONT_DIR = path.join(__dirname, '..', '..', 'front');
 app.disable('x-powered-by');
 
 // Headers de seguridad (helmet) + CSP a medida del frontend:
-// Google Maps (JS API + embed), CDN de jspdf/qrious y los estáticos propios.
+// Google Maps (JS API + embed), CDN de jspdf/qrious y estáticos propios.
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -66,8 +66,8 @@ app.use(
   }),
 );
 
-// CORS: en desarrollo refleja cualquier origen; en producción solo el
-// configurado en ALLOWED_ORIGIN (sin valor → se rechazan los cross-origin).
+// CORS: en desarrollo refleja cualquier origen; en producción solo el de
+// ALLOWED_ORIGIN. Sin valor en prod se rechazan los cross-origin.
 const corsOrigin = env.NODE_ENV === 'production'
   ? (env.ALLOWED_ORIGIN || false)
   : true;
@@ -98,7 +98,7 @@ app.use('/api/admin', authRouter);
 // Gestión de usuarios (rol admin validado dentro del router)
 app.use('/api/admin/usuarios', requireAuth, usuariosRouter);
 
-// Moderación de reseñas — sesión admin (requireAdmin en el PUT del router)
+// Moderación de reseñas con sesión admin (requireAdmin en el PUT del router)
 app.use('/api/admin/resenas', requireAuth, resenasAdminRouter);
 
 // Notas públicas (consulta cliente)
@@ -107,17 +107,17 @@ app.use('/api/notas', notasRouter);
 // Reseñas públicas (alta validada + listado de aprobadas)
 app.use('/api/resenas', resenasPublicRouter);
 
-// Servicios y clientes — protegidos por sesión admin
+// Servicios y clientes: protegidos por sesión admin
 app.use('/api/servicios', requireAuth, serviciosRouter);
 app.use('/api/clientes', requireAuth, clientesRouter);
 
-// Presupuestos — autenticación interna del propio router
+// Presupuestos: autenticación interna del propio router
 app.use('/api/presupuestos', presupuestosRouter);
 
-// IA (Fase 3) — autenticación interna del propio router
+// IA (Fase 3): autenticación interna del propio router
 app.use('/api/ai', aiRouter);
 
-// Panel admin → sirve main.html (la SPA detecta /admin y muestra el panel)
+// Panel admin: sirve main.html (la SPA detecta /admin y muestra el panel)
 app.get('/admin', (_req, res) => {
   res.sendFile(path.join(FRONT_DIR, 'main.html'));
 });

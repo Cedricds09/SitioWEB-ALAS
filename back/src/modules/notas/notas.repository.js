@@ -1,15 +1,13 @@
-// Repository — queries SQL del módulo notas.
-// Sin req/res, sin lógica de negocio.
+// Queries SQL del módulo notas. Sin req/res ni lógica de negocio.
 
 const { sql, getPool } = require('../../shared/db/pool');
 
 async function buscarPorClienteValidacion(cliente, validacion) {
   const pool = await getPool();
-  // JOIN con servicios para traer tipo_servicio (Issue 29 cierre Fase 2.10).
-  // Nota: dbo.notas no tiene la columna; se hereda lógicamente del servicio
-  // que generó la nota al finalizar.
-  // TOP 10 + orden por fecha DESC: si la validación es un teléfono, el
-  // cliente puede tener varias notas; se devuelven las más recientes.
+  // JOIN con servicios para traer tipo_servicio. dbo.notas no tiene esa
+  // columna; la hereda del servicio que generó la nota.
+  // TOP 10 por fecha DESC: si la validacion es un telefono el cliente
+  // puede tener varias notas, devolvemos las mas recientes.
   const result = await pool
     .request()
     .input('cliente', sql.NVarChar(50), cliente)
@@ -39,7 +37,7 @@ async function buscarPorClienteValidacion(cliente, validacion) {
   return result.recordset;
 }
 
-// DIAG: lista qué existe para ese cliente. Útil para troubleshooting cuando no hay match.
+// Lista qué hay para ese cliente. Útil para debug cuando no hay match.
 async function diagnosticarCliente(cliente) {
   const pool = await getPool();
   const result = await pool

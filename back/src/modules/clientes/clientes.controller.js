@@ -1,4 +1,4 @@
-// Controller — capa fina entre HTTP y service.
+// Controller: capa fina entre HTTP y service.
 
 const service = require('./clientes.service');
 

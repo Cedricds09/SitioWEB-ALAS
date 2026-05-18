@@ -1,9 +1,9 @@
 /* =====================================================
-   MÓDULO RESEÑAS — Frontend.
-   Parte pública (sitio): carrusel de reseñas aprobadas + formulario de
-   alta en 2 pasos (verificación CL-XXXX/teléfono → reseña).
-   Parte admin (/admin): badge de pendientes + moderación aprobar/rechazar.
-   Cada parte se inicializa solo según la ruta.
+   MÓDULO RESEÑAS (frontend).
+   Parte pública (sitio): carrusel de reseñas aprobadas y formulario de
+   alta en 2 pasos (verifica CL-XXXX/teléfono y luego pide la reseña).
+   Parte admin (/admin): badge de pendientes y moderación.
+   Cada parte se inicializa según la ruta.
    ===================================================== */
 (() => {
     const API_BASE = "";
@@ -79,7 +79,7 @@
     }
 
     /* =================================================
-       PARTE PÚBLICA — carrusel + formulario de alta
+       PARTE PÚBLICA: carrusel y formulario de alta
        ================================================= */
 
     // ----- Estado del carrusel -----
@@ -266,7 +266,7 @@
             }
         });
 
-        // FIX 0 — botón X: cierra el formulario y deja la sección como estaba.
+        // FIX 0: botón X. Cierra el formulario y deja la sección como estaba.
         if (closeBtn) {
             closeBtn.addEventListener("click", () => {
                 resetForm();
@@ -399,7 +399,7 @@
     }
 
     /* =================================================
-       PARTE ADMIN — moderación
+       PARTE ADMIN: moderación
        ================================================= */
     let adminResenas = [];   // último listado cargado (para expandir texto)
 

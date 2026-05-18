@@ -1,5 +1,5 @@
-// Pool singleton de SQL Server. Lazy init.
-// Migración funcional de back/db.js — sin defaults hardcodeados, env validado por env.js.
+// Pool singleton de SQL Server, con init perezoso.
+// Sin defaults hardcodeados: el env lo valida env.js.
 
 const sql = require('mssql');
 const env = require('../config/env');

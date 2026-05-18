@@ -1,5 +1,4 @@
-// Repository — queries SQL del módulo presupuestos.
-// Sin req/res, sin lógica de negocio, sin Express. Solo SQL.
+// Queries SQL del módulo presupuestos. Solo SQL, sin lógica de negocio.
 // Acepta `tx` opcional para operaciones transaccionales.
 
 const { sql, getPool } = require('../../shared/db/pool');
@@ -16,9 +15,9 @@ async function makeRequest(tx) {
 }
 
 // ============================================================
-// Lookup auxiliar: id del admin "owner" para solicitudes públicas.
-// Las solicitudes del formulario público no tienen sesión; el FK creado_por
-// debe apuntar a un usuario válido. Usamos el primer admin activo.
+// id del admin "owner" para solicitudes públicas.
+// El formulario público no tiene sesión, pero el FK creado_por necesita
+// un usuario válido. Usamos el primer admin activo.
 // ============================================================
 
 async function obtenerAdminParaSolicitudes(tx) {
@@ -60,7 +59,7 @@ async function validarAsignable(usuarioId, tx) {
 }
 
 // ============================================================
-// Header — consecutivo
+// Header: consecutivo
 // ============================================================
 
 async function nextNumeroPresupuesto(tx) {
@@ -76,7 +75,7 @@ async function nextNumeroPresupuesto(tx) {
 }
 
 // ============================================================
-// Header — CRUD
+// Header: CRUD
 // ============================================================
 
 async function crearHeader(data, tx) {
@@ -209,7 +208,14 @@ async function buscarPorIdPlano(id, tx) {
   const reqDb = await makeRequest(tx);
   const r = await reqDb
     .input('id', sql.Int, id)
-    .query('SELECT * FROM dbo.presupuestos WHERE id = @id');
+    .query(`
+      SELECT id, numero_presupuesto, servicio_id, cliente_nombre, cliente_telefono,
+             cliente_direccion, cliente_destinatario, ciudad, fecha_documento,
+             introduccion, nota_final, vigencia_dias, adelanto_porcentaje, moneda,
+             total_general, estado, notas_internas, creado_por, fecha_creacion,
+             fecha_modificacion, activo, tipo_servicio, fuente, asignado_a, numero_cliente
+      FROM dbo.presupuestos WHERE id = @id
+    `);
   return r.recordset[0] || null;
 }
 
@@ -281,8 +287,8 @@ async function listar({ estados, asignado_a, soloMineConOrfanas, cliente, numero
 
   // Visibilidad por rol:
   // - admin: sin filtro (asignado_a/soloMineConOrfanas vienen undefined).
-  // - tecnico: soloMineConOrfanas=true → ve los suyos + solicitudes huérfanas
-  //   (estado='solicitud' Y asignado_a IS NULL — compatibilidad con datos previos).
+  // - tecnico: soloMineConOrfanas=true ve los suyos mas las solicitudes
+  //   huérfanas (estado='solicitud' y asignado_a IS NULL, compat con datos viejos).
   if (soloMineConOrfanas && asignado_a !== undefined && asignado_a !== null) {
     reqDb.input('mine', sql.Int, asignado_a);
     where += ` AND (p.asignado_a = @mine OR (p.estado = 'solicitud' AND p.asignado_a IS NULL))`;

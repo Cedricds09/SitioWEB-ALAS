@@ -1,5 +1,5 @@
 // Carga y valida variables de entorno al arrancar.
-// Falla rápido si faltan variables críticas — evita errores en runtime.
+// Falla rápido si falta algo crítico, así no revienta en runtime.
 
 const path = require('path');
 
@@ -20,7 +20,7 @@ if (String(process.env.SESSION_SECRET).length < 32) {
   process.exit(1);
 }
 
-// Anthropic — requerido para el módulo de IA (Fase 3).
+// Anthropic: requerido por el módulo de IA (Fase 3).
 if (!process.env.ANTHROPIC_API_KEY || String(process.env.ANTHROPIC_API_KEY).trim() === '') {
   console.error('[ENV] Falta ANTHROPIC_API_KEY en .env (requerida por el módulo IA).');
   process.exit(1);
@@ -43,7 +43,7 @@ const env = Object.freeze({
   SESSION_SECRET: process.env.SESSION_SECRET,
 
   // Origen permitido para CORS en producción (ej. https://alas.com.mx).
-  // En desarrollo se ignora (CORS abierto). Sin valor en prod → CORS se cierra.
+  // En desarrollo se ignora (CORS abierto). Sin valor en prod, CORS se cierra.
   ALLOWED_ORIGIN: process.env.ALLOWED_ORIGIN || '',
 
   GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY || '',

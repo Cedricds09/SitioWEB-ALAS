@@ -1,7 +1,7 @@
 // Cliente Anthropic (SDK oficial) con timeout y retry acotado.
-// - Timeout: 30s por request.
-// - Retry: 1 reintento solo para errores transitorios (529 overloaded). Sin retry en 4xx.
-// - Logging: [AI][REQ] / [AI][RES] sin volcado de prompt ni respuesta (datos de cliente).
+// Timeout de 30s por request.
+// 1 reintento solo para errores transitorios (529 overloaded), no en 4xx.
+// Logs [AI][REQ]/[AI][RES] sin volcar prompt ni respuesta (datos de cliente).
 
 const Anthropic = require('@anthropic-ai/sdk');
 const env = require('../config/env');
@@ -16,15 +16,15 @@ const client = new Anthropic({
 });
 
 /**
- * Llamada a Claude. NO loguea contenido — solo metadatos.
+ * Llamada a Claude. No loguea contenido, solo metadatos.
  *
  * @param {object} params
- * @param {string} params.model             — id del modelo (env.ANTHROPIC_MODEL por defecto)
- * @param {number} params.maxTokens         — máximo de tokens de salida (1500 típico)
- * @param {number} params.temperature       — 0..1 (0.3 típico para tareas estructuradas)
- * @param {Array}  params.systemBlocks      — array de bloques { type:'text', text, cache_control? }
- * @param {Array}  params.messages          — pares user/assistant
- * @param {object} params.meta              — { presupuesto_id, modo } solo para logs
+ * @param {string} params.model         id del modelo (env.ANTHROPIC_MODEL por defecto)
+ * @param {number} params.maxTokens     máximo de tokens de salida (1500 típico)
+ * @param {number} params.temperature   0..1 (0.3 típico para tareas estructuradas)
+ * @param {Array}  params.systemBlocks  bloques { type:'text', text, cache_control? }
+ * @param {Array}  params.messages      pares user/assistant
+ * @param {object} params.meta          { presupuesto_id, modo } solo para logs
  * @returns {Promise<{ content: string, usage: object, model: string, latency_ms: number }>}
  */
 async function complete({ model, maxTokens, temperature, systemBlocks, messages, meta }) {
@@ -69,7 +69,7 @@ async function complete({ model, maxTokens, temperature, systemBlocks, messages,
     `stop=${stopReason}`,
   );
 
-  // Extrae el texto plano del primer bloque text. La SDK retorna content[] con bloques.
+  // Saca el texto plano del primer bloque text (la SDK retorna content[] con bloques).
   const textBlock = (response.content || []).find((b) => b.type === 'text');
   const text = textBlock ? textBlock.text : '';
 

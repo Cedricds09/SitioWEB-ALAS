@@ -14,9 +14,9 @@ function formatZodIssues(issues) {
     .join('; ');
 }
 
-// Express 5 hace `req.query` getter-only — `req.query = ...` falla silenciosamente.
-// Object.defineProperty redefine la propiedad como writable. body/params siguen
-// siendo writable en Express 5, pero usar defineProperty también para consistencia.
+// En Express 5 `req.query` es getter-only: `req.query = ...` falla en silencio.
+// Object.defineProperty la redefine como writable. body/params siguen siendo
+// writable en Express 5, pero usamos defineProperty igual por consistencia.
 function replaceReqProp(req, key, value) {
   Object.defineProperty(req, key, {
     value,

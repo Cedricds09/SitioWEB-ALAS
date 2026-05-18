@@ -29,13 +29,13 @@ function signToken(payload) {
   return `${body}.${sig}`;
 }
 
-// Async: además de firma + expiración, valida el token_version contra la DB
-// para soportar revocación de sesiones (M3).
-// Devuelve el payload, null (token mal formado / firma inválida / expirado),
-// o LANZA error en casos que el caller debe tratar como 401:
-//   - 'Sesión revocada...'  → token_version no coincide.
-//   - 'Usuario no encontrado o inactivo' → usuario borrado / desactivado.
-//   - 'No se pudo validar la sesión.' → fallo de DB (fail closed).
+// Además de firma y expiración, valida el token_version contra la DB para
+// soportar revocación de sesiones (M3). Async porque consulta la DB.
+// Devuelve el payload, o null si el token está mal formado, tiene firma
+// inválida o expiró. Lanza error en casos que el caller trata como 401:
+//   'Sesión revocada...': el token_version no coincide.
+//   'Usuario no encontrado o inactivo': usuario borrado o desactivado.
+//   'No se pudo validar la sesión.': fallo de DB, se rechaza (fail closed).
 async function verifyToken(token) {
   if (!token || typeof token !== 'string') return null;
   const idx = token.lastIndexOf('.');
@@ -55,20 +55,20 @@ async function verifyToken(token) {
   if (!payload || typeof payload.exp !== 'number') return null;
   if (Date.now() > payload.exp) return null;
 
-  // --- Revocación por token_version (M3) ---
+  // Revocación por token_version (M3)
   let tvDB;
   try {
     tvDB = await authRepo.getTokenVersion(payload.uid);
   } catch (err) {
-    // Columna token_version ausente (migración 009 pendiente):
-    // degradación controlada — no se bloquea durante el deploy.
+    // Si falta la columna token_version (migración 009 pendiente) degradamos
+    // de forma controlada: no se bloquea durante el deploy.
     const msg = (err && err.message) || '';
     if ((err && err.number === 207) || /invalid column name|token_version/i.test(msg)) {
-      console.warn('[AUTH] token_version ausente (migración 009 pendiente) — revocación inactiva temporalmente.');
+      console.warn('[AUTH] token_version ausente (migración 009 pendiente): revocación inactiva temporalmente.');
       return payload;
     }
-    // Cualquier otro fallo de DB → fail closed: el token NO se acepta.
-    console.error('[AUTH] No se pudo validar token_version — token rechazado:', msg);
+    // Cualquier otro fallo de DB: fail closed, el token NO se acepta.
+    console.error('[AUTH] No se pudo validar token_version, token rechazado:', msg);
     throw new Error('No se pudo validar la sesión.');
   }
 
@@ -79,7 +79,7 @@ async function verifyToken(token) {
 
   // Token emitido antes de la migración (sin tv): se permite hasta que expire.
   if (typeof payload.tv !== 'number') {
-    console.warn('[AUTH] token sin tv (emitido pre-migración) — se permite hasta expirar.');
+    console.warn('[AUTH] token sin tv (emitido pre-migración): se permite hasta expirar.');
     return payload;
   }
 
@@ -99,7 +99,7 @@ function readCookie(req, name) {
   return found ? decodeURIComponent(found.slice(name.length + 1)) : null;
 }
 
-// Async (verifyToken consulta la DB). Puede lanzar — ver verifyToken.
+// Async porque verifyToken consulta la DB. Puede lanzar (ver verifyToken).
 async function getSession(req) {
   return verifyToken(readCookie(req, COOKIE_NAME));
 }

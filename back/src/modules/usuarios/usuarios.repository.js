@@ -1,4 +1,4 @@
-// Repository — queries SQL del módulo usuarios.
+// Repository: queries SQL del módulo usuarios.
 
 const { sql, getPool } = require('../../shared/db/pool');
 const { ESTADO_SERVICIO } = require('../../shared/constants/estados');
@@ -102,7 +102,7 @@ async function actualizar(id, cambios, tx) {
   return r.recordset[0] || null;
 }
 
-// Cascade: actualiza referencias a usuario en servicios.
+// Al renombrar un usuario, propaga el nuevo nombre a sus referencias en servicios.
 async function cascadeRenameEnServicios(oldUsuario, nuevoUsuario, tx) {
   await new sql.Request(tx)
     .input('old', sql.NVarChar(50), oldUsuario)

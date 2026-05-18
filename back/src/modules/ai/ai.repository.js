@@ -1,5 +1,4 @@
-// Repository del módulo ai — queries SQL sobre dbo.ai_generations.
-// Sin lógica de negocio.
+// Queries SQL del módulo IA.
 
 const { sql, getPool } = require('../../shared/db/pool');
 
@@ -9,10 +8,7 @@ async function makeRequest(tx) {
   return pool.request();
 }
 
-/**
- * Cuenta generaciones globales en la última hora (exitosas + fallidas).
- * Usado por el circuit breaker.
- */
+
 async function countLastHour(tx) {
   const reqDb = await makeRequest(tx);
   const r = await reqDb.query(`
@@ -23,10 +19,6 @@ async function countLastHour(tx) {
   return Number(r.recordset[0]?.total) || 0;
 }
 
-/**
- * Cuenta generaciones de UN usuario en la última hora (exitosas + fallidas).
- * Usado por el circuit breaker per-user.
- */
 async function countLastHourByUser(userId, tx) {
   const reqDb = await makeRequest(tx);
   const r = await reqDb
@@ -41,7 +33,7 @@ async function countLastHourByUser(userId, tx) {
 }
 
 /**
- * Inserta una fila de tracking. Llamado tanto en éxito como en fallo.
+ * Inserta una fila de tracking.
  * @param {object} data
  *   - user_id            INT NOT NULL
  *   - presupuesto_id     INT NOT NULL
@@ -77,14 +69,10 @@ async function registrarGeneracion(data, tx) {
   return r.recordset[0];
 }
 
-// ============================================================
-// Consultas de negocio (sin Claude API — queries SQL directas).
-// El filtro por técnico llega resuelto desde el service:
-//   - servicios: { tecnico } = usuario (NVARCHAR) o null (admin → todo).
-//   - presupuestos: { uid } = id de usuario (INT) o null (admin → todo).
-// ============================================================
 
-// CONSULTA 1 — servicios activos (totales por estado).
+// Consultas de negocio: queries SQL directas a la DB.
+
+// Servicios activos: totales por estado.
 async function negocioActivos({ tecnico }) {
   const pool = await getPool();
   const reqDb = pool.request();
@@ -104,7 +92,7 @@ async function negocioActivos({ tecnico }) {
   return r.recordset[0];
 }
 
-// CONSULTA 2 — servicios más antiguos sin cerrar (TOP 5).
+// Servicios más antiguos sin cerrar.
 async function negocioUrgentes({ tecnico }) {
   const pool = await getPool();
   const reqDb = pool.request();
@@ -124,7 +112,7 @@ async function negocioUrgentes({ tecnico }) {
   return r.recordset;
 }
 
-// CONSULTA 3 — servicios activos sin presupuesto asociado.
+// Servicios activos sin presupuesto asociado.
 async function negocioSinPresupuesto({ tecnico }) {
   const pool = await getPool();
   const reqDb = pool.request();
@@ -146,7 +134,7 @@ async function negocioSinPresupuesto({ tecnico }) {
   return r.recordset[0];
 }
 
-// CONSULTA 4 — servicios EN_PROCESO demorados (> 7 días, TOP 5).
+// Servicios EN_PROCESO demorados (mas de 7 días, TOP 5).
 async function negocioSinCerrar({ tecnico }) {
   const pool = await getPool();
   const reqDb = pool.request();
@@ -167,7 +155,7 @@ async function negocioSinCerrar({ tecnico }) {
   return r.recordset;
 }
 
-// CONSULTA 5 — presupuestos sin respuesta del cliente.
+// Presupuestos sin respuesta del cliente.
 async function negocioPresupuestosPendientes({ uid }) {
   const pool = await getPool();
   const reqDb = pool.request();
@@ -187,7 +175,7 @@ async function negocioPresupuestosPendientes({ uid }) {
   return r.recordset[0];
 }
 
-// CONSULTA 6 — servicios programados para HOY (ordenados por hora).
+// Servicios programados para hoy, ordenados por hora.
 async function negocioAgendaHoy({ tecnico }) {
   const pool = await getPool();
   const reqDb = pool.request();
@@ -210,8 +198,7 @@ async function negocioAgendaHoy({ tecnico }) {
   return r.recordset;
 }
 
-// CONSULTA 7 — conteo de servicios activos SIN fecha programada.
-// Usado por agenda_hoy para el mensaje "tienes N activos sin fecha".
+// Conteo de servicios activos sin fecha programada.
 async function negocioActivosSinFecha({ tecnico }) {
   const pool = await getPool();
   const reqDb = pool.request();
@@ -230,7 +217,7 @@ async function negocioActivosSinFecha({ tecnico }) {
   return r.recordset[0];
 }
 
-// CONSULTA 8 — servicios programados ESTA SEMANA (hoy + 6 días).
+// Servicios programados esta semana (hoy + 6 días).
 async function negocioAgendaSemana({ tecnico }) {
   const pool = await getPool();
   const reqDb = pool.request();
@@ -255,13 +242,10 @@ async function negocioAgendaSemana({ tecnico }) {
 }
 
 // ============================================================
-// Consulta por cliente (ficha). tecnico/uid resueltos en el service.
-// Para un técnico, datos/activos/terminados se filtran por tecnico_asignado:
-// si no tiene ningún servicio de ese cliente, clienteDatos devuelve null
-// y el service responde 404 (no revela clientes ajenos).
+// Consulta de ficha de cliente
 // ============================================================
 
-// Datos básicos del cliente (del servicio más reciente que le pertenece).
+// Datos básicos del cliente, tomados del servicio más reciente.
 async function clienteDatos(numeroCliente, tecnico) {
   const pool = await getPool();
   const reqDb = pool.request().input('cl', sql.NVarChar(50), numeroCliente);
@@ -279,7 +263,7 @@ async function clienteDatos(numeroCliente, tecnico) {
   return r.recordset[0] || null;
 }
 
-// Servicios activos del cliente (PENDIENTE / EN_PROCESO).
+// Servicios activos del cliente (PENDIENTE o EN_PROCESO).
 async function clienteServiciosActivos(numeroCliente, tecnico) {
   const pool = await getPool();
   const reqDb = pool.request().input('cl', sql.NVarChar(50), numeroCliente);
@@ -317,7 +301,7 @@ async function clienteServiciosTerminadosCount(numeroCliente, tecnico) {
   return r.recordset[0].total;
 }
 
-// Presupuestos vigentes del cliente (no rechazados ni convertidos).
+// Presupuestos vigentes del cliente: no rechazados ni convertidos.
 async function clientePresupuestos(numeroCliente, uid) {
   const pool = await getPool();
   const reqDb = pool.request().input('cl', sql.NVarChar(50), numeroCliente);

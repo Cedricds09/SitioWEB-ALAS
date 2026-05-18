@@ -1,5 +1,5 @@
 // Errores tipados para flujos de aplicación.
-// El error.middleware los traduce a respuestas HTTP con shape { ok: false, error: msg }.
+// error.middleware los traduce a respuestas HTTP { ok: false, error: msg }.
 
 class AppError extends Error {
   constructor(message, statusCode = 500, code = 'INTERNAL_ERROR', details = null) {

@@ -31,8 +31,8 @@ const nullableTrimmedString = z.preprocess(
   z.union([z.string(), z.null()]).optional(),
 );
 
-// Teléfono: 10 dígitos exactos. Strip de no-dígitos antes de validar.
-// Defensa en profundidad — la columna cliente_telefono tiene CHECK constraint
+// Teléfono: 10 dígitos exactos. Quita no-dígitos antes de validar.
+// Defensa en profundidad: la columna cliente_telefono ya tiene CHECK constraint
 // (CK_presupuestos_cliente_telefono_formato, migración 005).
 const telefonoString = z.preprocess(
   (v) => {
@@ -191,7 +191,7 @@ const headerCommonFields = {
 
 const crearPresupuestoSchema = z.object({
   ...headerCommonFields,
-  // Sobrescribimos nota_final para aplicar default a la cláusula estándar si no llega.
+  // nota_final usa la cláusula estándar por default si no llega.
   nota_final: z.preprocess(
     (v) => {
       if (v === undefined) return NOTA_FINAL_DEFAULT;
@@ -204,7 +204,7 @@ const crearPresupuestoSchema = z.object({
   bloques: z.array(bloqueSchema).optional(),
 });
 
-// Update: todos los campos opcionales. Si vienen `bloques`, reemplaza el set.
+// Update: todos los campos opcionales. Si llegan `bloques`, reemplaza el set.
 const actualizarPresupuestoSchema = z
   .object({
     cliente_nombre: optionalString,
@@ -248,8 +248,8 @@ const actualizarPresupuestoSchema = z
 
 const agregarBloqueSchema = bloqueSchema;
 
-// Update de bloque: NO permite cambiar `tipo`. Campos del bloque opcionales según tipo.
-// Aceptamos un objeto plano y validamos manualmente en el service según el tipo del bloque actual.
+// Update de bloque: no permite cambiar `tipo`. Aceptamos un objeto plano y
+// validamos en el service según el tipo del bloque actual.
 const actualizarBloqueSchema = z
   .object({
     titulo: nullableTrimmedString,
@@ -319,7 +319,7 @@ const crearSolicitudPublicaSchema = z.object({
     z.string().min(1, 'tipo_servicio requerido.').max(100),
   ),
   descripcion_inicial: requiredString,
-  // Honeypot — debe venir vacío. Aceptamos cualquier valor; el handler decide.
+  // Honeypot: debe venir vacío. Aceptamos cualquier valor, el handler decide.
   honeypot: z.preprocess(
     (v) => (v == null ? '' : String(v).trim()),
     z.string(),

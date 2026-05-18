@@ -1,4 +1,4 @@
-// Routes del módulo auth.
+// Rutas del módulo auth.
 
 const router = require('express').Router();
 

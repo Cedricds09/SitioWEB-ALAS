@@ -1,5 +1,5 @@
-// Service — reglas de negocio del módulo servicios.
-// Sin SQL crudo, sin Express. Llama al repository y lanza errores tipados.
+// Service: reglas de negocio del módulo servicios.
+// Sin SQL crudo ni Express. Llama al repository y lanza errores tipados.
 
 const repo = require('./servicios.repository');
 const { withTransaction } = require('../../shared/db/transaction');
@@ -172,7 +172,7 @@ async function finalizar(id, resolucion, sesion) {
 }
 
 // ============================================================
-// Reabrir (admin only — el route lo protege; aquí valida estado)
+// Reabrir. El route ya exige admin; aquí solo se valida el estado.
 // ============================================================
 async function reabrir(id) {
   const found = await repo.buscarPorId(id);
@@ -248,7 +248,7 @@ async function programar(id, datos, sesion) {
 }
 
 // ============================================================
-// Calendario semanal — helpers de semana ISO (todo en UTC)
+// Calendario semanal: helpers de semana ISO (todo en UTC)
 // ============================================================
 function _formatYMD(d) {
   return d.toISOString().slice(0, 10);
@@ -257,7 +257,7 @@ function _formatYMD(d) {
 // {year, week} ISO de una fecha.
 function _isoWeek(date) {
   const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const day = d.getUTCDay() || 7; // Lun=1..Dom=7
+  const day = d.getUTCDay() || 7; // Lun=1 .. Dom=7
   d.setUTCDate(d.getUTCDate() + 4 - day); // jueves de esa semana
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   const week = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
@@ -299,7 +299,7 @@ async function calendario({ semana, isAdmin, usuario }) {
   const domingo = _formatYMD(sunday);
   const semanaStr = `${year}-W${String(week).padStart(2, '0')}`;
 
-  // Técnico → solo lo suyo. Admin → todos.
+  // Técnico ve solo lo suyo; admin ve todos.
   const tecnico = isAdmin ? undefined : (usuario || '');
   const rows = await repo.listarCalendario({ lunes, domingo, tecnico });
 

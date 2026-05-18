@@ -1,5 +1,4 @@
-// Routes del módulo servicios.
-// Solo declara endpoints + middleware. Nada más.
+// Routes del módulo servicios: solo endpoints y middleware.
 
 const router = require('express').Router();
 
@@ -45,8 +44,8 @@ router.put(
   validate({ params: S.idParamSchema, body: S.ajusteSchema }),
   asyncHandler(ctrl.actualizarAjuste),
 );
-// Programar fecha/hora — sin requireAdmin: el service permite admin o
-// el técnico asignado (mismo criterio que /ajuste y /finalizar).
+// Programar fecha/hora sin requireAdmin: el service deja pasar al admin o al
+// técnico asignado (mismo criterio que /ajuste y /finalizar).
 router.put(
   '/:id/programar',
   validate({ params: S.idParamSchema, body: S.programarSchema }),
