@@ -1,6 +1,7 @@
 (() => {
-    // Ajusta si el backend corre en otro host/puerto
-    const API_BASE = "http://localhost:3000";
+    // URL relativa: el fetch usa el mismo origen desde donde cargó la
+    // página → funciona en localhost, ngrok y producción sin cambios.
+    const API_BASE = "";
 
     function escape(s) {
         return String(s ?? "").replace(/[&<>"']/g, c => ({
