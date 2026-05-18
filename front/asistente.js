@@ -201,6 +201,7 @@
 
     function abrir() {
         state.abierto = true;
+        panel.classList.remove("is-minimized");
         panel.classList.add("show");
         btn.textContent = "✕";
         // El historial vive en el DOM: solo se inicializa la primera vez.
@@ -212,10 +213,24 @@
     function cerrar() {
         state.abierto = false;
         panel.classList.remove("show");
+        panel.classList.remove("is-minimized");
+        btn.innerHTML = BTN_ICON;
+    }
+
+    // Mobile: colapsa el panel tras navegar (NO lo cierra — el historial y el
+    // estado se conservan). La burbuja sigue visible para reabrirlo.
+    function minimizar() {
+        panel.classList.add("is-minimized");
         btn.innerHTML = BTN_ICON;
     }
 
     function toggle() {
+        // Si está minimizado (mobile), un toque restaura el panel.
+        if (panel.classList.contains("is-minimized")) {
+            panel.classList.remove("is-minimized");
+            btn.textContent = "✕";
+            return;
+        }
         if (state.abierto) cerrar();
         else abrir();
     }
@@ -255,14 +270,35 @@
         state.iniciado = false;
     }
 
+    // Opciones del menú principal — siempre disponibles.
+    const MENU_OPCIONES = [
+        { label: "📋 Nuevo presupuesto", action: empezarPresupuesto },
+        { label: "📊 Estado del negocio", action: menuNegocio },
+        { label: "🔧 Ver servicios", action: () => navegar("servicios") },
+        { label: "👥 Buscar cliente", action: () => navegar("clientes") },
+        { label: "📄 Consultar nota", action: () => navegar("notas") },
+    ];
+
+    // Menú principal "sticky": primer hijo de #asistMsgs, queda fijo arriba al
+    // hacer scroll y sus botones NO se deshabilitan (reutilizables siempre).
+    function renderMenuPrincipal() {
+        const menu = document.createElement("div");
+        menu.className = "asist-menu";
+        menu.id = "asistMenu";
+        MENU_OPCIONES.forEach((opt) => {
+            const b = document.createElement("button");
+            b.type = "button";
+            b.className = "asist-option-btn";
+            b.textContent = opt.label;
+            b.addEventListener("click", () => { if (opt.action) opt.action(); });
+            menu.appendChild(b);
+        });
+        msgs.appendChild(menu);
+    }
+
     function saludo() {
-        addBotMsg("Elige una opción o escríbeme lo que necesitas:", [
-            { label: "📋 Nuevo presupuesto", action: empezarPresupuesto },
-            { label: "📊 Estado del negocio", action: menuNegocio },
-            { label: "🔧 Ver servicios", action: () => navegar("servicios") },
-            { label: "👥 Buscar cliente", action: () => navegar("clientes") },
-            { label: "📄 Consultar nota", action: () => navegar("notas") },
-        ]);
+        renderMenuPrincipal();
+        addBotMsg("Elige una opción del menú o escríbeme lo que necesitas.");
     }
 
     /* ---------- Navegación (sin API) ---------- */
@@ -282,9 +318,13 @@
 
     function navegar(target) {
         const dash = document.getElementById("adminDash");
+        const isMobile = window.innerWidth < 768;
         const irAlDash = () => {
             if (dash) dash.scrollIntoView({ behavior: "smooth", block: "start" });
         };
+        // Mobile: tras navegar, minimiza el panel para que el usuario vea la
+        // sección a la que lo llevamos. En desktop el panel se queda como está.
+        const trasNavegar = () => { if (isMobile) minimizar(); };
 
         if (target === "servicios") {
             addUserMsg("Ver servicios");
@@ -292,6 +332,7 @@
             cambiarTab("active");
             irAlDash();
             addBotMsg("Te llevo a la lista de servicios.");
+            trasNavegar();
             return;
         }
 
@@ -301,6 +342,7 @@
             cambiarTab("search");
             irAlDash();
             addBotMsg("Te llevo a la búsqueda de clientes. Escribe nombre, número o teléfono.");
+            trasNavegar();
             return;
         }
 
@@ -317,6 +359,7 @@
             } else {
                 addBotMsg('Te llevo a los servicios. Cambia al filtro "Finalizados" para ver las notas.');
             }
+            trasNavegar();
             return;
         }
 
@@ -330,6 +373,7 @@
         if (el) {
             el.scrollIntoView({ behavior: "smooth", block: "start" });
             addBotMsg(`Te llevo a ${target}.`);
+            trasNavegar();
         } else {
             addBotMsg("No encontré esa sección.");
         }
@@ -338,7 +382,9 @@
     /* ---------- Consultas de negocio (datos reales, sin Claude API) ---------- */
     const KEYWORDS_NEGOCIO = {
         activos: ["activos", "cuántos servicios", "mis servicios",
-                  "servicios tengo", "cuantos servicios"],
+                  "servicios tengo", "cuantos servicios",
+                  "estado del negocio", "estado negocio",
+                  "cómo vamos", "como vamos", "resumen"],
         urgentes: ["urgentes", "más urgentes", "mas urgentes",
                    "prioridad", "más antiguos", "mas antiguos"],
         sin_presupuesto: ["sin presupuesto", "falta presupuesto",
@@ -693,12 +739,18 @@
     }
 
     /* ---------- Reconocimiento de voz (Web Speech API) ---------- */
+    // iOS expone solo webkitSpeechRecognition (a lo que ya resuelve SR) y exige
+    // continuous=false. Apple limita el dictado a nivel sistema/WebKit, así que
+    // la restricción aplica a TODOS los navegadores del dispositivo, no solo
+    // Safari. Sin soporte, micBtn ya viene oculto (hidden).
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     let recognition = null;
     let recording = false;
     if (SR) {
         recognition = new SR();
         recognition.lang = "es-MX";
-        recognition.interimResults = false;
+        recognition.continuous = false;     // requerido en iOS Safari
+        recognition.interimResults = false; // requerido en iOS Safari
         recognition.maxAlternatives = 1;
         recognition.onresult = (e) => {
             const txt = e.results[0][0].transcript;
@@ -711,9 +763,17 @@
             recording = false;
             micBtn.classList.remove("is-recording");
         };
-        recognition.onerror = () => {
+        recognition.onerror = (e) => {
             recording = false;
             micBtn.classList.remove("is-recording");
+            // Micrófono no disponible / permiso denegado: avisar en el chat.
+            if (e && (e.error === "not-allowed" || e.error === "service-not-allowed")) {
+                addBotMsg(
+                    isIOS
+                        ? "El micrófono no está disponible en este dispositivo. Escribe tu mensaje directamente."
+                        : "No pude acceder al micrófono. Revisa los permisos del micrófono en tu navegador.",
+                );
+            }
         };
         micBtn.addEventListener("click", () => {
             if (recording) {

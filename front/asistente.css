@@ -53,8 +53,17 @@
     display: none;
     flex-direction: column;
     overflow: hidden;
+    transition: all 0.3s ease;
 }
 .asist-panel.show { display: flex; }
+/* Estado minimizado (mobile): colapsado pero sin cerrar — el panel sigue
+   en el DOM con su historial; la burbuja lo restaura. */
+.asist-panel.is-minimized {
+    height: 0;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+}
 
 /* Header */
 .asist-head {
@@ -167,6 +176,22 @@
     cursor: not-allowed;
 }
 
+/* Menú principal sticky: primer bloque del chat, siempre visible al hacer
+   scroll. Los márgenes negativos cancelan el padding de .asist-msgs para
+   que la barra quede a ras de los bordes. */
+.asist-menu {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px;
+    margin: -16px -16px 4px;
+    background: var(--color-bg-card);
+    border-bottom: 1px solid var(--color-border);
+}
+
 /* Spinner inline */
 .asist-spinner {
     width: 20px;
@@ -236,7 +261,7 @@
     50%      { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
 }
 
-/* Mobile: panel ocupa casi toda la pantalla */
+/* Mobile: panel ocupa casi toda la pantalla + área de input accesible al tacto */
 @media (max-width: 480px) {
     .asist-panel {
         right: 16px;
@@ -249,5 +274,19 @@
     .asist-btn {
         right: 16px;
         bottom: 16px;
+    }
+    /* Más espacio táctil en la barra de input */
+    .asist-input-bar {
+        padding: 16px;
+    }
+    /* Tamaño mínimo recomendado para touch en iOS (48x48) */
+    .asist-mic-btn,
+    .asist-send-btn {
+        min-width: 48px;
+        min-height: 48px;
+    }
+    /* 16px evita el zoom automático de iOS al hacer focus en el input */
+    .asist-input {
+        font-size: 16px;
     }
 }

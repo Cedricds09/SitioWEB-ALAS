@@ -1192,6 +1192,9 @@ body:not(.admin-mode) .admin-only { display: none !important; }
 .toast.error { border-color: rgba(230, 57, 70, 0.4); }
 .toast-msg { font-size: 0.95rem; line-height: 1.45; align-self: center; }
 @media (min-width: 480px) { .toast { left: auto; } }
+/* En /admin el toast (ej. "Bienvenido…") se eleva por encima de la burbuja
+   del chatbot (.asist-btn: bottom 24px + 56px de alto) para no encimarse. */
+body.admin-mode .toast { bottom: 96px; }
 
 /* Modal — scroll lock + max-height interno */
 body.modal-open { overflow: hidden; }
@@ -3187,4 +3190,54 @@ body.modal-open { overflow: hidden; }
     font-size: 1rem;
     line-height: 1;
     padding: 0;
+}
+
+/* =====================================================
+   FIXES MOBILE — prueba real iPhone (Fase 8)
+   ===================================================== */
+@media (max-width: 768px) {
+    /* FIX 6 — sección de estadísticas centrada (19+, 1200+, CDMX, 100%) */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        text-align: center;
+        margin: 0 auto;
+        width: 100%;
+    }
+
+    /* FIX 7 — texto justificado en párrafos de la página pública */
+    .section-text,
+    .hero-sub {
+        text-align: justify;
+    }
+}
+
+/* =====================================================
+   FEATURE — buscador + colapso en consulta pública de notas
+   ===================================================== */
+.notes-filter {
+    width: 100%;
+    margin: 0 0 1rem;
+    padding: 0.7rem 1rem;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    color: var(--color-silver-1);
+    font-size: 16px; /* 16px evita el zoom automático de iOS al hacer focus */
+    font-family: inherit;
+    outline: none;
+}
+.notes-filter:focus { border-color: var(--color-purple); }
+.notes-filter::placeholder { color: var(--color-silver-3); }
+.notes-more {
+    display: block;
+    width: 100%;
+    margin-top: 1rem;
+}
+.notes-empty-filter {
+    padding: 1rem;
+    text-align: center;
+    color: var(--color-silver-3);
+    font-size: 0.9rem;
+    list-style: none;
 }

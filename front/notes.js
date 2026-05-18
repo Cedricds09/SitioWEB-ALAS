@@ -24,15 +24,17 @@
     }
 
     function formatNotaId(id) {
+        // El backend ya entrega el folio como "ALAS-XXXX": usarlo tal cual.
+        if (typeof id === "string" && id.startsWith("ALAS-")) return id;
         const n = parseInt(id, 10);
-        if (!Number.isFinite(n)) return "NT-0000";
-        return `NT-${String(n).padStart(4, "0")}`;
+        return isNaN(n) ? String(id) : `NT-${String(n).padStart(4, "0")}`;
     }
 
     function formatPdfFileId(id) {
+        // Mismo criterio: si ya viene "ALAS-XXXX" se usa directo.
+        if (typeof id === "string" && id.startsWith("ALAS-")) return id;
         const n = parseInt(id, 10);
-        if (!Number.isFinite(n)) return "ALAS-0000";
-        return `ALAS-${String(n).padStart(4, "0")}`;
+        return isNaN(n) ? String(id) : `ALAS-${String(n).padStart(4, "0")}`;
     }
 
     // Privacidad: censurar teléfono, visibles solo últimos 3 dígitos
@@ -122,42 +124,103 @@
         renderError("No se encontró ninguna nota con los datos proporcionados", { notFound: true });
     }
 
-    function renderNota(data, pdfNote) {
+    // Renderiza 1..N notas. 1-3 → todas; >3 → 3 recientes + "Ver más" +
+    // buscador en vivo (por fecha o folio) sobre las notas ya cargadas.
+    function renderNotas(dataArr) {
         const root = document.getElementById("notesResults");
         if (!root) return;
-
         root.classList.remove("error");
-        const estadoClase = String(data.estado || "").toLowerCase() === "pagado" ? "paid" : "pending";
-        const conceptosTxt = Array.isArray(pdfNote.items)
-            ? pdfNote.items.map(i => i.concept).join(" · ")
-            : String(data.conceptos ?? "—");
+
+        // Modelo de presentación por nota (incluye su PDF ya armado).
+        const notas = dataArr.map((d, idx) => ({
+            idx,
+            data: d,
+            pdf: toPdfNote(d),
+            folio: formatNotaId(d.id),
+            fechaStr: formatFecha(d.fecha),
+        }));
+
+        const count = notas.length;
+        const colapsable = count > 3;
 
         root.innerHTML = `
-            <p class="notes-count">1 nota encontrada</p>
-            <ul class="notes-list">
+            <p class="notes-count">${count} nota${count === 1 ? "" : "s"} encontrada${count === 1 ? "" : "s"}</p>
+            ${colapsable ? '<input type="search" class="notes-filter" id="notesFilter" placeholder="Buscar por fecha (dd/mm/aaaa) o folio (ALAS-XXXX)…" autocomplete="off" />' : ""}
+            <ul class="notes-list" id="notesList"></ul>
+            ${colapsable ? '<button type="button" class="btn btn-ghost notes-more" id="notesMore"></button>' : ""}
+        `;
+
+        const listEl = root.querySelector("#notesList");
+        const moreBtn = root.querySelector("#notesMore");
+        const filterEl = root.querySelector("#notesFilter");
+        let expandido = false;
+        let filtro = "";
+
+        function notaLi(n) {
+            const d = n.data;
+            const estadoClase = String(d.estado || "").toLowerCase() === "pagado" ? "paid" : "pending";
+            const conceptosTxt = Array.isArray(n.pdf.items)
+                ? n.pdf.items.map(i => i.concept).join(" · ")
+                : String(d.conceptos ?? "—");
+            return `
                 <li class="note-item">
                     <div class="note-meta">
-                        <span class="note-id">${escape(formatNotaId(data.id))}</span>
-                        <span class="note-id">Cliente: ${escape(formatClienteId(data.cliente))}</span>
-                        <span class="note-date">${escape(formatFecha(data.fecha))}</span>
+                        <span class="note-id">${escape(n.folio)}</span>
+                        <span class="note-id">Cliente: ${escape(formatClienteId(d.cliente))}</span>
+                        <span class="note-date">${escape(n.fechaStr)}</span>
                     </div>
                     <div class="note-info">
                         <p class="note-service">${escape(conceptosTxt)}</p>
-                        <p class="note-total">Total: ${escape(money(data.total))}</p>
-                        <p class="note-status ${estadoClase}">Estado: ${escape(data.estado)}</p>
+                        <p class="note-total">Total: ${escape(money(d.total))}</p>
+                        <p class="note-status ${estadoClase}">Estado: ${escape(d.estado)}</p>
                     </div>
-                    <button type="button" class="btn btn-primary note-dl">Descargar PDF</button>
+                    <button type="button" class="btn btn-primary note-dl" data-idx="${n.idx}">Descargar PDF</button>
                 </li>
-            </ul>
-        `;
-
-        const btn = root.querySelector(".note-dl");
-        if (btn) {
-            btn.addEventListener("click", () => {
-                if (window.AlasPDF) window.AlasPDF.generate(pdfNote);
-                else alert("Generador de PDF no disponible.");
-            });
+            `;
         }
+
+        function pintar() {
+            const q = filtro.trim().toLowerCase();
+            const filtradas = q
+                ? notas.filter(n => n.fechaStr.toLowerCase().includes(q) || n.folio.toLowerCase().includes(q))
+                : notas;
+
+            // El colapso solo aplica sin filtro activo.
+            const colapsadoAhora = colapsable && !q && !expandido;
+            const visibles = colapsadoAhora ? filtradas.slice(0, 3) : filtradas;
+
+            if (!filtradas.length) {
+                listEl.innerHTML = '<li class="notes-empty-filter">Sin notas para esa búsqueda.</li>';
+            } else {
+                listEl.innerHTML = visibles.map(notaLi).join("");
+                listEl.querySelectorAll(".note-dl").forEach((btn) => {
+                    btn.addEventListener("click", () => {
+                        const n = notas[parseInt(btn.dataset.idx, 10)];
+                        if (!n) return;
+                        if (window.AlasPDF) window.AlasPDF.generate(n.pdf);
+                        else alert("Generador de PDF no disponible.");
+                    });
+                });
+            }
+
+            if (moreBtn) {
+                const ocultas = filtradas.length - visibles.length;
+                if (colapsadoAhora && ocultas > 0) {
+                    moreBtn.hidden = false;
+                    moreBtn.textContent = `Ver ${ocultas} nota${ocultas === 1 ? "" : "s"} más ▼`;
+                } else if (colapsable && !q && expandido) {
+                    moreBtn.hidden = false;
+                    moreBtn.textContent = "Ocultar ▲";
+                } else {
+                    moreBtn.hidden = true;
+                }
+            }
+        }
+
+        if (moreBtn) moreBtn.addEventListener("click", () => { expandido = !expandido; pintar(); });
+        if (filterEl) filterEl.addEventListener("input", () => { filtro = filterEl.value; pintar(); });
+
+        pintar();
     }
 
     async function buscarNota(cliente, validacion) {
@@ -180,8 +243,15 @@
                 return;
             }
 
-            const pdfNote = toPdfNote(body.data, cliente, validacion);
-            renderNota(body.data, pdfNote);
+            // El backend devuelve un array de notas (puede traer 1..N).
+            const data = Array.isArray(body.data)
+                ? body.data
+                : (body.data ? [body.data] : []);
+            if (!data.length) {
+                renderNotFound();
+                return;
+            }
+            renderNotas(data);
             flashAndScroll(root);
         } catch (err) {
             console.error("[FRONT] Error fetch:", err);

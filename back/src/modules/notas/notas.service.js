@@ -8,8 +8,8 @@ async function buscar(cliente, validacion) {
   const clienteTrim = String(cliente).trim();
   const validacionTrim = String(validacion).trim();
 
-  const row = await repo.buscarPorClienteValidacion(clienteTrim, validacionTrim);
-  if (!row) {
+  const rows = await repo.buscarPorClienteValidacion(clienteTrim, validacionTrim);
+  if (!rows.length) {
     console.warn(`[NOTAS] Sin coincidencia cliente=${clienteTrim} validacion=${validacionTrim}`);
     const diag = await repo.diagnosticarCliente(clienteTrim);
     console.warn(`[NOTAS][DIAG] filas con ese cliente: ${diag.length}`);
@@ -21,7 +21,8 @@ async function buscar(cliente, validacion) {
     throw new NotFoundError('Cliente no encontrado o datos de validación incorrectos.');
   }
 
-  const respuesta = {
+  // Devuelve un array de notas (1..N), ya ordenadas por fecha DESC en el repo.
+  const respuesta = rows.map((row) => ({
     id: row.numero_nota ?? row.id,
     cliente: row.numero_cliente,
     nombre: row.nombre_cliente || null,
@@ -31,9 +32,9 @@ async function buscar(cliente, validacion) {
     total: Number(row.total),
     estado: row.estado,
     tipo_servicio: row.tipo_servicio || null,
-  };
+  }));
 
-  console.log(`[NOTAS] OK cliente=${cliente} total=${respuesta.total} estado=${respuesta.estado}`);
+  console.log(`[NOTAS] OK cliente=${cliente} notas=${respuesta.length}`);
   return respuesta;
 }
 

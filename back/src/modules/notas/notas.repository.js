@@ -8,12 +8,14 @@ async function buscarPorClienteValidacion(cliente, validacion) {
   // JOIN con servicios para traer tipo_servicio (Issue 29 cierre Fase 2.10).
   // Nota: dbo.notas no tiene la columna; se hereda lógicamente del servicio
   // que generó la nota al finalizar.
+  // TOP 10 + orden por fecha DESC: si la validación es un teléfono, el
+  // cliente puede tener varias notas; se devuelven las más recientes.
   const result = await pool
     .request()
     .input('cliente', sql.NVarChar(50), cliente)
     .input('validacion', sql.NVarChar(50), validacion)
     .query(`
-      SELECT TOP 1
+      SELECT TOP 10
         n.id,
         n.numero_cliente,
         n.nombre_cliente,
@@ -32,8 +34,9 @@ async function buscarPorClienteValidacion(cliente, validacion) {
               LTRIM(RTRIM(CAST(n.validacion   AS NVARCHAR(50)))) = @validacion
            OR LTRIM(RTRIM(CAST(n.numero_nota  AS NVARCHAR(50)))) = @validacion
         )
+      ORDER BY n.fecha DESC
     `);
-  return result.recordset[0] || null;
+  return result.recordset;
 }
 
 // DIAG: lista qué existe para ese cliente. Útil para troubleshooting cuando no hay match.

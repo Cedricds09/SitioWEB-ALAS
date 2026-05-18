@@ -89,6 +89,33 @@
     const yearEl = document.getElementById("year");
     if (yearEl) yearEl.textContent = new Date().getFullYear();
 
+    /* ===== FIX 8 — prefijo CL- en inputs públicos de número de cliente ===== */
+    function initClienteInput(inputEl) {
+        if (!inputEl) return;
+        // Valor inicial con el prefijo.
+        if (!inputEl.value) inputEl.value = "CL-";
+        // Al hacer focus → cursor al final (no antes del prefijo).
+        inputEl.addEventListener("focus", () => {
+            const len = inputEl.value.length;
+            inputEl.setSelectionRange(len, len);
+        });
+        // Si se borra el prefijo → restaurarlo.
+        inputEl.addEventListener("input", () => {
+            if (!inputEl.value.startsWith("CL-")) {
+                inputEl.value = "CL-";
+            }
+        });
+        // Al perder focus → mantener el prefijo como pista.
+        inputEl.addEventListener("blur", () => {
+            if (inputEl.value === "CL-") {
+                inputEl.value = "CL-";
+            }
+        });
+    }
+    // Formularios públicos con número de cliente:
+    initClienteInput(document.querySelector('#notesForm [name="customer"]')); // consulta de notas
+    initClienteInput(document.getElementById("resenaCliente"));                // reseñas (paso 1)
+
     // Issue 31 cierre: traduce paths Zod del backend ("nombre_cliente: msg; conceptos: msg")
     // a labels human-readable. Cubre los campos de svcForm/editServicio/editUser/userForm.
     const FIELD_LABELS_FRONT = {
