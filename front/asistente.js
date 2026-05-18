@@ -432,6 +432,18 @@
         ]);
     }
 
+    // Botón de navegación a la sección relevante por tipo de consulta.
+    // Se adjunta al final de la respuesta SOLO si trae datos.
+    const NAV_POR_TIPO = {
+        activos:                 { label: "🔧 Ver servicios",    action: () => navegar("servicios") },
+        urgentes:                { label: "🔧 Ver servicios",    action: () => navegar("servicios") },
+        sin_cerrar:              { label: "🔧 Ver servicios",    action: () => navegar("servicios") },
+        sin_presupuesto:         { label: "📄 Ver presupuestos", action: () => navegar("presupuestos") },
+        presupuestos_pendientes: { label: "📄 Ver presupuestos", action: () => navegar("presupuestos") },
+        agenda_hoy:              { label: "📅 Ver calendario",   action: navegarACalendario },
+        agenda_semana:           { label: "📅 Ver calendario",   action: navegarACalendario },
+    };
+
     // Consulta al backend y muestra la respuesta. `etiqueta` se usa cuando
     // la consulta viene de un botón (para reflejar la elección del usuario).
     async function consultarNegocio(tipo, etiqueta) {
@@ -450,12 +462,17 @@
                 addBotMsg("No pude consultar los datos. Intenta de nuevo.");
                 return;
             }
-            // Agenda con servicios → ofrecer botón [Ver calendario].
+            const respuesta = payload.data.respuesta || "No pude consultar los datos. Intenta de nuevo.";
+            // Botón de navegación a la sección relevante — solo si la respuesta
+            // trae datos. Agenda usa el flag `tieneServicios`; el resto se
+            // detecta porque las respuestas vacías terminan en "✅".
             const esAgenda = tipo === "agenda_hoy" || tipo === "agenda_semana";
-            const opciones = (esAgenda && payload.data.tieneServicios)
-                ? [{ label: "📅 Ver calendario", action: navegarACalendario }]
-                : undefined;
-            addBotMsg(payload.data.respuesta || "No pude consultar los datos. Intenta de nuevo.", opciones);
+            const tieneDatos = esAgenda
+                ? !!payload.data.tieneServicios
+                : !respuesta.includes("✅");
+            const nav = NAV_POR_TIPO[tipo];
+            const opciones = (tieneDatos && nav) ? [nav] : undefined;
+            addBotMsg(respuesta, opciones);
             // Memoria de contexto para preguntas de seguimiento (5 min).
             state.ultimoContexto = {
                 tipo: "consulta_negocio",
