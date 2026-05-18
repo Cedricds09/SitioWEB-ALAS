@@ -176,13 +176,10 @@
     cursor: not-allowed;
 }
 
-/* Menú principal sticky: primer bloque del chat, siempre visible al hacer
-   scroll. Los márgenes negativos cancelan el padding de .asist-msgs para
-   que la barra quede a ras de los bordes. */
+/* Menú principal: primer bloque del chat, vive como un mensaje normal en el
+   flujo. Los márgenes negativos cancelan el padding de .asist-msgs para que
+   la barra quede a ras de los bordes. */
 .asist-menu {
-    position: sticky;
-    top: 0;
-    z-index: 2;
     display: flex;
     flex-wrap: wrap;
     gap: 8px;

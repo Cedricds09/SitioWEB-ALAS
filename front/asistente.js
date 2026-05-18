@@ -387,9 +387,8 @@
     }
 
     /* ---------- Consultas de negocio (datos reales, sin Claude API) ---------- */
-    // Orden importa: detectarConsultaNegocio itera Object.keys() y devuelve la
-    // PRIMERA coincidencia. agenda_hoy va antes que agenda_semana para que
-    // "hoy" no sea absorbido por una keyword de "semana".
+    // agenda_hoy va antes que agenda_semana para que "hoy" no quede absorbido
+    // por una keyword de "semana" cuando la pregunta es de un solo tipo.
     const KEYWORDS_NEGOCIO = {
         agenda_hoy: ["hoy", "agenda hoy", "qué tengo hoy",
                      "que tengo hoy", "servicios hoy",
@@ -399,6 +398,7 @@
                         "servicios semana", "programados"],
         activos: ["activos", "cuántos servicios", "mis servicios",
                   "servicios tengo", "cuantos servicios",
+                  "que servicios", "qué servicios",
                   "estado del negocio", "estado negocio",
                   "cómo vamos", "como vamos", "resumen"],
         urgentes: ["urgentes", "más urgentes", "mas urgentes",
@@ -408,15 +408,30 @@
         sin_cerrar: ["sin cerrar", "no han cerrado", "demorados",
                      "llevan mucho", "no cierran"],
         presupuestos_pendientes: ["presupuestos pendientes", "sin respuesta",
-                                  "esperando respuesta", "presupuestos enviados"],
+                                  "esperando respuesta", "presupuestos enviados",
+                                  "mis presupuestos", "presupuestos activos",
+                                  "que presupuestos", "qué presupuestos"],
     };
 
-    // Devuelve el tipo de consulta si el texto contiene alguna keyword, o null.
-    function detectarConsultaNegocio(low) {
-        for (const tipo of Object.keys(KEYWORDS_NEGOCIO)) {
-            if (KEYWORDS_NEGOCIO[tipo].some((k) => low.includes(k))) return tipo;
-        }
-        return null;
+    // Keywords que activan el flujo de CREAR un presupuesto. Frases explícitas
+    // de creación: no capturan preguntas informativas ("que presupuestos hay",
+    // "presupuestos pendientes"), que las maneja detectarConsultasNegocio.
+    const KEYWORDS_NUEVO_PRESUPUESTO = [
+        "nuevo presupuesto", "crear presupuesto", "hacer presupuesto",
+        "quiero presupuesto", "generar presupuesto", "cotización nueva",
+        "nueva cotización",
+    ];
+
+    function esNuevoPresupuesto(low) {
+        return KEYWORDS_NUEVO_PRESUPUESTO.some((k) => low.includes(k));
+    }
+
+    // Devuelve TODOS los tipos de consulta cuyas keywords aparecen en el texto.
+    // Una pregunta mixta ("pendientes de presupuestos o servicios") detecta varios.
+    function detectarConsultasNegocio(low) {
+        return Object.keys(KEYWORDS_NEGOCIO).filter((tipo) =>
+            KEYWORDS_NEGOCIO[tipo].some((k) => low.includes(k)),
+        );
     }
 
     // Submenú con las 5 consultas de negocio.
@@ -485,6 +500,74 @@
             console.error("[ASIST] consulta-negocio error:", err);
             addBotMsg("No pude consultar los datos. Intenta de nuevo.");
         }
+    }
+
+    // Una sola llamada al backend. Devuelve { tipo, respuesta, tieneDatos }.
+    // No pinta nada: lo usa consultarNegocioMultiple para combinar resultados.
+    async function fetchConsulta(tipo) {
+        try {
+            const res = await fetch("/api/ai/consulta-negocio", {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ tipo }),
+            });
+            const payload = await res.json().catch(() => ({}));
+            if (!res.ok || !payload.ok || !payload.data) {
+                return { tipo, respuesta: null, tieneDatos: false };
+            }
+            const respuesta = payload.data.respuesta || null;
+            const esAgenda = tipo === "agenda_hoy" || tipo === "agenda_semana";
+            const tieneDatos = esAgenda
+                ? !!payload.data.tieneServicios
+                : !!(respuesta && !respuesta.includes("✅"));
+            return { tipo, respuesta, tieneDatos };
+        } catch (err) {
+            console.error("[ASIST] consulta-negocio error:", err);
+            return { tipo, respuesta: null, tieneDatos: false };
+        }
+    }
+
+    // Pregunta mixta: ejecuta varias consultas en paralelo y combina resultados.
+    // Cada respuesta es un mensaje; al final un solo bloque de botones de
+    // navegación, sin duplicar destino (servicios/presupuestos/calendario).
+    async function consultarNegocioMultiple(tipos) {
+        addLoadingMsg("Consultando datos…");
+        const resultados = await Promise.all(tipos.map(fetchConsulta));
+        removeLoadingMsg();
+
+        let huboRespuesta = false;
+        resultados.forEach((r) => {
+            if (r.respuesta) {
+                addBotMsg(r.respuesta);
+                huboRespuesta = true;
+            }
+        });
+        if (!huboRespuesta) {
+            addBotMsg("No pude consultar los datos. Intenta de nuevo.");
+            return;
+        }
+
+        const navs = [];
+        const vistos = new Set();
+        resultados.forEach((r) => {
+            if (!r.tieneDatos) return;
+            const nav = NAV_POR_TIPO[r.tipo];
+            if (nav && !vistos.has(nav.label)) {
+                vistos.add(nav.label);
+                navs.push(nav);
+            }
+        });
+        if (navs.length) addBotMsg("¿A dónde quieres ir?", navs);
+
+        state.ultimoContexto = {
+            tipo: "consulta_negocio",
+            datos: {
+                tipoConsulta: tipos.join(","),
+                respuesta: resultados.map((r) => r.respuesta).filter(Boolean).join("\n\n"),
+            },
+            timestamp: Date.now(),
+        };
     }
 
     /* ---------- Consulta por cliente específico ---------- */
@@ -839,20 +922,26 @@
         if (state.modo === null || state.paso === null) {
             addUserMsg(t);
             const low = t.toLowerCase();
-            // 1) Cliente concreto por folio CL-XXXX (lo más específico).
+            // Orden de prioridad: una pregunta informativa sobre presupuestos
+            // no debe disparar el flujo de crear uno. Por eso las consultas de
+            // negocio van primero y la creación va casi al final.
+            // 1) Consultas de negocio (mixtas o simples).
+            const tiposNegocio = detectarConsultasNegocio(low);
+            if (tiposNegocio.length > 1) return consultarNegocioMultiple(tiposNegocio);
+            if (tiposNegocio.length === 1) return consultarNegocio(tiposNegocio[0]);
+            // 2) Cliente concreto por folio CL-XXXX.
             const mCliente = t.match(/CL-\d{4}/i);
             if (mCliente) return consultarCliente(mCliente[0].toUpperCase());
-            // 2) Consultas de negocio: antes de navegación (algunas contienen
-            //    "servicio"/"presupuesto" y se confundirían con navegar).
-            const tipoNegocio = detectarConsultaNegocio(low);
-            if (tipoNegocio) return consultarNegocio(tipoNegocio);
             // 3) Pregunta de seguimiento sobre el último resultado.
             if (esSeguimiento(low)) return mostrarDetalleContexto();
-            if (/\b(presupuesto|cotizaci)/i.test(low)) return empezarPresupuesto();
+            // 4) Navegación a una sección.
             if (/\b(servicio)/i.test(low)) return navegar("servicios");
             if (/\b(cliente)/i.test(low)) return navegar("clientes");
             if (/\b(nota)/i.test(low)) return navegar("notas");
             if (/\b(usuario)/i.test(low)) return navegar("usuarios");
+            // 5) Intención explícita de crear un presupuesto.
+            if (esNuevoPresupuesto(low)) return empezarPresupuesto();
+            // 6) Sin coincidencia.
             addBotMsg(
                 "No entendí. Toca un botón o pregúntame por presupuestos, servicios, clientes o notas.",
             );
