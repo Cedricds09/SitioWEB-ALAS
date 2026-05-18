@@ -386,7 +386,16 @@
     }
 
     /* ---------- Consultas de negocio (datos reales, sin Claude API) ---------- */
+    // Orden importa: detectarConsultaNegocio itera Object.keys() y devuelve la
+    // PRIMERA coincidencia. agenda_hoy va antes que agenda_semana para que
+    // "hoy" no sea absorbido por una keyword de "semana".
     const KEYWORDS_NEGOCIO = {
+        agenda_hoy: ["hoy", "agenda hoy", "qué tengo hoy",
+                     "que tengo hoy", "servicios hoy",
+                     "tengo hoy", "para hoy"],
+        agenda_semana: ["esta semana", "semana", "agenda semana",
+                        "qué tengo esta semana", "que tengo esta semana",
+                        "servicios semana", "programados"],
         activos: ["activos", "cuántos servicios", "mis servicios",
                   "servicios tengo", "cuantos servicios",
                   "estado del negocio", "estado negocio",
@@ -413,6 +422,8 @@
     function menuNegocio() {
         addUserMsg("📊 Estado del negocio");
         addBotMsg("¿Qué quieres consultar?", [
+            { label: "📅 Agenda de hoy", action: () => consultarNegocio("agenda_hoy", "Agenda de hoy") },
+            { label: "📆 Esta semana", action: () => consultarNegocio("agenda_semana", "Esta semana") },
             { label: "📋 Servicios activos", action: () => consultarNegocio("activos", "Servicios activos") },
             { label: "⚡ Más urgentes", action: () => consultarNegocio("urgentes", "Más urgentes") },
             { label: "📄 Sin presupuesto", action: () => consultarNegocio("sin_presupuesto", "Sin presupuesto") },
@@ -439,7 +450,12 @@
                 addBotMsg("No pude consultar los datos. Intenta de nuevo.");
                 return;
             }
-            addBotMsg(payload.data.respuesta || "No pude consultar los datos. Intenta de nuevo.");
+            // Agenda con servicios → ofrecer botón [Ver calendario].
+            const esAgenda = tipo === "agenda_hoy" || tipo === "agenda_semana";
+            const opciones = (esAgenda && payload.data.tieneServicios)
+                ? [{ label: "📅 Ver calendario", action: navegarACalendario }]
+                : undefined;
+            addBotMsg(payload.data.respuesta || "No pude consultar los datos. Intenta de nuevo.", opciones);
             // Memoria de contexto para preguntas de seguimiento (5 min).
             state.ultimoContexto = {
                 tipo: "consulta_negocio",
@@ -479,6 +495,16 @@
             document.dispatchEvent(new CustomEvent("alas:abrir-servicio", {
                 detail: { id: servicioId },
             }));
+        }, NAV_DELAY);
+    }
+    // Lleva al tab del calendario semanal (main.js → activarTab('calendar')).
+    function navegarACalendario() {
+        addBotMsg("Te llevo al calendario…");
+        setTimeout(() => {
+            if (window.innerWidth < 768) minimizar();
+            document.dispatchEvent(
+                new CustomEvent("alas:cambiar-tab", { detail: { tab: "calendar" } }),
+            );
         }, NAV_DELAY);
     }
     function navegarAPresupuesto(presupuestoId) {

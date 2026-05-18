@@ -576,6 +576,30 @@ function formatEstado(e) {
   return String(e || '').toLowerCase().replace(/_/g, ' ');
 }
 
+const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+// 'YYYY-MM-DD' → "Lunes 19". Se parsea por partes (no new Date(str)) para
+// evitar el corrimiento por zona horaria UTC.
+function nombreDia(fechaStr) {
+  const [y, m, d] = String(fechaStr || '').split('-').map(Number);
+  if (!y || !m || !d) return '';
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return `${DIAS_SEMANA[dt.getUTCDay()]} ${d}`;
+}
+
+// 'HH:MM' (24h) → "10:00 AM". null/inválido → "Sin hora definida".
+function formatHora12(hhmm) {
+  if (!hhmm) return 'Sin hora definida';
+  const [hStr, mStr] = String(hhmm).split(':');
+  let h = parseInt(hStr, 10);
+  if (Number.isNaN(h)) return 'Sin hora definida';
+  const min = mStr || '00';
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h %= 12;
+  if (h === 0) h = 12;
+  return `${h}:${min} ${ampm}`;
+}
+
 async function consultaNegocio(tipo, sesion) {
   const esAdmin = !!(sesion && sesion.rol === ROL.ADMIN);
   // Técnico → filtra por su usuario / uid. Admin → null (sin filtro).
@@ -635,6 +659,43 @@ async function consultaNegocio(tipo, sesion) {
       const enviados = Number(r.enviados) || 0;
       return {
         respuesta: `Tienes ${total} presupuesto(s) sin respuesta del cliente:\n${borr} en borrador y ${enviados} enviados.`,
+      };
+    }
+
+    case 'agenda_hoy': {
+      const rows = await repo.negocioAgendaHoy({ tecnico });
+      if (rows.length) {
+        const lineas = rows
+          .map((s) => `• ${formatHora12(s.hora_programada)} — ${s.nombre_cliente} ${s.numero_cliente} (${s.estado})`)
+          .join('\n');
+        return {
+          respuesta: `Tienes ${rows.length} servicio(s) programado(s) para hoy:\n${lineas}`,
+          tieneServicios: true,
+        };
+      }
+      const sinFecha = Number((await repo.negocioActivosSinFecha({ tecnico })).total) || 0;
+      if (sinFecha) {
+        return {
+          respuesta:
+            'No tienes servicios programados para hoy.\n' +
+            `Tienes ${sinFecha} servicios activos sin fecha asignada.`,
+          tieneServicios: false,
+        };
+      }
+      return { respuesta: 'No tienes servicios programados para hoy. ✅', tieneServicios: false };
+    }
+
+    case 'agenda_semana': {
+      const rows = await repo.negocioAgendaSemana({ tecnico });
+      if (!rows.length) {
+        return { respuesta: 'No tienes servicios programados esta semana. ✅', tieneServicios: false };
+      }
+      const lineas = rows
+        .map((s) => `• ${nombreDia(s.fecha_programada)} — ${s.nombre_cliente} ${s.numero_cliente} ${formatHora12(s.hora_programada)}`)
+        .join('\n');
+      return {
+        respuesta: `Esta semana tienes ${rows.length} servicio(s) programado(s):\n${lineas}`,
+        tieneServicios: true,
       };
     }
 

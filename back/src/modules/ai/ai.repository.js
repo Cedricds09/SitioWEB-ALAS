@@ -187,6 +187,73 @@ async function negocioPresupuestosPendientes({ uid }) {
   return r.recordset[0];
 }
 
+// CONSULTA 6 — servicios programados para HOY (ordenados por hora).
+async function negocioAgendaHoy({ tecnico }) {
+  const pool = await getPool();
+  const reqDb = pool.request();
+  let filtro = '';
+  if (tecnico) {
+    reqDb.input('tec', sql.NVarChar(50), tecnico);
+    filtro = ' AND tecnico_asignado = @tec';
+  }
+  const r = await reqDb.query(`
+    SELECT id, numero_cliente, nombre_cliente, estado,
+           CONVERT(varchar(5), hora_programada, 108) AS hora_programada,
+           CONVERT(varchar(10), fecha_programada, 23) AS fecha_programada,
+           tecnico_asignado
+    FROM dbo.servicios
+    WHERE activo = 1
+      AND estado IN ('PENDIENTE','EN_PROCESO')
+      AND fecha_programada = CAST(GETDATE() AS DATE)${filtro}
+    ORDER BY hora_programada ASC
+  `);
+  return r.recordset;
+}
+
+// CONSULTA 7 — conteo de servicios activos SIN fecha programada.
+// Usado por agenda_hoy para el mensaje "tienes N activos sin fecha".
+async function negocioActivosSinFecha({ tecnico }) {
+  const pool = await getPool();
+  const reqDb = pool.request();
+  let filtro = '';
+  if (tecnico) {
+    reqDb.input('tec', sql.NVarChar(50), tecnico);
+    filtro = ' AND tecnico_asignado = @tec';
+  }
+  const r = await reqDb.query(`
+    SELECT COUNT(*) AS total
+    FROM dbo.servicios
+    WHERE activo = 1
+      AND estado IN ('PENDIENTE','EN_PROCESO')
+      AND fecha_programada IS NULL${filtro}
+  `);
+  return r.recordset[0];
+}
+
+// CONSULTA 8 — servicios programados ESTA SEMANA (hoy + 6 días).
+async function negocioAgendaSemana({ tecnico }) {
+  const pool = await getPool();
+  const reqDb = pool.request();
+  let filtro = '';
+  if (tecnico) {
+    reqDb.input('tec', sql.NVarChar(50), tecnico);
+    filtro = ' AND tecnico_asignado = @tec';
+  }
+  const r = await reqDb.query(`
+    SELECT id, numero_cliente, nombre_cliente, estado,
+           CONVERT(varchar(5), hora_programada, 108) AS hora_programada,
+           CONVERT(varchar(10), fecha_programada, 23) AS fecha_programada,
+           tecnico_asignado
+    FROM dbo.servicios
+    WHERE activo = 1
+      AND estado IN ('PENDIENTE','EN_PROCESO')
+      AND fecha_programada >= CAST(GETDATE() AS DATE)
+      AND fecha_programada <= DATEADD(DAY, 6, CAST(GETDATE() AS DATE))
+    ORDER BY fecha_programada ASC, hora_programada ASC
+  `);
+  return r.recordset;
+}
+
 // ============================================================
 // Consulta por cliente (ficha). tecnico/uid resueltos en el service.
 // Para un técnico, datos/activos/terminados se filtran por tecnico_asignado:
@@ -278,6 +345,9 @@ module.exports = {
   negocioSinPresupuesto,
   negocioSinCerrar,
   negocioPresupuestosPendientes,
+  negocioAgendaHoy,
+  negocioActivosSinFecha,
+  negocioAgendaSemana,
   clienteDatos,
   clienteServiciosActivos,
   clienteServiciosTerminadosCount,

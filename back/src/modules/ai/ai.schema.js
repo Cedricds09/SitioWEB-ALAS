@@ -77,6 +77,8 @@ const consultaNegocioSchema = z.object({
     'sin_presupuesto',
     'sin_cerrar',
     'presupuestos_pendientes',
+    'agenda_hoy',
+    'agenda_semana',
   ]),
 });
 
