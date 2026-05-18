@@ -66,6 +66,32 @@ const moneyNumber = z.preprocess(
   z.number({ invalid_type_error: 'Debe ser un número.' }).min(0, 'No puede ser negativo.'),
 );
 
+// Fecha programada (YYYY-MM-DD), opcional. '' o null → null.
+const fechaProgramada = z.preprocess(
+  (v) => {
+    if (v === undefined) return undefined;
+    if (v == null || v === '') return null;
+    return String(v).trim();
+  },
+  z.union([
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato inválido. Use YYYY-MM-DD'),
+    z.null(),
+  ]).optional(),
+);
+
+// Hora programada (HH:MM), opcional. '' o null → null.
+const horaProgramada = z.preprocess(
+  (v) => {
+    if (v === undefined) return undefined;
+    if (v == null || v === '') return null;
+    return String(v).trim();
+  },
+  z.union([
+    z.string().regex(/^\d{2}:\d{2}$/, 'Formato inválido. Use HH:MM'),
+    z.null(),
+  ]).optional(),
+);
+
 // ===== Body schemas =====
 
 const crearServicioSchema = z.object({
@@ -78,6 +104,8 @@ const crearServicioSchema = z.object({
   conceptos: requiredString,
   tipo_servicio: nullableTrimmedString,
   total: moneyNumber,
+  fecha_programada: fechaProgramada,
+  hora_programada: horaProgramada,
 });
 
 const editarServicioSchema = z
@@ -98,6 +126,8 @@ const editarServicioSchema = z
     ),
     tipo_servicio: nullableTrimmedString,
     tecnico_asignado: nullableTrimmedString,
+    fecha_programada: fechaProgramada,
+    hora_programada: horaProgramada,
   })
   .refine(
     (data) =>
@@ -127,6 +157,12 @@ const numeroClienteParamSchema = z.object({
   numero_cliente: requiredString,
 });
 
+// Programar fecha/hora de un servicio existente (endpoint /:id/programar).
+const programarSchema = z.object({
+  fecha_programada: fechaProgramada,
+  hora_programada: horaProgramada,
+});
+
 // ===== Query schemas =====
 
 const listarQuerySchema = z.object({
@@ -134,13 +170,23 @@ const listarQuerySchema = z.object({
   mine: optionalString,
 });
 
+// Calendario: semana ISO "YYYY-WNN" opcional (sin valor → semana actual).
+const calendarioQuerySchema = z.object({
+  semana: z.preprocess(
+    (v) => (v == null || v === '' ? undefined : String(v).trim()),
+    z.string().regex(/^\d{4}-W\d{2}$/i, 'Formato inválido. Use YYYY-WNN').optional(),
+  ),
+});
+
 module.exports = {
   crearServicioSchema,
   editarServicioSchema,
+  programarSchema,
   idParamSchema,
   numeroClienteParamSchema,
   asignarSchema,
   ajusteSchema,
   finalizarSchema,
   listarQuerySchema,
+  calendarioQuerySchema,
 };

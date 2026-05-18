@@ -350,6 +350,7 @@
     const tabBtns = document.querySelectorAll(".dash-tab");
     const tabActive = document.getElementById("tabActive");
     const tabSearch = document.getElementById("tabSearch");
+    const tabCalendar = document.getElementById("tabCalendar");
 
     // Search
     const clientSearch = document.getElementById("clientSearch");
@@ -580,7 +581,7 @@
     // Cambia de tab de forma programática. Lo usan tanto los botones del
     // dashboard como otros módulos (asistente.js) vía el evento alas:cambiar-tab.
     function activarTab(target) {
-        if (target !== "active" && target !== "search") return;
+        if (target !== "active" && target !== "search" && target !== "calendar") return;
         tabBtns.forEach((x) => {
             const on = x.dataset.tab === target;
             x.classList.toggle("is-active", on);
@@ -588,12 +589,16 @@
         });
         tabActive.hidden = target !== "active";
         tabSearch.hidden = target !== "search";
+        if (tabCalendar) tabCalendar.hidden = target !== "calendar";
         if (target === "search") {
             // No carga automática; estado vacío hasta que el usuario escriba
             if (!clientSearch.value.trim() && clientHistory.hidden) {
                 clearSearchResults();
             }
             clientSearch.focus();
+        }
+        if (target === "calendar") {
+            cargarCalendario();
         }
         // Scroll al elemento clave del tab (más preciso que al panel
         // contenedor, que dejaba la vista en la sección equivocada).
@@ -603,6 +608,9 @@
                 if (clientSearch) {
                     clientSearch.scrollIntoView({ behavior: "smooth", block: "center" });
                 }
+            } else if (target === "calendar") {
+                const w = document.getElementById("calendarioWrapper");
+                if (w) w.scrollIntoView({ behavior: "smooth", block: "start" });
             } else {
                 // Activos → primer servicio de la lista, o el panel si está vacía.
                 const objetivo = document.querySelector(".svc-item") || tabActive;
@@ -749,6 +757,13 @@
                         ${!terminado ? tecnicoSelectHTML(r) : ""}
                         ${terminado && r.atendido_por ? `<div class="svc-attended">Atendido por <strong>${escape(r.atendido_por)}</strong></div>` : ""}
                         ${terminado && r.resolucion ? `<div class="svc-resolucion"><strong>🛠 Resolución del servicio</strong>${escape(r.resolucion)}</div>` : ""}
+                        ${!terminado ? `
+                        <div class="svc-prog">
+                            <span class="svc-prog-label">📅 Programar</span>
+                            <input type="date" class="svc-prog-fecha" value="${escape(r.fecha_programada || "")}" />
+                            <input type="time" class="svc-prog-hora" value="${escape(r.hora_programada || "")}" />
+                            <button type="button" class="btn-edit svc-prog-save" data-id="${r.id}">💾 Guardar fecha</button>
+                        </div>` : ""}
                         <div class="svc-row-bot">
                             <div class="svc-info">
                                 <span class="svc-total">${money(r.total)}</span>
@@ -821,6 +836,9 @@
 
         container.querySelectorAll(".svc-fin").forEach((b) =>
             b.addEventListener("click", () => finalizar(parseInt(b.dataset.id, 10), b))
+        );
+        container.querySelectorAll(".svc-prog-save").forEach((b) =>
+            b.addEventListener("click", () => guardarFechaProgramada(b))
         );
         container.querySelectorAll(".svc-ajuste-btn").forEach((b) =>
             b.addEventListener("click", () => abrirAjuste(parseInt(b.dataset.id, 10), rows.find((r) => r.id === parseInt(b.dataset.id, 10))))
@@ -906,6 +924,177 @@
             renderServicios(body.data, svcList, { emptyMsg: empty, collapsible: true });
         } catch (err) {
             svcList.innerHTML = `<div class="svc-empty error">Error: ${escape(err.message)}</div>`;
+        }
+    }
+
+    /* ===== Calendario semanal de servicios ===== */
+    let calSemana = null;   // "YYYY-WNN" mostrada actualmente
+    let calLunes = null;    // "YYYY-MM-DD" del lunes mostrado
+
+    const CAL_DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+    const CAL_MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio",
+        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+
+    // "YYYY-MM-DD" → Date UTC.
+    function calParseYMD(s) {
+        const p = String(s).split("-").map(Number);
+        return new Date(Date.UTC(p[0], p[1] - 1, p[2]));
+    }
+    // Date → "YYYY-WNN" (semana ISO).
+    function calIsoSemana(date) {
+        const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+        const day = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - day);
+        const ys = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        const w = Math.ceil((((d - ys) / 86400000) + 1) / 7);
+        return `${d.getUTCFullYear()}-W${String(w).padStart(2, "0")}`;
+    }
+    // "HH:MM" 24h → "H:MM AM/PM".
+    function calFormatearHora(hhmm) {
+        const p = String(hhmm).split(":").map(Number);
+        if (!Number.isFinite(p[0])) return hhmm;
+        const ampm = p[0] < 12 ? "AM" : "PM";
+        const h12 = p[0] % 12 === 0 ? 12 : p[0] % 12;
+        return `${h12}:${String(p[1] || 0).padStart(2, "0")} ${ampm}`;
+    }
+
+    async function cargarCalendario(semana) {
+        const cont = document.getElementById("calendarioBody");
+        if (!cont) return;
+        cont.innerHTML = '<div class="svc-empty"><span class="svc-loader"></span>Cargando calendario…</div>';
+        const sem = semana || calSemana;
+        const q = sem ? `?semana=${encodeURIComponent(sem)}` : "";
+        try {
+            const res = await fetch(`${API_BASE}/api/servicios/calendario${q}`, { credentials: "include" });
+            if (res.status === 401) { showLogin(); return; }
+            const body = await res.json();
+            if (!res.ok || !body.ok) throw new Error(body.error || "Error");
+            calSemana = body.data.semana;
+            calLunes = body.data.lunes;
+            renderCalendario(body.data);
+        } catch (err) {
+            cont.innerHTML = `<div class="svc-empty error">Error: ${escape(err.message)}</div>`;
+        }
+    }
+
+    // Mueve la semana ±7 días y recarga.
+    function calNavegar(deltaDias) {
+        if (!calLunes) return;
+        const base = calParseYMD(calLunes);
+        base.setUTCDate(base.getUTCDate() + deltaDias);
+        cargarCalendario(calIsoSemana(base));
+    }
+
+    function calCard(s) {
+        const estadoCls = String(s.estado).toLowerCase() === "en_proceso" ? "en_proceso" : "pendiente";
+        const hora = s.hora_programada ? calFormatearHora(s.hora_programada) : "Sin hora";
+        return `
+            <div class="cal-card ${estadoCls}" data-id="${s.id}">
+                <div class="cal-card-hora">🕐 ${escape(hora)}</div>
+                <div class="cal-card-nombre">${escape(s.nombre_cliente || "")}</div>
+                <div class="cal-card-cl">${escape(s.numero_cliente || "")}</div>
+                <div class="cal-card-estado">● ${escape(s.estado)}</div>
+            </div>`;
+    }
+
+    function renderCalendario(data) {
+        const cont = document.getElementById("calendarioBody");
+        const titulo = document.getElementById("calTitulo");
+        if (!cont) return;
+
+        // Título con el rango de fechas de la semana.
+        if (titulo) {
+            const lun = calParseYMD(data.lunes);
+            const dom = calParseYMD(data.domingo);
+            const mesL = CAL_MESES[lun.getUTCMonth()];
+            const mesD = CAL_MESES[dom.getUTCMonth()];
+            titulo.textContent = mesL === mesD
+                ? `${lun.getUTCDate()} — ${dom.getUTCDate()} de ${mesD} ${dom.getUTCFullYear()}`
+                : `${lun.getUTCDate()} ${mesL} — ${dom.getUTCDate()} ${mesD} ${dom.getUTCFullYear()}`;
+        }
+
+        const hoyStr = new Date().toISOString().slice(0, 10);
+        const fechas = Object.keys(data.dias).sort();
+        const totalSemana = fechas.reduce((n, f) => n + (data.dias[f] || []).length, 0);
+
+        let html = '<div class="calendario-grid">';
+        fechas.forEach((fecha, i) => {
+            const servicios = data.dias[fecha] || [];
+            const d = calParseYMD(fecha);
+            const esHoy = fecha === hoyStr;
+            const vacio = servicios.length === 0;
+            html += `
+                <div class="calendario-dia${vacio ? " calendario-dia-vacio" : ""}">
+                    <div class="calendario-dia-header${esHoy ? " es-hoy" : ""}">
+                        ${CAL_DIAS[i] || ""} ${d.getUTCDate()}
+                    </div>
+                    <div class="calendario-dia-celdas">
+                        ${servicios.map(calCard).join("")}
+                    </div>
+                </div>`;
+        });
+        html += "</div>";
+
+        if (!totalSemana) {
+            html += '<p class="calendario-vacio">Sin servicios esta semana.</p>';
+        }
+
+        const sp = data.sin_programar || [];
+        if (sp.length) {
+            html += `
+                <div class="calendario-sin-programar">
+                    <p class="calendario-sp-titulo">📋 ${sp.length} servicio${sp.length === 1 ? "" : "s"} sin fecha programada</p>
+                    <div class="calendario-sp-lista">${sp.map(calCard).join("")}</div>
+                </div>`;
+        }
+
+        cont.innerHTML = html;
+        // Click en card → abre el detalle del servicio (reusa alas:abrir-servicio).
+        cont.querySelectorAll(".cal-card").forEach((card) => {
+            card.addEventListener("click", () => {
+                const id = parseInt(card.dataset.id, 10);
+                if (id) {
+                    document.dispatchEvent(
+                        new CustomEvent("alas:abrir-servicio", { detail: { id } }),
+                    );
+                }
+            });
+        });
+    }
+
+    {
+        const calPrev = document.getElementById("calPrev");
+        const calNext = document.getElementById("calNext");
+        if (calPrev) calPrev.addEventListener("click", () => calNavegar(-7));
+        if (calNext) calNext.addEventListener("click", () => calNavegar(7));
+    }
+
+    // Guarda fecha/hora programada de un servicio desde su tarjeta.
+    async function guardarFechaProgramada(btn) {
+        const id = parseInt(btn.dataset.id, 10);
+        const wrap = btn.closest(".svc-prog");
+        if (!wrap) return;
+        const fecha = wrap.querySelector(".svc-prog-fecha").value || null;
+        const hora = wrap.querySelector(".svc-prog-hora").value || null;
+        const original = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = "Guardando…";
+        try {
+            const res = await fetch(`${API_BASE}/api/servicios/${id}/programar`, {
+                method: "PUT",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ fecha_programada: fecha, hora_programada: hora }),
+            });
+            if (res.status === 401) { showLogin(); return; }
+            const body = await res.json();
+            if (!res.ok || !body.ok) throw new Error(body.error || "Error");
+            toast("Fecha programada guardada.", "success");
+        } catch (err) {
+            toast(traducirErrorBackend(err.message), "error");
+        } finally {
+            btn.disabled = false;
+            btn.textContent = original;
         }
     }
 

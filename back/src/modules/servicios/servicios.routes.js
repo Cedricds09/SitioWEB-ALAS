@@ -11,6 +11,12 @@ const S = require('./servicios.schema');
 
 router.post('/', validate({ body: S.crearServicioSchema }), asyncHandler(ctrl.crear));
 router.get('/', validate({ query: S.listarQuerySchema }), asyncHandler(ctrl.listar));
+// Rutas literales ANTES de cualquier '/:id' para que no se interpreten como id.
+router.get(
+  '/calendario',
+  validate({ query: S.calendarioQuerySchema }),
+  asyncHandler(ctrl.calendario),
+);
 router.get(
   '/cliente/:numero_cliente',
   validate({ params: S.numeroClienteParamSchema }),
@@ -38,6 +44,13 @@ router.put(
   '/:id/ajuste',
   validate({ params: S.idParamSchema, body: S.ajusteSchema }),
   asyncHandler(ctrl.actualizarAjuste),
+);
+// Programar fecha/hora — sin requireAdmin: el service permite admin o
+// el técnico asignado (mismo criterio que /ajuste y /finalizar).
+router.put(
+  '/:id/programar',
+  validate({ params: S.idParamSchema, body: S.programarSchema }),
+  asyncHandler(ctrl.programar),
 );
 router.post(
   '/:id/finalizar',

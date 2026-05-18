@@ -34,6 +34,8 @@ async function crear(input) {
         tipo_servicio: input.tipo_servicio ?? null,
         total: input.total ?? 0,
         tecnico_asignado: tecnico,
+        fecha_programada: input.fecha_programada ?? null,
+        hora_programada: input.hora_programada ?? null,
       },
       tx,
     );
@@ -218,9 +220,113 @@ async function datosParaReporte(id, sesion) {
   return s;
 }
 
+// ============================================================
+// Programar fecha/hora de un servicio (admin o técnico asignado)
+// ============================================================
+async function programar(id, datos, sesion) {
+  const serv = await repo.buscarPorId(id);
+  if (!serv) throw new NotFoundError('Servicio no encontrado.');
+
+  // Solo admin o el técnico asignado pueden programar.
+  if (sesion.rol !== ROL.ADMIN && serv.tecnico_asignado !== sesion.usu) {
+    throw new ForbiddenError('No autorizado para programar este servicio.');
+  }
+
+  // Solo servicios activos (no terminados).
+  const estado = String(serv.estado).toUpperCase();
+  if (estado !== ESTADO_SERVICIO.PENDIENTE && estado !== ESTADO_SERVICIO.EN_PROCESO) {
+    throw new ConflictError('Solo se puede programar un servicio activo.');
+  }
+
+  const updated = await repo.actualizarServicio(id, {
+    fecha_programada: datos.fecha_programada ?? null,
+    hora_programada: datos.hora_programada ?? null,
+  });
+  if (!updated) throw new NotFoundError('Servicio no encontrado.');
+  console.log(`[SERV] programado id=${id} fecha=${datos.fecha_programada} hora=${datos.hora_programada}`);
+  return updated;
+}
+
+// ============================================================
+// Calendario semanal — helpers de semana ISO (todo en UTC)
+// ============================================================
+function _formatYMD(d) {
+  return d.toISOString().slice(0, 10);
+}
+
+// {year, week} ISO de una fecha.
+function _isoWeek(date) {
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const day = d.getUTCDay() || 7; // Lun=1..Dom=7
+  d.setUTCDate(d.getUTCDate() + 4 - day); // jueves de esa semana
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return { year: d.getUTCFullYear(), week };
+}
+
+// Lunes (UTC) de una semana ISO. Jan 4 siempre cae en la semana 1.
+function _mondayOfIsoWeek(year, week) {
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const jan4Day = jan4.getUTCDay() || 7;
+  const week1Monday = new Date(jan4);
+  week1Monday.setUTCDate(jan4.getUTCDate() - jan4Day + 1);
+  const monday = new Date(week1Monday);
+  monday.setUTCDate(week1Monday.getUTCDate() + (week - 1) * 7);
+  return monday;
+}
+
+// ============================================================
+// Calendario semanal de servicios programados
+// ============================================================
+async function calendario({ semana, isAdmin, usuario }) {
+  let year;
+  let week;
+  const m = semana && String(semana).toUpperCase().match(/^(\d{4})-W(\d{2})$/);
+  if (m) {
+    year = parseInt(m[1], 10);
+    week = parseInt(m[2], 10);
+  } else {
+    const iso = _isoWeek(new Date());
+    year = iso.year;
+    week = iso.week;
+  }
+
+  const monday = _mondayOfIsoWeek(year, week);
+  const sunday = new Date(monday);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
+
+  const lunes = _formatYMD(monday);
+  const domingo = _formatYMD(sunday);
+  const semanaStr = `${year}-W${String(week).padStart(2, '0')}`;
+
+  // Técnico → solo lo suyo. Admin → todos.
+  const tecnico = isAdmin ? undefined : (usuario || '');
+  const rows = await repo.listarCalendario({ lunes, domingo, tecnico });
+
+  // 7 días vacíos lunes..domingo.
+  const dias = {};
+  for (let i = 0; i < 7; i += 1) {
+    const d = new Date(monday);
+    d.setUTCDate(monday.getUTCDate() + i);
+    dias[_formatYMD(d)] = [];
+  }
+  const sin_programar = [];
+  for (const s of rows) {
+    if (s.fecha_programada && dias[s.fecha_programada]) {
+      dias[s.fecha_programada].push(s);
+    } else if (!s.fecha_programada) {
+      sin_programar.push(s);
+    }
+  }
+
+  return { semana: semanaStr, lunes, domingo, dias, sin_programar };
+}
+
 module.exports = {
   crear,
   listar,
+  calendario,
+  programar,
   historialPorCliente,
   editar,
   eliminar,

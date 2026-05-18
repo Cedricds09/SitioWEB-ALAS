@@ -91,14 +91,18 @@ async function crearServicio(data, tx) {
     .input('total', sql.Decimal(12, 2), data.total)
     .input('estado', sql.NVarChar(20), ESTADO_SERVICIO.PENDIENTE)
     .input('tecnico_asignado', sql.NVarChar(50), data.tecnico_asignado)
+    // VarChar: SQL Server convierte implícitamente 'YYYY-MM-DD'→DATE y
+    // 'HH:MM'→TIME sin pasar por un JS Date (evita corrimientos de zona).
+    .input('fecha_programada', sql.VarChar(10), data.fecha_programada ?? null)
+    .input('hora_programada', sql.VarChar(5), data.hora_programada ?? null)
     .query(`
       INSERT INTO dbo.servicios
         (numero_cliente, nombre_cliente, telefono, direccion, lat, lng, conceptos, tipo_servicio, total,
-         estado, fecha_inicio, tecnico_asignado)
+         estado, fecha_inicio, tecnico_asignado, fecha_programada, hora_programada)
       OUTPUT INSERTED.*
       VALUES
         (@numero_cliente, @nombre_cliente, @telefono, @direccion, @lat, @lng, @conceptos, @tipo_servicio, @total,
-         @estado, GETDATE(), @tecnico_asignado)
+         @estado, GETDATE(), @tecnico_asignado, @fecha_programada, @hora_programada)
     `);
   return result.recordset[0];
 }
@@ -118,13 +122,46 @@ async function listarServicios({ estados, tecnico }) {
   const result = await reqDb.query(`
     SELECT id, numero_cliente, nombre_cliente, telefono, direccion, lat, lng, conceptos,
            total, estado, fecha_inicio, fecha_fin, ajuste, tipo_servicio,
-           tecnico_asignado, atendido_por, numero_nota, resolucion
+           tecnico_asignado, atendido_por, numero_nota, resolucion,
+           CONVERT(varchar(10), fecha_programada, 23) AS fecha_programada,
+           CONVERT(varchar(5), hora_programada, 108) AS hora_programada
     FROM dbo.servicios
     WHERE activo = 1 AND estado IN (${placeholders.join(',')})
       ${whereTec}
     ORDER BY fecha_inicio DESC
   `);
   return result.recordset;
+}
+
+// Servicios activos programados en una semana (o sin programar), para el
+// calendario. tecnico=undefined → todos (admin); valor → filtra ese técnico.
+async function listarCalendario({ lunes, domingo, tecnico }) {
+  const pool = await getPool();
+  const reqDb = pool
+    .request()
+    .input('lunes', sql.VarChar(10), lunes)
+    .input('domingo', sql.VarChar(10), domingo);
+  let whereTec = '';
+  if (tecnico !== undefined) {
+    reqDb.input('tec', sql.NVarChar(50), tecnico || '');
+    whereTec = ' AND tecnico_asignado = @tec';
+  }
+  const r = await reqDb.query(`
+    SELECT id, numero_cliente, nombre_cliente, telefono, direccion, estado,
+           tecnico_asignado, conceptos, total,
+           CONVERT(varchar(10), fecha_programada, 23) AS fecha_programada,
+           CONVERT(varchar(5), hora_programada, 108) AS hora_programada,
+           fecha_inicio
+    FROM dbo.servicios
+    WHERE activo = 1
+      AND estado IN ('${ESTADO_SERVICIO.PENDIENTE}','${ESTADO_SERVICIO.EN_PROCESO}')
+      AND (
+        (fecha_programada >= @lunes AND fecha_programada <= @domingo)
+        OR fecha_programada IS NULL
+      )${whereTec}
+    ORDER BY fecha_programada ASC, hora_programada ASC
+  `);
+  return r.recordset;
 }
 
 async function listarPorCliente(numero_cliente) {
@@ -135,7 +172,9 @@ async function listarPorCliente(numero_cliente) {
     .query(`
       SELECT id, numero_cliente, nombre_cliente, telefono, direccion, lat, lng, conceptos,
              total, estado, fecha_inicio, fecha_fin, ajuste, tipo_servicio,
-             tecnico_asignado, atendido_por, numero_nota, resolucion
+             tecnico_asignado, atendido_por, numero_nota, resolucion,
+             CONVERT(varchar(10), fecha_programada, 23) AS fecha_programada,
+             CONVERT(varchar(5), hora_programada, 108) AS hora_programada
       FROM dbo.servicios
       WHERE activo = 1 AND numero_cliente = @numero_cliente
       ORDER BY fecha_inicio DESC
@@ -149,7 +188,9 @@ async function buscarPorId(id, { lock = false } = {}, tx) {
   const result = await reqDb.input('id', sql.Int, id).query(`
     SELECT id, numero_cliente, nombre_cliente, telefono, direccion, lat, lng, conceptos,
            total, estado, fecha_inicio, fecha_fin, ajuste, tipo_servicio,
-           tecnico_asignado, atendido_por, numero_nota, resolucion, activo
+           tecnico_asignado, atendido_por, numero_nota, resolucion, activo,
+           CONVERT(varchar(10), fecha_programada, 23) AS fecha_programada,
+           CONVERT(varchar(5), hora_programada, 108) AS hora_programada
     FROM dbo.servicios ${lockHint}
     WHERE id = @id
   `);
@@ -173,6 +214,9 @@ async function actualizarServicio(id, campos) {
   if (campos.tipo_servicio !== undefined) addSet('tipo_servicio', sql.NVarChar(50), campos.tipo_servicio);
   if (campos.total !== undefined) addSet('total', sql.Decimal(12, 2), campos.total);
   if (campos.tecnico_asignado !== undefined) addSet('tecnico_asignado', sql.NVarChar(50), campos.tecnico_asignado);
+  // VarChar → SQL Server convierte 'YYYY-MM-DD'/'HH:MM' a DATE/TIME (o NULL).
+  if (campos.fecha_programada !== undefined) addSet('fecha_programada', sql.VarChar(10), campos.fecha_programada);
+  if (campos.hora_programada !== undefined) addSet('hora_programada', sql.VarChar(5), campos.hora_programada);
 
   if (!sets.length) return null;
 
@@ -312,6 +356,7 @@ module.exports = {
   // CRUD servicios
   crearServicio,
   listarServicios,
+  listarCalendario,
   listarPorCliente,
   buscarPorId,
   actualizarServicio,

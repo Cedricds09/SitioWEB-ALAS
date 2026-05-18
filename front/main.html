@@ -513,6 +513,16 @@
                                     <span>Descripción del trabajo</span>
                                     <textarea name="conceptos" rows="4" required placeholder="Detalle del servicio…"></textarea>
                                 </label>
+                                <div class="form-row">
+                                    <label>
+                                        <span>Fecha programada <small>(opcional)</small></span>
+                                        <input type="date" name="fecha_programada" id="svcFechaProg" />
+                                    </label>
+                                    <label>
+                                        <span>Hora de inicio <small>(opcional)</small></span>
+                                        <input type="time" name="hora_programada" id="svcHoraProg" />
+                                    </label>
+                                </div>
                                 <label>
                                     <span>Tipo de servicio</span>
                                     <select name="tipo_servicio" id="tipoServicioInput">
@@ -545,6 +555,7 @@
                             <div class="dash-tabs" role="tablist">
                                 <button type="button" class="dash-tab is-active" data-tab="active" role="tab" aria-selected="true">Activos</button>
                                 <button type="button" class="dash-tab" data-tab="search" role="tab" aria-selected="false">Buscar cliente</button>
+                                <button type="button" class="dash-tab" data-tab="calendar" role="tab" aria-selected="false">📅 Calendario</button>
                             </div>
                             <button type="button" class="btn-icon" id="svcRefresh" title="Recargar lista">↻ Recargar</button>
                         </header>
@@ -582,6 +593,18 @@
                                     </div>
                                 </div>
                                 <div id="historyList"></div>
+                            </div>
+                        </div>
+
+                        <!-- Tab: Calendario -->
+                        <div class="dash-card-body" id="tabCalendar" role="tabpanel" hidden>
+                            <div class="calendario-wrapper" id="calendarioWrapper">
+                                <div class="calendario-nav">
+                                    <button type="button" class="btn-icon" id="calPrev" aria-label="Semana anterior">◀</button>
+                                    <span class="calendario-titulo" id="calTitulo">—</span>
+                                    <button type="button" class="btn-icon" id="calNext" aria-label="Semana siguiente">▶</button>
+                                </div>
+                                <div id="calendarioBody"></div>
                             </div>
                         </div>
                     </article>

@@ -3252,3 +3252,114 @@ body.modal-open { overflow: hidden; }
     }
     100% { box-shadow: none; }
 }
+
+/* =====================================================
+   CALENDARIO SEMANAL DE SERVICIOS (Fase 9)
+   ===================================================== */
+.calendario-wrapper { margin-top: 0.5rem; }
+.calendario-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.8rem;
+    margin-bottom: 1rem;
+}
+.calendario-titulo {
+    flex: 1;
+    text-align: center;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--color-silver-1);
+}
+.calendario-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+}
+.calendario-dia { min-width: 0; }
+.calendario-dia-header {
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--color-silver-2);
+    padding: 4px 0;
+    margin-bottom: 6px;
+    border-bottom: 1px solid var(--color-border);
+}
+.calendario-dia-header.es-hoy {
+    color: var(--color-purple);
+    font-weight: 700;
+}
+.calendario-dia-celdas {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 80px;
+}
+.cal-card {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-left: 3px solid transparent;
+    border-radius: 8px;
+    padding: 8px 10px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    transition: opacity 0.2s ease;
+}
+.cal-card:hover { opacity: 0.85; }
+.cal-card.pendiente { border-left-color: #F59E0B; }
+.cal-card.en_proceso { border-left-color: #3B82F6; }
+.cal-card-hora { font-weight: 700; color: var(--color-purple); }
+.cal-card-nombre { color: var(--color-silver-1); margin-top: 2px; }
+.cal-card-cl { color: var(--color-silver-2); font-size: 0.75rem; }
+.cal-card-estado { color: var(--color-silver-3); font-size: 0.72rem; margin-top: 2px; }
+.calendario-vacio {
+    text-align: center;
+    color: var(--color-silver-3);
+    font-size: 0.9rem;
+    padding: 1.5rem 0;
+}
+.calendario-sin-programar { margin-top: 24px; }
+.calendario-sp-titulo {
+    font-size: 0.85rem;
+    color: var(--color-silver-2);
+    margin: 0 0 0.6rem;
+}
+.calendario-sp-lista {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+}
+.calendario-sp-lista .cal-card { flex: 0 0 200px; }
+
+/* Programar fecha/hora en la tarjeta del servicio */
+.svc-prog {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+}
+.svc-prog-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-silver-2);
+}
+.svc-prog input {
+    background: var(--color-bg-mid);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 6px 10px;
+    color: var(--color-silver-1);
+    font-size: 16px;
+    font-family: inherit;
+}
+
+/* Mobile: una columna; los días sin servicios se ocultan */
+@media (max-width: 767px) {
+    .calendario-grid { grid-template-columns: 1fr; }
+    .calendario-dia { margin-bottom: 12px; }
+    .calendario-dia-vacio { display: none; }
+    .calendario-dia-celdas { min-height: 0; }
+    .calendario-sp-lista .cal-card { flex-basis: 75%; }
+}

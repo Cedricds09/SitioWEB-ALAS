@@ -31,9 +31,26 @@ async function listar(req, res) {
   res.json({ ok: true, data });
 }
 
+// GET /api/servicios/calendario?semana=YYYY-WNN
+async function calendario(req, res) {
+  const sess = req.session || {};
+  const data = await service.calendario({
+    semana: req.query.semana,
+    isAdmin: sess.rol === ROL.ADMIN,
+    usuario: sess.usu,
+  });
+  res.json({ ok: true, data });
+}
+
 // GET /api/servicios/cliente/:numero_cliente
 async function historial(req, res) {
   const data = await service.historialPorCliente(req.params.numero_cliente);
+  res.json({ ok: true, data });
+}
+
+// PUT /api/servicios/:id/programar
+async function programar(req, res) {
+  const data = await service.programar(req.params.id, req.body, req.session || {});
   res.json({ ok: true, data });
 }
 
@@ -91,7 +108,9 @@ async function reporte(req, res) {
 module.exports = {
   crear,
   listar,
+  calendario,
   historial,
+  programar,
   editar,
   eliminar,
   asignar,
