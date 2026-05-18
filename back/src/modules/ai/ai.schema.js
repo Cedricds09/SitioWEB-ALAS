@@ -80,9 +80,15 @@ const consultaNegocioSchema = z.object({
   ]),
 });
 
+// Schema del endpoint /consulta-cliente — ficha de un cliente por su folio.
+const consultaClienteSchema = z.object({
+  numero_cliente: z.string().regex(/^CL-\d{4}$/i, 'Formato debe ser CL-XXXX.'),
+});
+
 module.exports = {
   sugerirBloquesSchema,
   chatPresupuestoSchema,
   consultaNegocioSchema,
+  consultaClienteSchema,
   MODOS,
 };

@@ -33,4 +33,12 @@ router.post(
   asyncHandler(ctrl.consultaNegocio),
 );
 
+// Ficha de un cliente por folio — datos reales de la DB, sin Claude API.
+router.post(
+  '/consulta-cliente',
+  consultaNegocioLimiter,
+  validate({ body: S.consultaClienteSchema }),
+  asyncHandler(ctrl.consultaCliente),
+);
+
 module.exports = router;

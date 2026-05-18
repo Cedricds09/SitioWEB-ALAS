@@ -3241,3 +3241,14 @@ body.modal-open { overflow: hidden; }
     font-size: 0.9rem;
     list-style: none;
 }
+
+/* Resaltado temporal de un servicio al navegar desde el asistente */
+.svc-item.svc-highlight {
+    animation: svcHighlight 2s ease-out;
+}
+@keyframes svcHighlight {
+    0%, 35% {
+        box-shadow: 0 0 0 2px var(--color-purple), 0 0 22px rgba(106, 60, 255, 0.55);
+    }
+    100% { box-shadow: none; }
+}

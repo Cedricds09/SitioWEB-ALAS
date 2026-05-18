@@ -595,6 +595,22 @@
             }
             clientSearch.focus();
         }
+        // Scroll al elemento clave del tab (más preciso que al panel
+        // contenedor, que dejaba la vista en la sección equivocada).
+        setTimeout(() => {
+            if (target === "search") {
+                // Buscar cliente → centrar el input de búsqueda en pantalla.
+                if (clientSearch) {
+                    clientSearch.scrollIntoView({ behavior: "smooth", block: "center" });
+                }
+            } else {
+                // Activos → primer servicio de la lista, o el panel si está vacía.
+                const objetivo = document.querySelector(".svc-item") || tabActive;
+                if (objetivo) {
+                    objetivo.scrollIntoView({ behavior: "smooth", block: "start" });
+                }
+            }
+        }, 150);
     }
 
     tabBtns.forEach((b) => {
@@ -605,6 +621,26 @@
     // simular clicks, que no siempre cambian el tab de forma fiable.
     document.addEventListener("alas:cambiar-tab", (e) => {
         activarTab(e.detail && e.detail.tab);
+    });
+
+    // El asistente pide abrir el detalle de un servicio concreto: cambia al
+    // tab de servicios, expande el colapso si hace falta, y resalta la tarjeta.
+    document.addEventListener("alas:abrir-servicio", (e) => {
+        const id = e.detail && e.detail.id;
+        if (!id) return;
+        activarTab("active");
+        setTimeout(() => {
+            const card = svcList.querySelector(`.svc-item[data-id="${id}"]`);
+            if (!card) return;
+            const extra = card.closest(".svc-extra");
+            if (extra && !extra.classList.contains("is-open")) {
+                const moreBtn = svcList.querySelector(".svc-toggle-more");
+                if (moreBtn) moreBtn.click(); // usa el toggle de colapso existente
+            }
+            card.scrollIntoView({ behavior: "smooth", block: "center" });
+            card.classList.add("svc-highlight");
+            setTimeout(() => card.classList.remove("svc-highlight"), 2000);
+        }, 120);
     });
 
     /* ===== Render servicios ===== */
@@ -678,7 +714,7 @@
         const articulosHTML = rows.map((r) => {
                     const terminado = String(r.estado).toUpperCase() === "TERMINADO";
                     return `
-                    <article class="svc-item">
+                    <article class="svc-item" data-id="${r.id}">
                         <div class="svc-row-top">
                             <div class="svc-client">
                                 <span class="svc-name">${escape(r.nombre_cliente)}</span>

@@ -25,6 +25,9 @@
             respuestas_adicionales: {},
         },
         sesion: null,
+        // Memoria del último resultado (consulta de negocio o cliente) para
+        // responder preguntas de seguimiento. Expira a los 5 minutos.
+        ultimoContexto: { tipo: null, datos: null, timestamp: null },
     };
 
     const TIPOS = {
@@ -268,6 +271,7 @@
         resetFlujo();
         msgs.innerHTML = "";
         state.iniciado = false;
+        state.ultimoContexto = { tipo: null, datos: null, timestamp: null };
     }
 
     // Opciones del menú principal — siempre disponibles.
@@ -316,50 +320,50 @@
         );
     }
 
+    // Delay entre el mensaje del bot y la navegación: da tiempo a leerlo
+    // antes de que el panel se mueva/minimice.
+    const NAV_DELAY = 1500;
+
     function navegar(target) {
-        const dash = document.getElementById("adminDash");
         const isMobile = window.innerWidth < 768;
-        const irAlDash = () => {
-            if (dash) dash.scrollIntoView({ behavior: "smooth", block: "start" });
-        };
         // Mobile: tras navegar, minimiza el panel para que el usuario vea la
-        // sección a la que lo llevamos. En desktop el panel se queda como está.
+        // sección. En desktop el panel se queda como está. El scroll al panel
+        // del tab lo hace activarTab() en main.js.
         const trasNavegar = () => { if (isMobile) minimizar(); };
 
         if (target === "servicios") {
             addUserMsg("Ver servicios");
-            // Servicios = tab "Activos" del dashboard.
-            cambiarTab("active");
-            irAlDash();
             addBotMsg("Te llevo a la lista de servicios.");
-            trasNavegar();
+            // Primero el mensaje; la navegación ocurre tras el delay.
+            setTimeout(() => {
+                cambiarTab("active");
+                trasNavegar();
+            }, NAV_DELAY);
             return;
         }
 
         if (target === "clientes") {
             addUserMsg("Buscar cliente");
-            // La sección de clientes es el tab "Buscar cliente" del dashboard.
-            cambiarTab("search");
-            irAlDash();
             addBotMsg("Te llevo a la búsqueda de clientes. Escribe nombre, número o teléfono.");
-            trasNavegar();
+            setTimeout(() => {
+                cambiarTab("search");
+                trasNavegar();
+            }, NAV_DELAY);
             return;
         }
 
         if (target === "notas") {
             addUserMsg("Consultar nota");
-            // Las notas se consultan en los servicios finalizados: tab "Activos"
-            // + filtro "Finalizados". Cada servicio terminado con nota muestra
-            // el botón "📄 Ver nota".
-            cambiarTab("active");
-            const filtroOk = clickSi('.filter-btn[data-estado="TERMINADO"]');
-            irAlDash();
-            if (filtroOk) {
-                addBotMsg('Te llevo a los servicios finalizados. Cada uno con nota tiene el botón "📄 Ver nota".');
-            } else {
-                addBotMsg('Te llevo a los servicios. Cambia al filtro "Finalizados" para ver las notas.');
-            }
-            trasNavegar();
+            // El mensaje depende de si existe el filtro "Finalizados" en el DOM.
+            const hayFiltro = !!document.querySelector('.filter-btn[data-estado="TERMINADO"]');
+            addBotMsg(hayFiltro
+                ? 'Te llevo a los servicios finalizados. Cada uno con nota tiene el botón "📄 Ver nota".'
+                : 'Te llevo a los servicios. Cambia al filtro "Finalizados" para ver las notas.');
+            setTimeout(() => {
+                cambiarTab("active");
+                clickSi('.filter-btn[data-estado="TERMINADO"]');
+                trasNavegar();
+            }, NAV_DELAY);
             return;
         }
 
@@ -370,13 +374,15 @@
             usuarios: "usuariosSection",
         };
         const el = map[target] && document.getElementById(map[target]);
-        if (el) {
-            el.scrollIntoView({ behavior: "smooth", block: "start" });
-            addBotMsg(`Te llevo a ${target}.`);
-            trasNavegar();
-        } else {
+        if (!el) {
             addBotMsg("No encontré esa sección.");
+            return;
         }
+        addBotMsg(`Te llevo a ${target}.`);
+        setTimeout(() => {
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+            trasNavegar();
+        }, NAV_DELAY);
     }
 
     /* ---------- Consultas de negocio (datos reales, sin Claude API) ---------- */
@@ -434,10 +440,155 @@
                 return;
             }
             addBotMsg(payload.data.respuesta || "No pude consultar los datos. Intenta de nuevo.");
+            // Memoria de contexto para preguntas de seguimiento (5 min).
+            state.ultimoContexto = {
+                tipo: "consulta_negocio",
+                datos: { tipoConsulta: tipo, respuesta: payload.data.respuesta },
+                timestamp: Date.now(),
+            };
         } catch (err) {
             removeLoadingMsg();
             console.error("[ASIST] consulta-negocio error:", err);
             addBotMsg("No pude consultar los datos. Intenta de nuevo.");
+        }
+    }
+
+    /* ---------- Consulta por cliente específico ---------- */
+    function fmtMoney(n) {
+        const num = Number(n) || 0;
+        return "$" + num.toLocaleString("es-MX", {
+            minimumFractionDigits: 2, maximumFractionDigits: 2,
+        });
+    }
+    // Primera línea recortada (los conceptos pueden venir multilínea).
+    function recortarTexto(s, max) {
+        const t = String(s == null ? "" : s).split(/\r?\n/)[0].trim();
+        return t.length > max ? t.slice(0, max - 1) + "…" : t;
+    }
+    function primerNombre(nombre) {
+        const p = String(nombre || "").trim().split(/\s+/).filter(Boolean);
+        return p[0] || "";
+    }
+
+    // Lleva al detalle de un servicio / presupuesto desde el chat.
+    // Mensaje primero, navegación tras NAV_DELAY (tiempo para leerlo).
+    function navegarAServicio(servicioId) {
+        addBotMsg("Te llevo al servicio…");
+        setTimeout(() => {
+            if (window.innerWidth < 768) minimizar();
+            document.dispatchEvent(new CustomEvent("alas:abrir-servicio", {
+                detail: { id: servicioId },
+            }));
+        }, NAV_DELAY);
+    }
+    function navegarAPresupuesto(presupuestoId) {
+        addBotMsg("Te llevo al presupuesto…");
+        setTimeout(() => {
+            if (window.innerWidth < 768) minimizar();
+            document.dispatchEvent(new CustomEvent("alas:abrir-presupuesto", {
+                detail: { presupuesto_id: presupuestoId },
+            }));
+        }, NAV_DELAY);
+    }
+
+    // Pinta la ficha de un cliente: datos + servicios activos + presupuestos.
+    function renderClienteCard(data) {
+        const nombre = data.nombre_cliente || "Cliente";
+        addBotMsg(
+            `📋 ${nombre} — ${data.numero_cliente}` +
+            (data.telefono ? `\nTel: ${data.telefono}` : ""),
+        );
+
+        const activos = data.servicios_activos || [];
+        if (activos.length) {
+            addBotMsg(`Servicios activos (${activos.length}):`);
+            activos.forEach((s) => {
+                const icono = s.estado === "PENDIENTE" ? "⚠️" : "🔧";
+                addBotMsg(
+                    `${icono} ${s.estado} — ${recortarTexto(s.conceptos, 50)} (${s.dias} día${s.dias === 1 ? "" : "s"})`,
+                    [{ label: "Ver servicio", action: () => navegarAServicio(s.id) }],
+                );
+            });
+        } else {
+            addBotMsg(`✅ ${data.numero_cliente} ${primerNombre(nombre)} no tiene servicios activos.`);
+        }
+
+        const presupuestos = data.presupuestos || [];
+        if (presupuestos.length) {
+            addBotMsg(`Presupuestos (${presupuestos.length}):`);
+            presupuestos.forEach((p) => {
+                addBotMsg(
+                    `📄 ${p.numero_presupuesto} ${p.estado} — ${fmtMoney(p.total_general)}`,
+                    [{ label: "Ver presupuesto", action: () => navegarAPresupuesto(p.id) }],
+                );
+            });
+        }
+
+        if (data.servicios_terminados_count > 0) {
+            const n = data.servicios_terminados_count;
+            addBotMsg(`✅ ${n} servicio${n === 1 ? "" : "s"} terminado${n === 1 ? "" : "s"} anteriormente.`);
+        }
+    }
+
+    // Consulta la ficha de un cliente por su folio CL-XXXX.
+    async function consultarCliente(numeroCliente) {
+        addLoadingMsg("Consultando cliente…");
+        try {
+            const res = await fetch("/api/ai/consulta-cliente", {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ numero_cliente: numeroCliente }),
+            });
+            const payload = await res.json().catch(() => ({}));
+            removeLoadingMsg();
+            if (res.status === 404) {
+                addBotMsg((payload && payload.error) || "No encontré un cliente con ese número.");
+                return;
+            }
+            if (!res.ok || !payload.ok || !payload.data) {
+                addBotMsg("No pude consultar el cliente. Intenta de nuevo.");
+                return;
+            }
+            renderClienteCard(payload.data);
+            // Memoria de contexto para preguntas de seguimiento (5 min).
+            state.ultimoContexto = {
+                tipo: "cliente",
+                datos: payload.data,
+                timestamp: Date.now(),
+            };
+        } catch (err) {
+            removeLoadingMsg();
+            console.error("[ASIST] consulta-cliente error:", err);
+            addBotMsg("No pude consultar el cliente. Intenta de nuevo.");
+        }
+    }
+
+    /* ---------- Memoria de contexto (preguntas de seguimiento) ---------- */
+    const KEYWORDS_SEGUIMIENTO = [
+        "cuál es", "cual es", "cuáles", "cuales", "dime más", "dame más",
+        "más info", "detalle", "muéstrame", "muestrame", "cuál", "cual",
+    ];
+    const CONTEXTO_TTL_MS = 5 * 60 * 1000; // 5 minutos
+
+    function esSeguimiento(low) {
+        return KEYWORDS_SEGUIMIENTO.some((k) => low.includes(k));
+    }
+
+    // Muestra el detalle del último resultado si sigue vigente (< 5 min).
+    function mostrarDetalleContexto() {
+        const ctx = state.ultimoContexto;
+        const vigente = ctx && ctx.tipo && ctx.timestamp
+            && (Date.now() - ctx.timestamp < CONTEXTO_TTL_MS);
+        if (!vigente) {
+            addBotMsg("No tengo contexto de tu pregunta anterior. ¿Sobre qué quieres más detalle?");
+            return;
+        }
+        if (ctx.tipo === "cliente") {
+            renderClienteCard(ctx.datos);
+        } else {
+            // consulta_negocio: re-mostrar el resultado guardado.
+            addBotMsg(ctx.datos.respuesta || "No tengo más detalle de esa consulta.");
         }
     }
 
@@ -644,10 +795,15 @@
         if (state.modo === null || state.paso === null) {
             addUserMsg(t);
             const low = t.toLowerCase();
-            // Consultas de negocio: se evalúan primero (algunas contienen
-            // "servicio"/"presupuesto" y se confundirían con navegación).
+            // 1) Cliente concreto por folio CL-XXXX (lo más específico).
+            const mCliente = t.match(/CL-\d{4}/i);
+            if (mCliente) return consultarCliente(mCliente[0].toUpperCase());
+            // 2) Consultas de negocio: antes de navegación (algunas contienen
+            //    "servicio"/"presupuesto" y se confundirían con navegar).
             const tipoNegocio = detectarConsultaNegocio(low);
             if (tipoNegocio) return consultarNegocio(tipoNegocio);
+            // 3) Pregunta de seguimiento sobre el último resultado.
+            if (esSeguimiento(low)) return mostrarDetalleContexto();
             if (/\b(presupuesto|cotizaci)/i.test(low)) return empezarPresupuesto();
             if (/\b(servicio)/i.test(low)) return navegar("servicios");
             if (/\b(cliente)/i.test(low)) return navegar("clientes");

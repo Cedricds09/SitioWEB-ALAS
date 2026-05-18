@@ -187,6 +187,88 @@ async function negocioPresupuestosPendientes({ uid }) {
   return r.recordset[0];
 }
 
+// ============================================================
+// Consulta por cliente (ficha). tecnico/uid resueltos en el service.
+// Para un técnico, datos/activos/terminados se filtran por tecnico_asignado:
+// si no tiene ningún servicio de ese cliente, clienteDatos devuelve null
+// y el service responde 404 (no revela clientes ajenos).
+// ============================================================
+
+// Datos básicos del cliente (del servicio más reciente que le pertenece).
+async function clienteDatos(numeroCliente, tecnico) {
+  const pool = await getPool();
+  const reqDb = pool.request().input('cl', sql.NVarChar(50), numeroCliente);
+  let filtro = '';
+  if (tecnico) {
+    reqDb.input('tec', sql.NVarChar(50), tecnico);
+    filtro = ' AND tecnico_asignado = @tec';
+  }
+  const r = await reqDb.query(`
+    SELECT TOP 1 nombre_cliente, telefono
+    FROM dbo.servicios
+    WHERE numero_cliente = @cl AND activo = 1${filtro}
+    ORDER BY fecha_inicio DESC
+  `);
+  return r.recordset[0] || null;
+}
+
+// Servicios activos del cliente (PENDIENTE / EN_PROCESO).
+async function clienteServiciosActivos(numeroCliente, tecnico) {
+  const pool = await getPool();
+  const reqDb = pool.request().input('cl', sql.NVarChar(50), numeroCliente);
+  let filtro = '';
+  if (tecnico) {
+    reqDb.input('tec', sql.NVarChar(50), tecnico);
+    filtro = ' AND tecnico_asignado = @tec';
+  }
+  const r = await reqDb.query(`
+    SELECT id, conceptos, estado, fecha_inicio,
+      DATEDIFF(DAY, fecha_inicio, GETDATE()) AS dias
+    FROM dbo.servicios
+    WHERE numero_cliente = @cl AND activo = 1
+      AND estado IN ('PENDIENTE','EN_PROCESO')${filtro}
+    ORDER BY fecha_inicio ASC
+  `);
+  return r.recordset;
+}
+
+// Conteo de servicios terminados del cliente.
+async function clienteServiciosTerminadosCount(numeroCliente, tecnico) {
+  const pool = await getPool();
+  const reqDb = pool.request().input('cl', sql.NVarChar(50), numeroCliente);
+  let filtro = '';
+  if (tecnico) {
+    reqDb.input('tec', sql.NVarChar(50), tecnico);
+    filtro = ' AND tecnico_asignado = @tec';
+  }
+  const r = await reqDb.query(`
+    SELECT COUNT(*) AS total
+    FROM dbo.servicios
+    WHERE numero_cliente = @cl AND activo = 1
+      AND estado = 'TERMINADO'${filtro}
+  `);
+  return r.recordset[0].total;
+}
+
+// Presupuestos vigentes del cliente (no rechazados ni convertidos).
+async function clientePresupuestos(numeroCliente, uid) {
+  const pool = await getPool();
+  const reqDb = pool.request().input('cl', sql.NVarChar(50), numeroCliente);
+  let filtro = '';
+  if (uid) {
+    reqDb.input('uid', sql.Int, uid);
+    filtro = ' AND asignado_a = @uid';
+  }
+  const r = await reqDb.query(`
+    SELECT id, numero_presupuesto, estado, total_general
+    FROM dbo.presupuestos
+    WHERE numero_cliente = @cl AND activo = 1
+      AND estado NOT IN ('rechazado','convertido')${filtro}
+    ORDER BY fecha_creacion DESC
+  `);
+  return r.recordset;
+}
+
 module.exports = {
   countLastHour,
   countLastHourByUser,
@@ -196,4 +278,8 @@ module.exports = {
   negocioSinPresupuesto,
   negocioSinCerrar,
   negocioPresupuestosPendientes,
+  clienteDatos,
+  clienteServiciosActivos,
+  clienteServiciosTerminadosCount,
+  clientePresupuestos,
 };

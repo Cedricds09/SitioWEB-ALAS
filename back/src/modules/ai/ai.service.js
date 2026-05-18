@@ -643,8 +643,55 @@ async function consultaNegocio(tipo, sesion) {
   }
 }
 
+// ============================================================
+// Ficha de un cliente — datos reales de la DB, sin Claude API.
+// Admin ve todo; técnico solo clientes/servicios/presupuestos suyos.
+// Si el técnico no tiene relación con el cliente → 404 (no lo revela).
+// ============================================================
+async function consultaCliente(numeroCliente, sesion) {
+  const esAdmin = !!(sesion && sesion.rol === ROL.ADMIN);
+  const tecnico = esAdmin ? null : (sesion && sesion.usu) || null;
+  const uid = esAdmin ? null : (sesion && sesion.uid) || null;
+
+  const cl = String(numeroCliente || '').trim().toUpperCase();
+
+  // Datos del cliente. Para un técnico, esto ya restringe a clientes suyos:
+  // si no tiene servicios de ese cliente, no hay datos → 404.
+  const datos = await repo.clienteDatos(cl, tecnico);
+  if (!datos) {
+    throw new NotFoundError('No encontramos un cliente con ese número.');
+  }
+
+  const [activos, terminadosCount, presupuestos] = await Promise.all([
+    repo.clienteServiciosActivos(cl, tecnico),
+    repo.clienteServiciosTerminadosCount(cl, tecnico),
+    repo.clientePresupuestos(cl, uid),
+  ]);
+
+  return {
+    numero_cliente: cl,
+    nombre_cliente: datos.nombre_cliente || null,
+    telefono: datos.telefono || null,
+    servicios_activos: activos.map((s) => ({
+      id: s.id,
+      conceptos: s.conceptos,
+      estado: s.estado,
+      fecha_inicio: s.fecha_inicio,
+      dias: Number(s.dias) || 0,
+    })),
+    servicios_terminados_count: Number(terminadosCount) || 0,
+    presupuestos: presupuestos.map((p) => ({
+      id: p.id,
+      numero_presupuesto: p.numero_presupuesto,
+      estado: p.estado,
+      total_general: Number(p.total_general) || 0,
+    })),
+  };
+}
+
 module.exports = {
   sugerirBloques,
   chatPresupuesto,
   consultaNegocio,
+  consultaCliente,
 };
