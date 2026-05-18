@@ -1248,6 +1248,22 @@ body.modal-open { overflow: hidden; }
 }
 .modal-actions .btn { flex: 1 1 140px; padding: 0.85rem 1.2rem; }
 
+/* Preview del mensaje de WhatsApp en el modal de envío al cliente */
+.envio-preview {
+    background: rgba(37, 211, 102, 0.08);
+    border: 1px solid rgba(37, 211, 102, 0.25);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    color: var(--color-silver-1);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 220px;
+    overflow-y: auto;
+    font-family: monospace;
+}
+
 /* Form hint */
 .form-hint {
     font-size: 0.8rem;

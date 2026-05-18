@@ -831,7 +831,10 @@
         }
 
         container.querySelectorAll(".svc-fin").forEach((b) =>
-            b.addEventListener("click", () => finalizar(parseInt(b.dataset.id, 10), b))
+            b.addEventListener("click", () => finalizar(
+                parseInt(b.dataset.id, 10),
+                rows.find((r) => r.id === parseInt(b.dataset.id, 10)),
+            ))
         );
         container.querySelectorAll(".svc-prog-save").forEach((b) =>
             b.addEventListener("click", () => guardarFechaProgramada(b))
@@ -1324,8 +1327,13 @@
     const finalizeCancel = document.getElementById("finalizeCancel");
     const finalizeError = document.getElementById("finalizeError");
 
-    function finalizar(id) {
+    // Servicio que se está finalizando. Se captura al abrir el modal para
+    // tener sus datos (teléfono, folio) al construir el aviso de WhatsApp.
+    let finalizeServicio = null;
+
+    function finalizar(id, servicio) {
         finalizeSvcId.value = id;
+        finalizeServicio = servicio || null;
         finalizeResolucion.value = "";
         finalizeError.textContent = "";
         openModal(finalizeBack);
@@ -1361,10 +1369,10 @@
             if (!res.ok || !body.ok) throw new Error(body.error || "Error");
             cerrarFinalize();
             toast(`Nota generada: ${body.data.numero_nota}`, "success");
-            listar();
-            if (clientHistory.dataset.cliente) {
-                cargarHistorial(clientHistory.dataset.cliente, clientHistory.dataset.nombre);
-            }
+            // Modal de envío al cliente. Si se muestra, la recarga de la lista
+            // se hace al cerrarlo; si no, se recarga de inmediato.
+            const envioMostrado = mostrarModalEnvioCliente(finalizeServicio, body.data);
+            if (!envioMostrado) recargarTrasFinalizar();
         } catch (err) {
             finalizeError.textContent = err.message;
         } finally {
@@ -1372,6 +1380,121 @@
             finalizeSubmit.textContent = original;
         }
     });
+
+    /* ===== Envío de datos al cliente por WhatsApp (post-finalización) ===== */
+    const modalEnvioCliente = document.getElementById("modalEnvioCliente");
+    const btnEnviarWhatsappCliente = document.getElementById("btnEnviarWhatsappCliente");
+    const btnCerrarEnvioCliente = document.getElementById("btnCerrarEnvioCliente");
+    const envioPreview = document.getElementById("envioPreview");
+    const envioNotaNumero = document.getElementById("envioNotaNumero");
+
+    // Recarga la lista (y el historial si está abierto) tras finalizar.
+    function recargarTrasFinalizar() {
+        listar();
+        if (clientHistory.dataset.cliente) {
+            cargarHistorial(clientHistory.dataset.cliente, clientHistory.dataset.nombre);
+        }
+    }
+
+    // Arma el mensaje de WhatsApp. Solo texto plano: nombre, folios, total y
+    // la URL pública del sitio. Sin datos internos.
+    function construirMensajeWhatsapp({ nombreCliente, numeroCliente, numeroNota, total, dominio }) {
+        const nombre = String(nombreCliente || "Cliente").trim().slice(0, 100);
+        const cl = String(numeroCliente || "").trim();
+        const nota = String(numeroNota || "").trim();
+        const monto = Number(total) || 0;
+        const url = String(dominio).trim();
+
+        const totalFormateado = monto.toLocaleString("es-MX", {
+            style: "currency",
+            currency: "MXN",
+            minimumFractionDigits: 2,
+        });
+
+        return [
+            `Estimado/a ${nombre},`,
+            ``,
+            `Por medio del presente se le informa que el servicio solicitado ha sido concluido satisfactoriamente.`,
+            ``,
+            `Sus datos de consulta son:`,
+            `• Número de cliente: ${cl}`,
+            `• Número de nota: ${nota}`,
+            `• Total del servicio: ${totalFormateado}`,
+            ``,
+            `Puede consultar y descargar su nota de servicio en:`,
+            `${url}`,
+            ``,
+            `Ingrese su número de cliente (${cl}) y su número telefónico registrado para acceder.`,
+            ``,
+            `Agradecemos su preferencia.`,
+            `Atte. Adán Castellanos — Mantenimiento Habitacional ALAS`,
+        ].join("\n");
+    }
+
+    // Muestra el modal de envío al cliente. Devuelve true si se mostró,
+    // false si faltan datos (el caller decide entonces recargar la lista).
+    function mostrarModalEnvioCliente(servicio, nota) {
+        if (!nota || !nota.numero_nota || !servicio) return false;
+        if (!servicio.telefono) {
+            toast("Nota generada. El cliente no tiene teléfono registrado.", "info");
+            return false;
+        }
+
+        const mensaje = construirMensajeWhatsapp({
+            nombreCliente: servicio.nombre_cliente || "Cliente",
+            numeroCliente: servicio.numero_cliente,
+            numeroNota: nota.numero_nota,
+            total: servicio.total || 0,
+            dominio: window.location.origin,
+        });
+
+        // textContent (no innerHTML): el mensaje se muestra como texto plano.
+        if (envioPreview) envioPreview.textContent = mensaje;
+        if (envioNotaNumero) envioNotaNumero.textContent = nota.numero_nota;
+
+        // Datos del envío en data-* del botón, no en variables globales.
+        if (btnEnviarWhatsappCliente) {
+            btnEnviarWhatsappCliente.dataset.telefono = servicio.telefono;
+            btnEnviarWhatsappCliente.dataset.mensaje = encodeURIComponent(mensaje);
+        }
+
+        if (modalEnvioCliente) openModal(modalEnvioCliente);
+        return true;
+    }
+
+    function cerrarModalEnvioCliente() {
+        if (modalEnvioCliente) closeModal(modalEnvioCliente);
+        if (btnEnviarWhatsappCliente) {
+            btnEnviarWhatsappCliente.dataset.telefono = "";
+            btnEnviarWhatsappCliente.dataset.mensaje = "";
+        }
+        recargarTrasFinalizar();
+    }
+
+    if (btnEnviarWhatsappCliente) {
+        btnEnviarWhatsappCliente.addEventListener("click", () => {
+            const tel = btnEnviarWhatsappCliente.dataset.telefono;
+            const mensaje = btnEnviarWhatsappCliente.dataset.mensaje; // ya encodeURIComponent
+            if (!tel || !mensaje) {
+                toast("No se pudo construir el enlace de WhatsApp.", "error");
+                return;
+            }
+            // Teléfono: solo dígitos, con código de país MX (52) si falta.
+            const telLimpio = tel.replace(/\D/g, "");
+            const telConPais = telLimpio.startsWith("52") ? telLimpio : `52${telLimpio}`;
+            if (telConPais.length !== 12) {
+                toast("El teléfono del cliente no tiene formato válido para WhatsApp.", "error");
+                return;
+            }
+            const url = `https://wa.me/${telConPais}?text=${mensaje}`;
+            window.open(url, "_blank", "noopener,noreferrer");
+            cerrarModalEnvioCliente();
+        });
+    }
+
+    if (btnCerrarEnvioCliente) {
+        btnCerrarEnvioCliente.addEventListener("click", cerrarModalEnvioCliente);
+    }
 
     /* ===== Ajuste ===== */
     let ajusteCurrentId = null;

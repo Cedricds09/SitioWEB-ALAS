@@ -766,6 +766,22 @@
         </div>
     </div>
 
+    <!-- Modal: enviar datos al cliente post-finalización -->
+    <div id="modalEnvioCliente" class="modal-back" role="dialog" aria-modal="true" aria-labelledby="envioTitle">
+        <div class="modal" style="max-width:480px">
+            <h3 id="envioTitle">✅ Servicio finalizado</h3>
+            <p class="section-text" style="margin-bottom:16px">
+                La nota <strong id="envioNotaNumero"></strong> ha sido generada.<br>
+                ¿Deseas enviar los datos de consulta al cliente por WhatsApp?
+            </p>
+            <div class="envio-preview" id="envioPreview"></div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-ghost" id="btnCerrarEnvioCliente">Ahora no</button>
+                <button type="button" class="btn btn-primary" id="btnEnviarWhatsappCliente">📱 Enviar por WhatsApp</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal ver nota -->
     <div id="notaBack" class="modal-back" role="dialog" aria-modal="true" aria-labelledby="notaTitle">
         <div class="modal modal-wide">
