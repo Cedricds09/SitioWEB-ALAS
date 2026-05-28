@@ -8,6 +8,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
 
+const pkg = require('../package.json'); // version para /api/health
 const { getPool } = require('./shared/db/pool');
 const errorMiddleware = require('./shared/middleware/error.middleware');
 const { requireAuth } = require('./shared/middleware/auth.middleware');
@@ -115,12 +116,18 @@ if (env.MAINTENANCE_MODE) {
 }
 
 app.get('/api/health', async (_req, res) => {
+  // Datos siempre disponibles, no dependen de la DB.
+  const meta = {
+    version: pkg.version,
+    uptime: Math.round(process.uptime()), // segundos desde el arranque
+    maintenance: env.MAINTENANCE_MODE,
+  };
   try {
     const pool = await getPool();
     await pool.request().query('SELECT 1 AS ok');
-    res.json({ ok: true, db: 'up' });
+    res.json({ ok: true, db: 'ok', ...meta });
   } catch (err) {
-    res.status(500).json({ ok: false, db: 'down', error: err.message });
+    res.status(500).json({ ok: false, db: 'error', error: err.message, ...meta });
   }
 });
 
