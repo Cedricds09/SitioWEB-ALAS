@@ -36,6 +36,15 @@ const FRONT_DIR = path.join(__dirname, '..', '..', 'front');
 // No revelar el stack en headers.
 app.disable('x-powered-by');
 
+// Trust proxy: en producción el server vive detrás de NGINX/Cloudflare, así
+// req.ip y X-Forwarded-For reflejan la IP real del cliente (clave para que el
+// rate-limit cuente por IP correcta y no por la del proxy). Confiamos SOLO en
+// el primer hop (1) — `true` permitiría spoofear X-Forwarded-For y burlar los
+// limiters. En desarrollo queda en false (default) porque no hay proxy.
+if (env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // Headers de seguridad (helmet) + CSP a medida del frontend:
 // Google Maps (JS API + embed), CDN de jspdf/qrious y estáticos propios.
 app.use(
