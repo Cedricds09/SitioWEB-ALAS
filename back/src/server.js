@@ -56,6 +56,8 @@ app.use(
         // que el navegador pide vía connect-src.
         'connect-src': ["'self'", 'https://maps.googleapis.com', 'https://cdnjs.cloudflare.com'],
         'frame-src': ['https://www.google.com', 'https://maps.google.com'],
+        // Anti-clickjacking moderno (complemento a X-Frame-Options de helmet).
+        'frame-ancestors': ["'self'"],
         'worker-src': ["'self'", 'blob:'],
         'object-src': ["'none'"],
         'base-uri': ["'self'"],
@@ -66,16 +68,35 @@ app.use(
   }),
 );
 
-// CORS: en desarrollo refleja cualquier origen; en producción solo el de
-// ALLOWED_ORIGIN. Sin valor en prod se rechazan los cross-origin.
+// CORS: en desarrollo refleja cualquier origen; en producción solo los
+// listados en ALLOWED_ORIGIN. Acepta CSV ("https://a.com,https://b.com")
+// para soportar múltiples subdominios. Sin valor en prod rechaza todo.
+const allowedOrigins = String(env.ALLOWED_ORIGIN || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 const corsOrigin = env.NODE_ENV === 'production'
-  ? (env.ALLOWED_ORIGIN || false)
+  ? (origin, cb) => {
+      // origin null = same-origin o request server-side (curl, health checks).
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error(`CORS bloqueado: ${origin}`));
+    }
   : true;
+
 app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json());
 
+// Sanitiza query strings sensibles antes de loguear (PII en logs es P0).
+// validacion = teléfono del cliente; password = obvio; token = sesión.
+const SENSITIVE_QUERY_KEYS = /(validacion|telefono|password|token|api[_-]?key)=[^&]*/gi;
+function sanitizeUrlForLog(url) {
+  return String(url || '').replace(SENSITIVE_QUERY_KEYS, (m) => m.split('=')[0] + '=***');
+}
+
 app.use((req, _res, next) => {
-  console.log(`[REQ] ${req.method} ${req.originalUrl}`);
+  console.log(`[REQ] ${req.method} ${sanitizeUrlForLog(req.originalUrl)}`);
   next();
 });
 

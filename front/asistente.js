@@ -95,7 +95,8 @@
 
     // Avatar del bot (logo del chatbot ALAS). Se usa en el header, en cada
     // burbuja del bot y como icono del botón flotante (globo).
-    const BOT_AVATAR = "imagenes/logo-chatbot-alas.png";
+    // Asistente vive solo en /admin — todos los navegadores aceptan WebP.
+    const BOT_AVATAR = "imagenes/logo-chatbot-alas.webp";
     const BTN_ICON = `<img class="asist-btn-icon" src="${BOT_AVATAR}" alt="Asistente" />`;
 
     const html = `

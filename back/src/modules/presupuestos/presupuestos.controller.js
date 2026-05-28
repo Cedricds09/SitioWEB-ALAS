@@ -124,7 +124,10 @@ async function crearSolicitudPublica(req, res) {
   const ip = req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress;
   console.log('[PRES][PUB] solicitud entrante ip=', ip);
 
-  const result = await service.crearSolicitudPublica(req.body);
+  // Llamada al service: real o honeypot. El controller NO diferencia el shape
+  // de la respuesta entre los dos casos — esto preserva el anti-bot (un bot
+  // que compara respuestas no puede deducir si cayó en el honeypot).
+  await service.crearSolicitudPublica(req.body);
 
   // WhatsApp pre-armado. Si no hay telefono, abre el selector de contacto.
   const tel = String(req.body.cliente_telefono || '').replace(/\D/g, '');
@@ -137,12 +140,12 @@ async function crearSolicitudPublica(req, res) {
   );
   const whatsapp_url = `${waBase}?text=${waText}`;
 
+  // Shape público mínimo, idéntico real vs honeypot. El frontend solo usa
+  // whatsapp_url para abrir WA — no lee presupuesto_id ni numero_presupuesto.
   res.json({
     ok: true,
     mensaje: 'Solicitud recibida. Te contactaremos a la brevedad.',
     whatsapp_url,
-    presupuesto_id: result.id || null,
-    numero_presupuesto: result.numero_presupuesto || null,
   });
 }
 

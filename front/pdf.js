@@ -2,7 +2,8 @@
     const BUSINESS_NAME = "Servicios Integrales ALAS";
     const BUSINESS_TAG  = "Mantenimiento Habitacional";
     const BUSINESS_INFO = "Ciudad de México  ·  Tel. +52 55 3167 5824";
-    const LOGO_URL = "imagenes/logoprincipal.png";
+    // jspdf via canvas — acepta WebP en navegadores modernos.
+    const LOGO_URL = "imagenes/logoprincipal.webp";
 
     let logoDataUrl = null;
     let logoPromise = null;

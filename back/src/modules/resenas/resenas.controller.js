@@ -24,14 +24,14 @@ async function listarPublicas(_req, res) {
 }
 
 // GET /api/admin/resenas  (requireAuth)
-async function listarAdmin(_req, res) {
-  const result = await service.listarAdmin();
+async function listarAdmin(req, res) {
+  const result = await service.listarAdmin(req.session);
   res.json(result);
 }
 
 // PUT /api/admin/resenas/:id  (requireAdmin)
 async function moderar(req, res) {
-  const result = await service.moderar(req.params.id, req.body.estado);
+  const result = await service.moderar(req.params.id, req.body.estado, req.session);
   res.json(result);
 }
 

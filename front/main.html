@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ALAS - Servicios Integrales y Mantenimiento Habitacional</title>
+    <link rel="icon" type="image/webp" href="imagenes/faviconpagina.webp">
     <link rel="icon" type="image/png" href="imagenes/faviconpagina.png">
-    <link rel="shortcut icon" type="image/png" href="imagenes/faviconpagina.png">
+    <link rel="shortcut icon" type="image/webp" href="imagenes/faviconpagina.webp">
     <link rel="apple-touch-icon" href="imagenes/faviconpagina.png">
     <link rel="stylesheet" href="main.css">
 </head>
@@ -14,7 +15,10 @@
     <header class="nav" id="nav">
         <div class="nav-inner">
             <a href="#hero" class="brand">
-                <img src="imagenes/logoprincipal.png" alt="Logo ALAS" class="brand-logo">
+                <picture>
+                    <source srcset="imagenes/logoprincipal.webp" type="image/webp">
+                    <img src="imagenes/logoprincipal.png" alt="Logo ALAS" class="brand-logo">
+                </picture>
                 <span class="brand-text">ALAS</span>
             </a>
             <button class="nav-toggle" id="navToggle" aria-label="Abrir menú">
@@ -407,7 +411,10 @@
         <div class="container footer-grid">
             <div>
                 <div class="brand brand-footer">
-                    <img src="imagenes/logoprincipal.png" alt="Logo ALAS" class="brand-logo">
+                    <picture>
+                        <source srcset="imagenes/logoprincipal.webp" type="image/webp">
+                        <img src="imagenes/logoprincipal.png" alt="Logo ALAS" class="brand-logo">
+                    </picture>
                     <span class="brand-text">ALAS</span>
                 </div>
                 <p class="footer-tag">Servicios Integrales y Mantenimiento Habitacional</p>
@@ -1141,8 +1148,14 @@
         </svg>
     </a>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
+            integrity="sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAOnx5S09ydFYWWNSfcEqDTTHgtNA=="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"
+            integrity="sha512-pUhApVQtLbnpLtJn6DuzDD5o2xtmLJnJ7oBoMsBnzOkVkpqofGLGPaBJ6ayD2zQe3lCgCibhJBi4cj5wAxwVKA=="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"></script>
     <script src="main.js"></script>
     <script src="pdf.js"></script>
     <script src="notes.js"></script>

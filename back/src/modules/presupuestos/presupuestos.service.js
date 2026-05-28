@@ -120,7 +120,9 @@ async function _recalcularTotal(presupuesto_id, tx) {
 }
 
 // Admin ve todo. Técnico ve los suyos (asignado_a) y las solicitudes huérfanas.
-// Lanza 404 en vez de Forbidden para no revelar que el presupuesto existe.
+// IDOR: 404 INTENCIONAL (no 403) para no confirmar la existencia de IDs
+// ajenos a un técnico curioso. NO refactorizar a ForbiddenError; rompe
+// la defensa anti-enumeración.
 function _validarVisibilidad(presupuesto, sesion) {
   if (sesion.rol === ROL.ADMIN) return;
   const esSuyo = presupuesto.asignado_a === sesion.uid;
@@ -649,6 +651,18 @@ async function convertirAServicio(id, sesion) {
       numeroCliente = await serviciosRepo.nextNumeroCliente(tx);
     }
 
+    // Validar campos requeridos por dbo.servicios ANTES del INSERT, así
+    // devolvemos 400 claro en vez de 500 críptico por constraint NOT NULL.
+    if (!numeroCliente) {
+      throw new ValidationError('No se pudo resolver número de cliente para el servicio.');
+    }
+    if (!p.cliente_nombre || !String(p.cliente_nombre).trim()) {
+      throw new ValidationError('El presupuesto no tiene nombre de cliente — no se puede convertir.');
+    }
+    if (!conceptos || !conceptos.trim()) {
+      throw new ValidationError('El presupuesto no tiene bloques con contenido — no se puede convertir.');
+    }
+
     // INSERT en servicios.
     const servicio = await serviciosRepo.crearServicio({
       numero_cliente: numeroCliente,
@@ -686,10 +700,17 @@ async function convertirAServicio(id, sesion) {
 // ============================================================
 
 async function crearSolicitudPublica(input) {
-  // Honeypot anti-bot: si llega lleno, ignorar en silencio.
+  // Honeypot anti-bot: si llega lleno, devolvemos la MISMA forma que un alta
+  // real (numero_presupuesto fake) para que el bot no detecte la trampa por
+  // el shape de la respuesta. Logueamos internamente para análisis posterior.
   if (input.honeypot && input.honeypot.length > 0) {
-    console.log('[PRES][PUB] honeypot disparado — solicitud descartada silenciosamente');
-    return { ignorada: true };
+    console.log('[PRES][PUB] honeypot disparado — respondiendo fake-success');
+    return {
+      id: 0,
+      numero_presupuesto: 'PR-0000',
+      estado: ESTADO_PRESUPUESTO.SOLICITUD,
+      ignorada: true, // flag interno; el controller debe filtrarlo
+    };
   }
 
   console.log(

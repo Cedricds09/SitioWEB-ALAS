@@ -2,7 +2,17 @@
 // Sin SQL crudo ni Express. Llama al repository y lanza errores tipados.
 
 const repo = require('./resenas.repository');
-const { NotFoundError, ConflictError } = require('../../shared/errors/AppError');
+const { NotFoundError, ConflictError, ForbiddenError } = require('../../shared/errors/AppError');
+const ROL = require('../../shared/constants/roles');
+
+// Defense in depth: aunque routes.js ya aplica requireAdmin, re-validamos
+// en el service. Si un refactor futuro cambia el mount o llama al service
+// directamente (asistente, scripts), esto cierra el hueco.
+function _assertAdmin(sesion) {
+  if (!sesion || sesion.rol !== ROL.ADMIN) {
+    throw new ForbiddenError('Solo administradores pueden moderar reseñas.');
+  }
+}
 
 // Labels legibles para el sitio público.
 const TIPO_LABELS = {
@@ -62,14 +72,24 @@ async function crearPublica(data) {
     throw new ConflictError('Ya tienes una reseña registrada con este número de cliente.');
   }
 
-  await repo.crearResena({
-    numero_cliente,
-    telefono,
-    nombre_display: String(data.nombre_display).trim(),
-    colonia: data.colonia ? String(data.colonia).trim() : null,
-    tipo_servicio: data.tipo_servicio || null,
-    texto: String(data.texto).trim(),
-  });
+  try {
+    await repo.crearResena({
+      numero_cliente,
+      telefono,
+      nombre_display: String(data.nombre_display).trim(),
+      colonia: data.colonia ? String(data.colonia).trim() : null,
+      tipo_servicio: data.tipo_servicio || null,
+      texto: String(data.texto).trim(),
+    });
+  } catch (err) {
+    // Red de seguridad anti-race: el pre-check + INSERT no son atómicos;
+    // UX_resenas_cliente_activa (migración 011) atrapa el caso concurrente.
+    // mssql expone el código nativo de SQL Server en err.number.
+    if (err && (err.number === 2601 || err.number === 2627)) {
+      throw new ConflictError('Ya tienes una reseña registrada con este número de cliente.');
+    }
+    throw err;
+  }
 
   return { ok: true, mensaje: 'Gracias por tu reseña. La publicaremos pronto.' };
 }
@@ -89,7 +109,8 @@ async function listarPublicas() {
 }
 
 // Todas las reseñas + contador de pendientes, para el panel de moderación.
-async function listarAdmin() {
+async function listarAdmin(sesion) {
+  _assertAdmin(sesion);
   const [rows, pendientes] = await Promise.all([
     repo.listarAdmin(),
     repo.contarPendientes(),
@@ -109,7 +130,8 @@ async function listarAdmin() {
   return { ok: true, data: { resenas, pendientes } };
 }
 
-async function moderar(id, estado) {
+async function moderar(id, estado, sesion) {
+  _assertAdmin(sesion);
   const resena = await repo.obtenerPorId(id);
   if (!resena || !resena.activo) {
     throw new NotFoundError('Reseña no encontrada.');

@@ -88,6 +88,33 @@ const consultaNegocioLimiter = rateLimit({
   },
 });
 
+// Check de sesión: 30 requests por IP cada 15 minutos. Frena enumeración
+// silenciosa de tokens válidos (un atacante con tokens robados podría
+// validarlos en masa sin login).
+const checkLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 min
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    ok: false,
+    error: 'Demasiadas consultas de sesión.',
+  },
+});
+
+// Logout: 20 requests por IP por hora. Sin esto, un atacante con cookie
+// válida puede spam-revocar tokens (incrementa token_version sin parar).
+const logoutLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hora
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    ok: false,
+    error: 'Demasiados intentos.',
+  },
+});
+
 // Lecturas públicas de bajo riesgo (config, listado de reseñas aprobadas):
 // 60 requests por IP cada 10 minutos. Holgado para uso legítimo (una llamada
 // por carga de página), pero frena scraping y abuso del ORDER BY NEWID().
@@ -107,6 +134,8 @@ module.exports = {
   resenaPublicLimiter,
   resenaVerificarLimiter,
   loginLimiter,
+  checkLimiter,
+  logoutLimiter,
   notasLimiter,
   consultaNegocioLimiter,
   publicReadLimiter,

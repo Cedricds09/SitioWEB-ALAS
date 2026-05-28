@@ -370,20 +370,34 @@ async function sugerirBloques(input, sesion) {
     throw new AppError('La IA devolvió un modo inconsistente.', 500, 'AI_MODE_MISMATCH');
   }
 
-  // 9) Persistir tracking de éxito.
+  // 9) Persistir tracking de éxito. CRÍTICO: si esto falla, el costo de
+  // Claude ya se incurrió pero no queda registrado → circuit breaker
+  // subestima uso y facturación interna no cuadra. Loguear con severidad
+  // alta y datos suficientes para reconciliar manualmente. NO interrumpir
+  // la respuesta al usuario por un fallo de tracking (ya pagamos el token).
   const costo = calculateCostUsd(aiResp.usage || {});
-  await repo.registrarGeneracion({
-    user_id: sesion.uid,
-    presupuesto_id,
-    tokens_input: aiResp.usage?.input_tokens || 0,
-    tokens_output: aiResp.usage?.output_tokens || 0,
-    costo_estimado_usd: costo,
-    modelo: aiResp.model,
-    modo,
-    exitoso: true,
-    error_mensaje: null,
-  });
-  trackingDone = true;
+  try {
+    await repo.registrarGeneracion({
+      user_id: sesion.uid,
+      presupuesto_id,
+      tokens_input: aiResp.usage?.input_tokens || 0,
+      tokens_output: aiResp.usage?.output_tokens || 0,
+      costo_estimado_usd: costo,
+      modelo: aiResp.model,
+      modo,
+      exitoso: true,
+      error_mensaje: null,
+    });
+    trackingDone = true;
+  } catch (trackErr) {
+    console.error(
+      '[AI][CRITICAL] cost tracking failed — reconciliar manualmente. ' +
+      `user=${sesion.uid} pres=${presupuesto_id} modo=${modo} ` +
+      `tokens_in=${aiResp.usage?.input_tokens || 0} tokens_out=${aiResp.usage?.output_tokens || 0} ` +
+      `costo_usd=${costo} modelo=${aiResp.model} err=${trackErr.message}`,
+    );
+    // No re-lanzar: la respuesta al usuario ya está lista.
+  }
 
   return validation.data;
 }

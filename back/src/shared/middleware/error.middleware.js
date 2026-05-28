@@ -4,6 +4,8 @@
 
 const { AppError } = require('../errors/AppError');
 
+const IS_PROD = process.env.NODE_ENV === 'production';
+
 // eslint-disable-next-line no-unused-vars
 function errorMiddleware(err, req, res, next) {
   if (err instanceof AppError) {
@@ -16,7 +18,9 @@ function errorMiddleware(err, req, res, next) {
   }
 
   console.error('[ERR]', req.method, req.originalUrl, '-', err.message);
-  if (err.stack) console.error(err.stack);
+  // En producción no exponemos el stack en logs (puede filtrar paths internos,
+  // queries SQL parametrizadas, o datos de cliente capturados en frames).
+  if (!IS_PROD && err.stack) console.error(err.stack);
 
   if (!res.headersSent) {
     res.status(500).json({ ok: false, error: 'Error interno del servidor.' });
