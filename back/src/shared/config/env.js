@@ -46,6 +46,12 @@ const env = Object.freeze({
   // En desarrollo se ignora (CORS abierto). Sin valor en prod, CORS se cierra.
   ALLOWED_ORIGIN: process.env.ALLOWED_ORIGIN || '',
 
+  // Modo mantenimiento: si es true, el server responde 503 + mantenimiento.html
+  // a todas las rutas excepto GET /api/health. Se evalúa al arrancar (cambiar
+  // requiere reiniciar). Acepta "true" (cualquier mayúscula); cualquier otra
+  // cosa cuenta como false.
+  MAINTENANCE_MODE: String(process.env.MAINTENANCE_MODE || '').trim().toLowerCase() === 'true',
+
   GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY || '',
 
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,

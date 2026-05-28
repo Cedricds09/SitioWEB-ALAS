@@ -100,6 +100,20 @@ app.use((req, _res, next) => {
   next();
 });
 
+// Modo mantenimiento: 503 + mantenimiento.html en TODAS las rutas excepto
+// GET /api/health (para que UptimeRobot siga sondeando). Se registra solo si
+// MAINTENANCE_MODE=true al arrancar; sin overhead cuando está apagado.
+if (env.MAINTENANCE_MODE) {
+  console.warn('[SERVER] MODO MANTENIMIENTO ACTIVO — solo GET /api/health responde normal.');
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && req.path === '/api/health') return next();
+    res
+      .status(503)
+      .set('Retry-After', '3600')
+      .sendFile(path.join(FRONT_DIR, 'mantenimiento.html'));
+  });
+}
+
 app.get('/api/health', async (_req, res) => {
   try {
     const pool = await getPool();
