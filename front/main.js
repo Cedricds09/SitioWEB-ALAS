@@ -1022,8 +1022,12 @@
             const d = calParseYMD(fecha);
             const esHoy = fecha === hoyStr;
             const vacio = servicios.length === 0;
+            // P1-7: si "hoy" está vacío, NO marcar como calendario-dia-vacio
+            // (el CSS mobile lo ocultaría y el usuario perdería el ancla visual).
+            const cls = (vacio && !esHoy ? " calendario-dia-vacio" : "")
+                + (esHoy ? " cal-today" : "");
             html += `
-                <div class="calendario-dia${vacio ? " calendario-dia-vacio" : ""}">
+                <div class="calendario-dia${cls}">
                     <div class="calendario-dia-header${esHoy ? " es-hoy" : ""}">
                         ${CAL_DIAS[i] || ""} ${d.getUTCDate()}
                     </div>
@@ -1299,11 +1303,14 @@
         if (svcNombreInput && sel.nombre) svcNombreInput.value = sel.nombre;
         if (svcNumeroHidden) svcNumeroHidden.value = sel.numero_cliente || "";
         actualizarClienteIdInfo();
-        if (svcTelefonoInput && sel.telefono && !svcTelefonoInput.value.trim()) {
+        // Al seleccionar cliente del autocomplete, sus datos son la fuente de
+        // verdad: sobrescribir SIEMPRE teléfono y dirección (no solo si el
+        // campo está vacío) para no dejar valores tecleados a medias mezclados
+        // con los del cliente elegido.
+        if (svcTelefonoInput && sel.telefono) {
             svcTelefonoInput.value = sel.telefono;
         }
-        // Issue 40: autollenar dirección si está disponible y el campo está vacío.
-        if (svcDireccionInput && sel.direccion && !svcDireccionInput.value.trim()) {
+        if (svcDireccionInput && sel.direccion) {
             svcDireccionInput.value = sel.direccion;
         }
         svcClienteResults.hidden = true;

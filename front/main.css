@@ -2881,6 +2881,10 @@ body.modal-open { overflow: hidden; }
     border-radius: var(--radius);
     padding: 1.8rem;
 }
+/* `.form` aplica display:grid y vence al [hidden] del UA stylesheet — sin
+   esto, el paso 2 (#resenaSubmitForm) se ve al inicializar y junto al paso 1.
+   Mismo patrón que `.form label[hidden]` (línea 401) y Lección 11. */
+.resena-form[hidden] { display: none; }
 .resena-form-title {
     color: var(--color-silver-1);
     font-size: 1.05rem;
@@ -3304,6 +3308,18 @@ body.modal-open { overflow: hidden; }
 .calendario-dia-header.es-hoy {
     color: var(--color-purple);
     font-weight: 700;
+}
+/* Día actual: la celda recibe .cal-today desde el render (main.js). Resalta
+   el header en violeta con border-bottom destacado para que sea el ancla
+   visual de la semana, aunque el día no tenga servicios. */
+.cal-today .calendario-dia-header {
+    color: var(--color-purple);
+    font-weight: 700;
+    border-bottom: 2px solid var(--color-purple);
+}
+.cal-today {
+    background: var(--color-purple-soft);
+    border-radius: 8px;
 }
 .calendario-dia-celdas {
     display: flex;
