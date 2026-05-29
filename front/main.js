@@ -906,10 +906,6 @@
     }
 
     async function listar(reason = "manual") {
-        // Log temporal (Issue 27v2): rastrea cada refresh para detectar
-        // fuentes inesperadas. Quitar cuando el bug de "servicio desaparece"
-        // quede confirmado como cerrado.
-        console.log("[REFRESH SERVICIOS]", new Date().toISOString(), "razón:", reason);
         svcList.innerHTML = '<div class="svc-empty"><span class="svc-loader"></span>Cargando servicios…</div>';
         try {
             await loadTecnicos();
