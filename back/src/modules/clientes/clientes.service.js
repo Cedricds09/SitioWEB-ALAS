@@ -23,13 +23,26 @@ async function buscar({ q, limit }) {
 async function historial(numero_cliente, sesion) {
   console.log('[CLIENTES] historial cliente=', maskCliente(numero_cliente));
 
-  const [servicios, notas, presupuestos] = await Promise.all([
+  // allSettled: si una fuente falla (p.ej. DB intermitente en una tabla), se
+  // devuelven las demás en vez de romper TODO el historial. El camino feliz
+  // (las tres OK) entrega exactamente los mismos datos que antes.
+  const [rServicios, rNotas, rPresupuestos] = await Promise.allSettled([
     serviciosRepo.listarPorCliente(numero_cliente),
     notasRepo.listarPorCliente(numero_cliente),
     presupuestosService.listar({ numero_cliente }, sesion),
   ]);
 
-  return { servicios, notas, presupuestos };
+  function take(res, etiqueta) {
+    if (res.status === 'fulfilled') return res.value;
+    console.error(`[CLIENTES] historial: fuente "${etiqueta}" falló:`, res.reason?.message || res.reason);
+    return [];
+  }
+
+  return {
+    servicios: take(rServicios, 'servicios'),
+    notas: take(rNotas, 'notas'),
+    presupuestos: take(rPresupuestos, 'presupuestos'),
+  };
 }
 
 module.exports = { buscar, historial };

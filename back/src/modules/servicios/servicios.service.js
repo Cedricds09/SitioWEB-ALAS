@@ -56,7 +56,7 @@ async function crear(input) {
 // ============================================================
 // Listar (activos por defecto). Técnico siempre ve los suyos.
 // ============================================================
-async function listar({ estadoQuery, isAdmin, mine, usuario }) {
+async function listar({ estadoQuery, isAdmin, mine, usuario, page, limit }) {
   const estados = (estadoQuery || ESTADOS_ACTIVOS.join(','))
     .split(',')
     .map((s) => s.trim().toUpperCase())
@@ -65,7 +65,9 @@ async function listar({ estadoQuery, isAdmin, mine, usuario }) {
   const filtraMis = !isAdmin || mine;
   const tecnico = filtraMis ? usuario || '' : undefined;
 
-  return repo.listarServicios({ estados, tecnico });
+  // page/limit son opcionales; si vienen undefined el repo no pagina (igual
+  // que antes). Sin cambios para el frontend actual que no los envía.
+  return repo.listarServicios({ estados, tecnico, page, limit });
 }
 
 async function historialPorCliente(numero_cliente) {

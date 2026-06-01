@@ -24,6 +24,8 @@ async function listar(req, res) {
     isAdmin,
     mine,
     usuario: sess.usu,
+    page: req.query.page,
+    limit: req.query.limit,
   });
   res.json({ ok: true, data });
 }

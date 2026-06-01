@@ -24,23 +24,29 @@ async function makeRequest(tx) {
 // ============================================================
 
 async function nextNumeroCliente(tx) {
-  const r = await new sql.Request(tx).query(`
+  // El patrón LIKE va parametrizado (defensa en profundidad). El offset de
+  // SUBSTRING es un entero de compilación (longitud del prefijo), sin input.
+  const r = await new sql.Request(tx)
+    .input('prefijo', sql.VarChar(20), `${PREFIJO_CLIENTE}%`)
+    .query(`
     SELECT MAX(
       TRY_CAST(SUBSTRING(numero_cliente, ${PREFIJO_CLIENTE.length + 1}, 50) AS INT)
     ) AS maxNum
     FROM dbo.servicios WITH (TABLOCKX, HOLDLOCK)
-    WHERE numero_cliente LIKE '${PREFIJO_CLIENTE}%'
+    WHERE numero_cliente LIKE @prefijo
   `);
   return formatClienteCode((r.recordset[0].maxNum || 0) + 1);
 }
 
 async function nextNumeroNota(tx) {
-  const r = await new sql.Request(tx).query(`
+  const r = await new sql.Request(tx)
+    .input('prefijo', sql.NVarChar(20), `${PREFIJO_NOTA}%`)
+    .query(`
     SELECT MAX(
       TRY_CAST(SUBSTRING(numero_nota, ${PREFIJO_NOTA.length + 1}, 50) AS INT)
     ) AS maxNum
     FROM dbo.notas WITH (TABLOCKX, HOLDLOCK)
-    WHERE numero_nota LIKE '${PREFIJO_NOTA}%'
+    WHERE numero_nota LIKE @prefijo
   `);
   return formatNotaCode((r.recordset[0].maxNum || 0) + 1);
 }
@@ -50,24 +56,30 @@ async function nextNumeroNota(tx) {
 // ============================================================
 
 async function asignarTecnicoAuto(tx) {
-  const r = await new sql.Request(tx).query(`
+  const r = await new sql.Request(tx)
+    .input('estPend', sql.VarChar(20), ESTADO_SERVICIO.PENDIENTE)
+    .input('estProc', sql.VarChar(20), ESTADO_SERVICIO.EN_PROCESO)
+    .input('rolTec', sql.NVarChar(20), ROL.TECNICO)
+    .query(`
     SELECT TOP 1 u.usuario
     FROM dbo.usuarios u
     LEFT JOIN (
       SELECT tecnico_asignado, COUNT(*) AS cnt
       FROM dbo.servicios
-      WHERE activo = 1 AND estado IN ('${ESTADO_SERVICIO.PENDIENTE}','${ESTADO_SERVICIO.EN_PROCESO}')
+      WHERE activo = 1 AND estado IN (@estPend, @estProc)
       GROUP BY tecnico_asignado
     ) s ON s.tecnico_asignado = u.usuario
-    WHERE u.rol = '${ROL.TECNICO}' AND u.activo = 1
+    WHERE u.rol = @rolTec AND u.activo = 1
     ORDER BY ISNULL(s.cnt, 0) ASC, u.id ASC
   `);
   if (r.recordset.length) return r.recordset[0].usuario;
 
-  const f = await new sql.Request(tx).query(`
+  const f = await new sql.Request(tx)
+    .input('rolAdmin', sql.NVarChar(20), ROL.ADMIN)
+    .query(`
     SELECT TOP 1 usuario
     FROM dbo.usuarios
-    WHERE rol = '${ROL.ADMIN}' AND activo = 1
+    WHERE rol = @rolAdmin AND activo = 1
     ORDER BY id ASC
   `);
   return f.recordset.length ? f.recordset[0].usuario : null;
@@ -107,7 +119,7 @@ async function crearServicio(data, tx) {
   return result.recordset[0];
 }
 
-async function listarServicios({ estados, tecnico }) {
+async function listarServicios({ estados, tecnico, page, limit }) {
   const pool = await getPool();
   const reqDb = pool.request();
   const placeholders = estados.map((_, i) => {
@@ -119,6 +131,15 @@ async function listarServicios({ estados, tecnico }) {
     reqDb.input('tec', sql.NVarChar(50), tecnico || '');
     whereTec = ' AND tecnico_asignado = @tec';
   }
+  // Paginación opt-in (M6): solo se aplica si llega un limit > 0. Sin él, el
+  // comportamiento es el de siempre (devuelve todos los activos ordenados),
+  // así el frontend actual no cambia. OFFSET/FETCH exige el ORDER BY presente.
+  let paging = '';
+  if (limit && limit > 0) {
+    const off = ((page && page > 0 ? page : 1) - 1) * limit;
+    reqDb.input('off', sql.Int, off).input('lim', sql.Int, limit);
+    paging = ' OFFSET @off ROWS FETCH NEXT @lim ROWS ONLY';
+  }
   const result = await reqDb.query(`
     SELECT id, numero_cliente, nombre_cliente, telefono, direccion, lat, lng, conceptos,
            total, estado, fecha_inicio, fecha_fin, ajuste, tipo_servicio,
@@ -128,7 +149,7 @@ async function listarServicios({ estados, tecnico }) {
     FROM dbo.servicios
     WHERE activo = 1 AND estado IN (${placeholders.join(',')})
       ${whereTec}
-    ORDER BY fecha_inicio DESC
+    ORDER BY fecha_inicio DESC${paging}
   `);
   return result.recordset;
 }
@@ -140,7 +161,9 @@ async function listarCalendario({ lunes, domingo, tecnico }) {
   const reqDb = pool
     .request()
     .input('lunes', sql.VarChar(10), lunes)
-    .input('domingo', sql.VarChar(10), domingo);
+    .input('domingo', sql.VarChar(10), domingo)
+    .input('estPend', sql.VarChar(20), ESTADO_SERVICIO.PENDIENTE)
+    .input('estProc', sql.VarChar(20), ESTADO_SERVICIO.EN_PROCESO);
   let whereTec = '';
   if (tecnico !== undefined) {
     reqDb.input('tec', sql.NVarChar(50), tecnico || '');
@@ -154,7 +177,7 @@ async function listarCalendario({ lunes, domingo, tecnico }) {
            fecha_inicio
     FROM dbo.servicios
     WHERE activo = 1
-      AND estado IN ('${ESTADO_SERVICIO.PENDIENTE}','${ESTADO_SERVICIO.EN_PROCESO}')
+      AND estado IN (@estPend, @estProc)
       AND (
         (fecha_programada >= @lunes AND fecha_programada <= @domingo)
         OR fecha_programada IS NULL
@@ -275,9 +298,10 @@ async function finalizarServicio({ id, atendido_por, numero_nota, resolucion }, 
     .input('atendido_por', sql.NVarChar(50), atendido_por)
     .input('numero_nota', sql.NVarChar(20), numero_nota)
     .input('resolucion', sql.NVarChar(sql.MAX), resolucion)
+    .input('estTerminado', sql.VarChar(20), ESTADO_SERVICIO.TERMINADO)
     .query(`
       UPDATE dbo.servicios
-      SET estado = '${ESTADO_SERVICIO.TERMINADO}',
+      SET estado = @estTerminado,
           fecha_fin = GETDATE(),
           atendido_por = @atendido_por,
           numero_nota = @numero_nota,
@@ -311,9 +335,13 @@ async function crearNotaDesdeServicio(serv, numero_nota, conceptos_finales, tx) 
 
 async function reabrirServicio(id) {
   const pool = await getPool();
-  const r = await pool.request().input('id', sql.Int, id).query(`
+  const r = await pool
+    .request()
+    .input('id', sql.Int, id)
+    .input('estPendiente', sql.VarChar(20), ESTADO_SERVICIO.PENDIENTE)
+    .query(`
     UPDATE dbo.servicios
-    SET estado = '${ESTADO_SERVICIO.PENDIENTE}', fecha_fin = NULL
+    SET estado = @estPendiente, fecha_fin = NULL
     OUTPUT INSERTED.*
     WHERE id = @id
   `);

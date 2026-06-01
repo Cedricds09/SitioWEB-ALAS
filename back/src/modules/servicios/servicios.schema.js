@@ -168,6 +168,10 @@ const programarSchema = z.object({
 const listarQuerySchema = z.object({
   estado: optionalString,
   mine: optionalString,
+  // Paginación opt-in (M6): ambos opcionales. Si no llegan, el listado se
+  // comporta como siempre (sin paginar). limit acotado para evitar abusos.
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().max(200).optional(),
 });
 
 // Calendario: semana ISO "YYYY-WNN" opcional. Sin valor usa la semana actual.
