@@ -224,13 +224,17 @@ async function negocioActivosSinFecha({ tecnico }) {
 // en logs (sin truncar en silencio).
 const AGENDA_SEMANA_CAP = 200;
 
-async function negocioAgendaSemana({ tecnico }) { // eslint-disable-line no-unused-vars
+async function negocioAgendaSemana({ tecnico }) {
   const pool = await getPool();
   const reqDb = pool.request().input('cap', sql.Int, AGENDA_SEMANA_CAP);
-  // NOTA: el comportamiento actual NO filtra por técnico (la query histórica
-  // declaraba el filtro pero nunca lo aplicaba; ver bug latente reportado). Se
-  // preserva tal cual y solo se añade el cap de seguridad. Si se decide filtrar
-  // por técnico, inyectar `AND tecnico_asignado = @tec` con su .input.
+  // Filtra por técnico igual que negocioAgendaHoy/negocioActivosSinFecha: si
+  // llega `tecnico` (técnico ve lo suyo) aplica el AND; si viene undefined
+  // (admin) trae todos. Antes el filtro se calculaba pero no se inyectaba.
+  let filtro = '';
+  if (tecnico) {
+    reqDb.input('tec', sql.NVarChar(50), tecnico);
+    filtro = ' AND tecnico_asignado = @tec';
+  }
   const r = await reqDb.query(`
     SELECT TOP (@cap) id, numero_cliente, nombre_cliente, estado,
            CONVERT(varchar(5), hora_programada, 108) AS hora_programada,
@@ -240,7 +244,7 @@ async function negocioAgendaSemana({ tecnico }) { // eslint-disable-line no-unus
     WHERE activo = 1
       AND estado IN ('PENDIENTE','EN_PROCESO')
       AND fecha_programada >= CAST(GETDATE() AS DATE)
-      AND fecha_programada <= DATEADD(DAY, 6, CAST(GETDATE() AS DATE))
+      AND fecha_programada <= DATEADD(DAY, 6, CAST(GETDATE() AS DATE))${filtro}
     ORDER BY fecha_programada ASC, hora_programada ASC
   `);
   if (r.recordset.length === AGENDA_SEMANA_CAP) {
