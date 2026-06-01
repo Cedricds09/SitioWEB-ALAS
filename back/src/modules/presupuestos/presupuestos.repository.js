@@ -272,7 +272,7 @@ async function buscarPorIdCompleto(id, tx) {
   };
 }
 
-async function listar({ estados, asignado_a, soloMineConOrfanas, cliente, numero_cliente, desde, hasta }, tx) {
+async function listar({ estados, asignado_a, soloMineConOrfanas, cliente, numero_cliente, desde, hasta, page, limit }, tx) {
   const reqDb = await makeRequest(tx);
 
   let where = 'WHERE p.activo = 1';
@@ -314,6 +314,14 @@ async function listar({ estados, asignado_a, soloMineConOrfanas, cliente, numero
     where += ' AND p.fecha_documento <= @hasta';
   }
 
+  // Paginación opt-in (M6): solo si llega limit > 0. Sin él, devuelve todo
+  // como antes. OFFSET/FETCH se apoya en el ORDER BY presente.
+  let paging = '';
+  if (limit && limit > 0) {
+    const off = ((page && page > 0 ? page : 1) - 1) * limit;
+    reqDb.input('off', sql.Int, off).input('lim', sql.Int, limit);
+    paging = ' OFFSET @off ROWS FETCH NEXT @lim ROWS ONLY';
+  }
   const r = await reqDb.query(`
     SELECT p.id, p.numero_presupuesto, p.servicio_id,
            p.numero_cliente,
@@ -326,7 +334,7 @@ async function listar({ estados, asignado_a, soloMineConOrfanas, cliente, numero
     FROM dbo.presupuestos p
     LEFT JOIN dbo.usuarios u ON u.id = p.asignado_a
     ${where}
-    ORDER BY p.fecha_creacion DESC, p.id DESC
+    ORDER BY p.fecha_creacion DESC, p.id DESC${paging}
   `);
   return r.recordset;
 }

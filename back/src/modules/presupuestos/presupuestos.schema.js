@@ -380,6 +380,10 @@ const listarQuerySchema = z.object({
   numero_cliente: optionalString,
   desde: isoDateString,
   hasta: isoDateString,
+  // Paginación opt-in: ambos opcionales. Sin ellos el listado no pagina
+  // (comportamiento actual). limit acotado para evitar abusos.
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().max(200).optional(),
 });
 
 module.exports = {

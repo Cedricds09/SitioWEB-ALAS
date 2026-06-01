@@ -218,16 +218,21 @@ async function negocioActivosSinFecha({ tecnico }) {
 }
 
 // Servicios programados esta semana (hoy + 6 días).
-async function negocioAgendaSemana({ tecnico }) {
+// Cap de seguridad (guard) para no traer un volumen ilimitado a la IA. La
+// consulta ya está acotada a 7 días, así que a escala realista devuelve todo;
+// el TOP solo protege ante crecimiento anómalo. Si se alcanza el tope se avisa
+// en logs (sin truncar en silencio).
+const AGENDA_SEMANA_CAP = 200;
+
+async function negocioAgendaSemana({ tecnico }) { // eslint-disable-line no-unused-vars
   const pool = await getPool();
-  const reqDb = pool.request();
-  let filtro = '';
-  if (tecnico) {
-    reqDb.input('tec', sql.NVarChar(50), tecnico);
-    filtro = ' AND tecnico_asignado = @tec';
-  }
+  const reqDb = pool.request().input('cap', sql.Int, AGENDA_SEMANA_CAP);
+  // NOTA: el comportamiento actual NO filtra por técnico (la query histórica
+  // declaraba el filtro pero nunca lo aplicaba; ver bug latente reportado). Se
+  // preserva tal cual y solo se añade el cap de seguridad. Si se decide filtrar
+  // por técnico, inyectar `AND tecnico_asignado = @tec` con su .input.
   const r = await reqDb.query(`
-    SELECT id, numero_cliente, nombre_cliente, estado,
+    SELECT TOP (@cap) id, numero_cliente, nombre_cliente, estado,
            CONVERT(varchar(5), hora_programada, 108) AS hora_programada,
            CONVERT(varchar(10), fecha_programada, 23) AS fecha_programada,
            tecnico_asignado
@@ -238,6 +243,9 @@ async function negocioAgendaSemana({ tecnico }) {
       AND fecha_programada <= DATEADD(DAY, 6, CAST(GETDATE() AS DATE))
     ORDER BY fecha_programada ASC, hora_programada ASC
   `);
+  if (r.recordset.length === AGENDA_SEMANA_CAP) {
+    console.warn(`[AI] agenda semana alcanzó el cap (${AGENDA_SEMANA_CAP}); puede haber más servicios sin mostrar.`);
+  }
   return r.recordset;
 }
 

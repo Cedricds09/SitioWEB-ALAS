@@ -240,7 +240,7 @@ async function crear(input, sesion) {
 // Listar
 // ============================================================
 
-async function listar({ estado, mine, cliente, numero_cliente, desde, hasta }, sesion) {
+async function listar({ estado, mine, cliente, numero_cliente, desde, hasta, page, limit }, sesion) {
   const isAdmin = sesion.rol === ROL.ADMIN;
   const estados = (estado || '')
     .split(',')
@@ -250,18 +250,19 @@ async function listar({ estado, mine, cliente, numero_cliente, desde, hasta }, s
   // Visibilidad:
   // - Técnico: siempre solo los suyos mas solicitudes huérfanas (mine se ignora).
   // - Admin: si mine=true filtra por los suyos, si no ve todo.
+  // page/limit son opt-in (undefined => sin paginar, igual que antes).
   if (!isAdmin) {
     return repo.listar({
       estados,
       asignado_a: sesion.uid,
       soloMineConOrfanas: true,
-      cliente, numero_cliente, desde, hasta,
+      cliente, numero_cliente, desde, hasta, page, limit,
     });
   }
   if (mine === true) {
-    return repo.listar({ estados, asignado_a: sesion.uid, cliente, numero_cliente, desde, hasta });
+    return repo.listar({ estados, asignado_a: sesion.uid, cliente, numero_cliente, desde, hasta, page, limit });
   }
-  return repo.listar({ estados, cliente, numero_cliente, desde, hasta });
+  return repo.listar({ estados, cliente, numero_cliente, desde, hasta, page, limit });
 }
 
 // ============================================================

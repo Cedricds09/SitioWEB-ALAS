@@ -67,14 +67,22 @@ async function listarPublicas() {
 }
 
 // Todas las reseñas activas para moderación: pendientes primero, luego por fecha.
-async function listarAdmin() {
+// Paginación opt-in: sin limit devuelve todas (comportamiento actual).
+async function listarAdmin({ page, limit } = {}) {
   const pool = await getPool();
-  const r = await pool.request().query(`
+  const reqDb = pool.request();
+  let paging = '';
+  if (limit && limit > 0) {
+    const off = ((page && page > 0 ? page : 1) - 1) * limit;
+    reqDb.input('off', sql.Int, off).input('lim', sql.Int, limit);
+    paging = ' OFFSET @off ROWS FETCH NEXT @lim ROWS ONLY';
+  }
+  const r = await reqDb.query(`
     SELECT id, numero_cliente, telefono, nombre_display, colonia, tipo_servicio,
            texto, estado, fecha_creacion, fecha_moderacion
     FROM dbo.resenas
     WHERE activo = 1
-    ORDER BY CASE estado WHEN 'pendiente' THEN 0 ELSE 1 END, fecha_creacion DESC
+    ORDER BY CASE estado WHEN 'pendiente' THEN 0 ELSE 1 END, fecha_creacion DESC${paging}
   `);
   return r.recordset;
 }

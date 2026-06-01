@@ -23,9 +23,18 @@ async function listarPublicas(_req, res) {
   res.json(result);
 }
 
-// GET /api/admin/resenas  (requireAuth)
+// Coerción defensiva a entero positivo, o undefined (la ruta admin no valida
+// query). Mantiene la paginación como opt-in sin introducir un schema nuevo.
+function posIntOrUndef(v) {
+  const n = Number.parseInt(v, 10);
+  return Number.isInteger(n) && n > 0 ? n : undefined;
+}
+
+// GET /api/admin/resenas  (requireAuth) — page/limit opcionales (opt-in).
 async function listarAdmin(req, res) {
-  const result = await service.listarAdmin(req.session);
+  const page = posIntOrUndef(req.query.page);
+  const limit = Math.min(posIntOrUndef(req.query.limit) || 0, 200) || undefined;
+  const result = await service.listarAdmin(req.session, { page, limit });
   res.json(result);
 }
 

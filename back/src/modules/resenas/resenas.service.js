@@ -109,10 +109,11 @@ async function listarPublicas() {
 }
 
 // Todas las reseñas + contador de pendientes, para el panel de moderación.
-async function listarAdmin(sesion) {
+async function listarAdmin(sesion, paginacion = {}) {
   _assertAdmin(sesion);
+  // pendientes cuenta SIEMPRE el total (independiente de la página actual).
   const [rows, pendientes] = await Promise.all([
-    repo.listarAdmin(),
+    repo.listarAdmin(paginacion),
     repo.contarPendientes(),
   ]);
   const resenas = rows.map((r) => ({
