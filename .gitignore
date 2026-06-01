@@ -52,3 +52,7 @@ back/scripts/test-*.http
 # Artefactos transitorios de pruebas
 back/scripts/cookies.txt
 back/scripts/call*.json
+
+# Config de PM2 / despliegue — específica de la máquina de producción
+# (env block con NODE_ENV, rutas locales). No se versiona.
+back/ecosystem.config.js
