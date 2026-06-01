@@ -15,8 +15,12 @@ const passwordString = z.preprocess(
   z.string().min(6, 'Contraseña mínimo 6 caracteres.'),
 );
 
+// Default a TÉCNICO (menor privilegio) si el rol llega ausente o no-string.
+// El front siempre envía rol explícito (su selector default ya es "tecnico"),
+// así que esto solo blinda el caso de una llamada directa sin rol: por
+// principio de mínimo privilegio nunca debe crear un admin por omisión.
 const rolString = z.preprocess(
-  (v) => (typeof v === 'string' ? v.trim().toLowerCase() : 'admin'),
+  (v) => (typeof v === 'string' ? v.trim().toLowerCase() : ROL.TECNICO),
   z.enum(ROLES_VALIDOS, { errorMap: () => ({ message: 'Rol inválido.' }) }),
 );
 
@@ -33,7 +37,7 @@ const telefonoNullable = z.preprocess(
 const crearUsuarioSchema = z.object({
   usuario: usuarioString,
   password: passwordString,
-  rol: rolString.optional().default(ROL.ADMIN),
+  rol: rolString.optional().default(ROL.TECNICO),
   telefono: telefonoNullable,
 });
 
