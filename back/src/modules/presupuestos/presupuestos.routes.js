@@ -6,7 +6,10 @@ const ctrl = require('./presupuestos.controller');
 const validate = require('../../shared/middleware/validate.middleware');
 const { requireAuth, requireAdmin } = require('../../shared/middleware/auth.middleware');
 const asyncHandler = require('../../shared/middleware/async-handler');
-const { publicSolicitudLimiter } = require('../../shared/middleware/rate-limit.middleware');
+const {
+  publicSolicitudLimiter,
+  presupuestosLimiter,
+} = require('../../shared/middleware/rate-limit.middleware');
 const S = require('./presupuestos.schema');
 
 // ===== PÚBLICO (sin auth, con rate limit + honeypot dentro del service) =====
@@ -19,6 +22,9 @@ router.post(
 
 // ===== PROTEGIDO (requiere sesión) =====
 router.use(requireAuth);
+// Cap de seguridad por usuario para todos los endpoints autenticados. Holgado
+// (la edición es muy granular) pero frena creación/borrado masivo o enumeración.
+router.use(presupuestosLimiter);
 
 // Header
 router.post(

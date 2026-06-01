@@ -6,7 +6,13 @@ const ctrl = require('./servicios.controller');
 const validate = require('../../shared/middleware/validate.middleware');
 const { requireAdmin } = require('../../shared/middleware/auth.middleware');
 const asyncHandler = require('../../shared/middleware/async-handler');
+const { serviciosLimiter } = require('../../shared/middleware/rate-limit.middleware');
 const S = require('./servicios.schema');
+
+// Cap de seguridad por usuario para todo el módulo (corre tras el requireAuth
+// que aplica server.js al montar /api/servicios). Holgado: no estorba el uso
+// legítimo del panel, frena spam de operaciones.
+router.use(serviciosLimiter);
 
 router.post('/', validate({ body: S.crearServicioSchema }), asyncHandler(ctrl.crear));
 router.get('/', validate({ query: S.listarQuerySchema }), asyncHandler(ctrl.listar));

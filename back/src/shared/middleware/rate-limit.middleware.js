@@ -129,6 +129,61 @@ const publicReadLimiter = rateLimit({
   },
 });
 
+// Clave por usuario autenticado; fallback a IP normalizada (IPv6-safe). Se
+// reutiliza en los limiters autenticados de abajo (corren tras requireAuth).
+function uidKey(req) {
+  const uid = req.session && req.session.uid;
+  if (uid) return `uid:${uid}`;
+  return ipKeyGenerator(req.ip);
+}
+
+// Búsqueda de clientes (A1): autocompletado del formulario de servicios. El
+// front teclea con debounce, así que el uso legítimo genera pocas decenas por
+// minuto; 120/min/usuario deja margen de sobra pero corta la enumeración en
+// bucle (miles de q/seg) de toda la cartera de numero_cliente.
+const clienteSearchLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 min
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: uidKey,
+  message: {
+    ok: false,
+    error: 'Demasiadas búsquedas. Intenta de nuevo en un momento.',
+  },
+});
+
+// Servicios (A3): cap de seguridad para todos los endpoints autenticados del
+// módulo (listado + acciones). 200/min/usuario es holgado para el panel admin
+// (refrescos + acciones) y frena spam de creación/finalización.
+const serviciosLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 min
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: uidKey,
+  message: {
+    ok: false,
+    error: 'Demasiadas operaciones. Intenta de nuevo en un momento.',
+  },
+});
+
+// Presupuestos (M4): cap para los endpoints autenticados. La edición es muy
+// granular (un request por bloque/item/estado) y suma el chat IA, así que el
+// tope es alto (300/min/usuario) para no estorbar la edición legítima, pero
+// frena creación/borrado masivo o enumeración de IDs.
+const presupuestosLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 min
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: uidKey,
+  message: {
+    ok: false,
+    error: 'Demasiadas operaciones. Intenta de nuevo en un momento.',
+  },
+});
+
 module.exports = {
   publicSolicitudLimiter,
   resenaPublicLimiter,
@@ -139,4 +194,7 @@ module.exports = {
   notasLimiter,
   consultaNegocioLimiter,
   publicReadLimiter,
+  clienteSearchLimiter,
+  serviciosLimiter,
+  presupuestosLimiter,
 };

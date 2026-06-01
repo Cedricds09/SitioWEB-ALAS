@@ -64,7 +64,11 @@ async function asignar(req, res) {
 }
 
 async function actualizarAjuste(req, res) {
-  const data = await service.actualizarAjuste(req.params.id, req.body.ajuste ?? null);
+  const data = await service.actualizarAjuste(
+    req.params.id,
+    req.body.ajuste ?? null,
+    req.session || {},
+  );
   res.json({ ok: true, data });
 }
 

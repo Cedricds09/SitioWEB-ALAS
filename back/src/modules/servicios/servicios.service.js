@@ -117,9 +117,17 @@ async function reasignar(id, tecnico) {
 }
 
 // ============================================================
-// Ajuste
+// Ajuste (admin o técnico asignado — mismo criterio que programar/finalizar)
 // ============================================================
-async function actualizarAjuste(id, ajuste) {
+async function actualizarAjuste(id, ajuste, sesion = {}) {
+  const serv = await repo.buscarPorId(id);
+  if (!serv) throw new NotFoundError('Servicio no encontrado.');
+
+  // Solo admin o el técnico asignado pueden ajustar (defensa IDOR).
+  if (sesion.rol !== ROL.ADMIN && serv.tecnico_asignado !== sesion.usu) {
+    throw new ForbiddenError('No autorizado para ajustar este servicio.');
+  }
+
   const updated = await repo.actualizarAjuste(id, ajuste);
   if (!updated) throw new NotFoundError('Servicio no encontrado.');
   return updated;

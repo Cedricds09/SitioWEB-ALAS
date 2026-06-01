@@ -9,14 +9,21 @@ const { signToken, COOKIE_MAX_AGE_MS } = require('../../shared/auth/session');
 // Hash dummy para mantener tiempo similar cuando user no existe (mitiga timing attacks).
 const DUMMY_HASH = '$2a$10$0000000000000000000000000000000000000000000000000000a';
 
+// No se loguea el nombre de usuario en claro (revela cuentas válidas y patrones
+// de intentos si los logs se comprometen). Se enmascara dejando la inicial.
+function maskUser(u) {
+  const s = String(u || '');
+  return s ? `${s.slice(0, 1)}***` : '(vacío)';
+}
+
 async function login(usuario, password) {
-  console.log('[AUTH] login intento usuario=', usuario);
+  console.log('[AUTH] login intento usuario=', maskUser(usuario));
 
   const u = await repo.buscarPorUsuario(usuario);
   const ok = await bcrypt.compare(password, u ? u.password_hash : DUMMY_HASH);
 
   if (!u || !u.activo || !ok) {
-    console.log('[AUTH] login fallido usuario=', usuario);
+    console.log('[AUTH] login fallido usuario=', maskUser(usuario));
     throw new UnauthorizedError('Usuario o contraseña incorrectos.');
   }
 
@@ -38,7 +45,7 @@ async function login(usuario, password) {
     tv,
   });
 
-  console.log('[AUTH] login OK usuario=', u.usuario, 'id=', u.id);
+  console.log('[AUTH] login OK uid=', u.id, 'rol=', u.rol);
   return { token, uid: u.id, usuario: u.usuario, rol: u.rol };
 }
 
