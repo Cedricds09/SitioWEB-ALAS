@@ -58,13 +58,21 @@ app.use(
           'https://cdnjs.cloudflare.com',
           'https://maps.googleapis.com',
           'https://maps.gstatic.com',
+          // Beacon de Cloudflare Web Analytics (lo inyecta Cloudflare).
+          'https://static.cloudflareinsights.com',
         ],
         'style-src': ["'self'", "'unsafe-inline'"],
         'img-src': ["'self'", 'data:', 'https:'],
         'font-src': ["'self'", 'data:'],
         // cdnjs incluido para los source maps (.map) de jspdf/qrious,
         // que el navegador pide vía connect-src.
-        'connect-src': ["'self'", 'https://maps.googleapis.com', 'https://cdnjs.cloudflare.com'],
+        'connect-src': [
+          "'self'",
+          'https://maps.googleapis.com',
+          'https://cdnjs.cloudflare.com',
+          // Cloudflare Web Analytics: el beacon reporta (POST RUM) aquí.
+          'https://cloudflareinsights.com',
+        ],
         'frame-src': ['https://www.google.com', 'https://maps.google.com'],
         // Anti-clickjacking moderno (complemento a X-Frame-Options de helmet).
         'frame-ancestors': ["'self'"],
