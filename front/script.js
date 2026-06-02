@@ -53,7 +53,7 @@
         if (welcome.classList.contains("fade-out")) return;
         welcome.classList.add("fade-out");
         setTimeout(() => {
-            window.location.href = "main.html";
+            window.location.href = "/main";
         }, 1000);
     }
 
