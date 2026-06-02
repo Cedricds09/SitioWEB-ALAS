@@ -168,6 +168,12 @@ app.use('/api/presupuestos', presupuestosRouter);
 // IA (Fase 3): autenticación interna del propio router
 app.use('/api/ai', aiRouter);
 
+// Sitio principal: ruta limpia /main que sirve main.html (la bienvenida en
+// index.html lleva aquí). main.html sigue accesible directo vía estáticos.
+app.get('/main', (_req, res) => {
+  res.sendFile(path.join(FRONT_DIR, 'main.html'));
+});
+
 // Panel admin: sirve main.html (la SPA detecta /admin y muestra el panel)
 app.get('/admin', (_req, res) => {
   res.sendFile(path.join(FRONT_DIR, 'main.html'));
