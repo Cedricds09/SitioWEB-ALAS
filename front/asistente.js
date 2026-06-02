@@ -393,45 +393,184 @@
     const KEYWORDS_NEGOCIO = {
         agenda_hoy: ["hoy", "agenda hoy", "qué tengo hoy",
                      "que tengo hoy", "servicios hoy",
-                     "tengo hoy", "para hoy"],
+                     "tengo hoy", "para hoy", "que tengo agendado",
+                     "que tengo manana", "agendado manana"],
         agenda_semana: ["esta semana", "semana", "agenda semana",
                         "qué tengo esta semana", "que tengo esta semana",
                         "servicios semana", "programados"],
-        activos: ["activos", "cuántos servicios", "mis servicios",
+        activos: ["activos", "cuántos servicios",
                   "servicios tengo", "cuantos servicios",
                   "que servicios", "qué servicios",
                   "estado del negocio", "estado negocio",
-                  "cómo vamos", "como vamos", "resumen"],
+                  "cómo vamos", "como vamos", "resumen",
+                  "como va el negocio", "como va", "como voy",
+                  "cuanto llevo", "cuanto tengo", "este mes", "del mes"],
         urgentes: ["urgentes", "más urgentes", "mas urgentes",
-                   "prioridad", "más antiguos", "mas antiguos"],
+                   "prioridad", "más antiguos", "mas antiguos",
+                   "urgente", "algo urgente", "atrasado", "atrasados",
+                   "atrasadas", "esta atrasado", "que esta atrasado"],
         sin_presupuesto: ["sin presupuesto", "falta presupuesto",
-                          "no tienen presupuesto", "presupuesto falta"],
+                          "no tienen presupuesto", "presupuesto falta",
+                          "sin cotizar", "sin cotizacion", "falta cotizar",
+                          "les falta presupuesto", "no tienen cotizacion",
+                          "no tiene cotizacion", "no tiene presupuesto"],
         sin_cerrar: ["sin cerrar", "no han cerrado", "demorados",
-                     "llevan mucho", "no cierran"],
+                     "llevan mucho", "no cierran", "sin asignar",
+                     "por terminar", "por cobrar", "por cerrar",
+                     "faltan por", "me deben", "no han pagado",
+                     "sin terminar", "falta terminar", "que falta",
+                     "que pendientes", "que esta pendiente"],
         presupuestos_pendientes: ["presupuestos pendientes", "sin respuesta",
                                   "esperando respuesta", "presupuestos enviados",
                                   "mis presupuestos", "presupuestos activos",
-                                  "que presupuestos", "qué presupuestos"],
+                                  "que presupuestos", "qué presupuestos",
+                                  "cotizaciones pendientes", "cotizaciones",
+                                  "sin contestar", "sin responder",
+                                  "no han aprobado", "no han contestado",
+                                  "no han respondido", "esperando su presupuesto",
+                                  "cuantos presupuestos", "cuantas cotizaciones",
+                                  "cuales presupuestos", "cuantos presupuestos faltan",
+                                  "presupuestos sin", "que cotizaciones"],
     };
+
+    // Compara tolerante a acentos y mayúsculas: normaliza el texto del usuario
+    // y cada keyword, así "cotización" matchea aunque escriban "cotizacion".
+    // (normaliza() está declarada más abajo; hoisting de función lo permite.)
+    function incluyeAlguna(low, lista) {
+        const n = normaliza(low);
+        return lista.some((k) => n.includes(normaliza(k)));
+    }
 
     // Keywords que activan el flujo de CREAR un presupuesto. Frases explícitas
     // de creación: no capturan preguntas informativas ("que presupuestos hay",
     // "presupuestos pendientes"), que las maneja detectarConsultasNegocio.
+    // Se escriben sin acentos a propósito (la comparación es tolerante) y cubren
+    // las variaciones naturales del español mexicano, incluido lenguaje de
+    // alguien poco familiarizado con la tecnología.
     const KEYWORDS_NUEVO_PRESUPUESTO = [
-        "nuevo presupuesto", "crear presupuesto", "hacer presupuesto",
-        "quiero presupuesto", "generar presupuesto", "cotización nueva",
-        "nueva cotización",
+        // crear / hacer / armar (+ formas con enclítico -me)
+        "nuevo presupuesto", "presupuesto nuevo", "nueva cotizacion",
+        "cotizacion nueva", "otra cotizacion", "otro presupuesto",
+        "crear presupuesto", "crear un presupuesto", "crear una cotizacion",
+        "hacer presupuesto", "hacer un presupuesto", "hacer una cotizacion",
+        "hazme un presupuesto", "hazme una cotizacion", "haz un presupuesto",
+        "haz una cotizacion", "hagamos un presupuesto", "haga un presupuesto",
+        "armar un presupuesto", "armar presupuesto", "arma un presupuesto",
+        "armame", "elaborar un presupuesto", "preparar un presupuesto",
+        "preparame", "levantar un presupuesto", "levantar presupuesto",
+        "generar presupuesto", "generar un presupuesto",
+        "sacar un presupuesto", "sacar presupuesto", "sacar una cotizacion",
+        "sacame un presupuesto", "echame un presupuesto", "echa un presupuesto",
+        "ponme un presupuesto", "dar un presupuesto", "pasar un presupuesto",
+        "pasar un costo", "pasarle un costo",
+        "registrar un presupuesto", "agregar un presupuesto",
+        "meter un presupuesto", "iniciar un presupuesto",
+        "empezar un presupuesto", "comenzar un presupuesto",
+        "abrir un presupuesto", "abreme un presupuesto", "abrime un presupuesto",
+        "dar de alta un presupuesto", "dame de alta un presupuesto",
+        "alta de presupuesto",
+        // querer / necesitar / pedir
+        "quiero un presupuesto", "quiero hacer un presupuesto",
+        "quiero hacer una cotizacion", "quiero presupuesto", "quiero cotizar",
+        "quiero presupuestar", "quisiera un presupuesto",
+        "quisiera hacer un presupuesto", "quisiera cotizar",
+        "necesito un presupuesto", "necesito hacer un presupuesto",
+        "necesito presupuesto", "necesito una cotizacion", "necesito cotizar",
+        "ocupo un presupuesto", "ocupo hacer un presupuesto", "ocupo cotizar",
+        "me haces un presupuesto", "me haces una cotizacion",
+        "puedes hacer un presupuesto", "podrias hacer un presupuesto",
+        "ayudame con un presupuesto", "ayudame a hacer un presupuesto",
+        "ayudame a hacer una cotizacion", "ayudame a cotizar",
+        // verbo / sustantivo de acción sueltos (señales fuertes de "crear")
+        "cotizar", "cotiza", "cotizame", "cotizale", "cotizacion",
+        "presupuestar", "presupuesto", "presu", "vamos a cotizar",
+        "hay que cotizar", "vamos a hacer un presupuesto", "vamos a sacar",
     ];
 
     function esNuevoPresupuesto(low) {
-        return KEYWORDS_NUEVO_PRESUPUESTO.some((k) => low.includes(k));
+        return incluyeAlguna(low, KEYWORDS_NUEVO_PRESUPUESTO);
     }
+
+    // ---- Registro / alta de algo (servicio o cliente) ----
+    // Verbos imperativos de "dar de alta / registrar" (anclados a artículo para
+    // no confundir con participios informativos: "registrados", "agendado").
+    const VERBOS_ALTA = [
+        "dar de alta", "dame de alta", "darme de alta", "de alta",
+        "registrar", "registrame", "registra un", "registra el", "registra una",
+        "registra mi", "agendar", "agendame", "agenda un", "agenda el",
+        "agenda una", "agenda mi", "apuntar", "apuntame", "apunta un",
+        "apunta una", "apunta el", "anotar", "anotame", "anota un", "anota una",
+        "anota el", "levantar un", "levanta un", "levantar una", "meter un",
+        "mete un", "meterle", "programar", "programa un", "programa una",
+        "agregar", "agrega un", "agrega una", "agregame", "abrir un",
+        "abreme un", "abrime un",
+    ];
+    const NOUNS_SERVICIO = [
+        "servicio", "servicios", "trabajo", "trabajos", "chamba", "chambas",
+        "visita", "visitas", "obra", "obras", "mantenimiento", "reparacion",
+    ];
+    const NOUNS_CLIENTE = [
+        "cliente", "clientes", "marchante", "marchantes", "persona",
+        "señor", "señora", "dueño", "don ",
+    ];
+    // Frases explícitas de "alta" con adjetivo (nuevo/otro va ANTES del
+    // sustantivo: comando), separadas de las consultas informativas
+    // ("servicios nuevos", "que servicios tengo").
+    const FRASES_REG_SERVICIO = [
+        "nuevo servicio", "nuevo trabajo", "nueva chamba", "nueva visita",
+        "otro servicio", "otro trabajo", "otra chamba",
+    ];
+    const FRASES_REG_CLIENTE = [
+        "nuevo cliente", "nuevo marchante", "nueva persona", "otro cliente",
+    ];
+
+    // Es registro si hay verbo de alta + sustantivo de la sección, o una frase
+    // explícita ("nuevo servicio"). Se evalúa ANTES de las consultas de negocio,
+    // para que un comando con palabra de tiempo ("dar de alta un servicio para
+    // esta semana") no se desvíe a la agenda.
+    // Si la frase menciona presupuesto/cotización, NO es un registro de sección
+    // sino creación de presupuesto ("levantar un presupuesto de un cliente").
+    function mencionaPresupuesto(low) {
+        return incluyeAlguna(low, ["presupuesto", "cotizacion", "cotizar", "presupuestar"]);
+    }
+    function esRegistroServicio(low) {
+        if (mencionaPresupuesto(low)) return false;
+        return incluyeAlguna(low, FRASES_REG_SERVICIO) ||
+            (incluyeAlguna(low, VERBOS_ALTA) && incluyeAlguna(low, NOUNS_SERVICIO));
+    }
+    function esRegistroCliente(low) {
+        if (mencionaPresupuesto(low)) return false;
+        return incluyeAlguna(low, FRASES_REG_CLIENTE) ||
+            (incluyeAlguna(low, VERBOS_ALTA) && incluyeAlguna(low, NOUNS_CLIENTE));
+    }
+
+    // ---- Navegación / consulta de una sección (sustantivos y "ver/lista") ----
+    // Se evalúan DESPUÉS de negocio y de crear-presupuesto. NOTAS va antes que
+    // SERVICIOS: "ver el reporte de un servicio" es sobre notas, no la lista.
+    const KEYWORDS_NAV_NOTAS = [
+        "nota", "notas", "reporte", "reportes", "ver nota", "consultar nota",
+        "apunte", "apuntes", "observacion", "observaciones",
+    ];
+    const KEYWORDS_NAV_SERVICIOS = [
+        "servicio", "servicios", "trabajo", "trabajos", "chamba", "chambas",
+        "visita", "visitas", "reparacion", "reparaciones", "mantenimiento",
+        "ver servicios", "lista de servicios", "mis trabajos", "mis chambas",
+        "ver trabajos", "ver chambas", "abrir servicios", "ir a servicios",
+    ];
+    const KEYWORDS_NAV_CLIENTES = [
+        "cliente", "clientes", "marchante", "marchantes", "persona", "personas",
+        "contacto", "contactos", "buscar cliente", "ver cliente", "buscar a",
+        "buscar al", "datos del cliente",
+    ];
+    const KEYWORDS_NAV_USUARIOS = [
+        "usuario", "usuarios", "empleado", "empleados",
+    ];
 
     // Devuelve TODOS los tipos de consulta cuyas keywords aparecen en el texto.
     // Una pregunta mixta ("pendientes de presupuestos o servicios") detecta varios.
     function detectarConsultasNegocio(low) {
         return Object.keys(KEYWORDS_NEGOCIO).filter((tipo) =>
-            KEYWORDS_NEGOCIO[tipo].some((k) => low.includes(k)),
+            incluyeAlguna(low, KEYWORDS_NEGOCIO[tipo]),
         );
     }
 
@@ -923,25 +1062,44 @@
         if (state.modo === null || state.paso === null) {
             addUserMsg(t);
             const low = t.toLowerCase();
-            // Orden de prioridad: una pregunta informativa sobre presupuestos
-            // no debe disparar el flujo de crear uno. Por eso las consultas de
-            // negocio van primero y la creación va casi al final.
-            // 1) Consultas de negocio (mixtas o simples).
+            // Detección por niveles, pensada para un usuario poco técnico:
+            // primero COMANDOS explícitos (crear/registrar, con verbo imperativo),
+            // que no deben ser secuestrados por palabras de tiempo/estado; luego
+            // las consultas informativas de negocio; luego navegación por
+            // sustantivos; y al final el seguimiento (genérico) y el fallback.
+
+            // 0) Folio de cliente CL-XXXX: lo más específico.
+            const mCliente = t.match(/CL-\d{4}/i);
+            if (mCliente) return consultarCliente(mCliente[0].toUpperCase());
+
+            // 1) Registro/alta explícito (verbo imperativo + sustantivo de
+            // sección). ANTES de negocio: "dar de alta un servicio para esta
+            // semana" no debe irse a la agenda. Servicio antes que cliente: una
+            // frase con ambos ("trabajo para el señor X") es un servicio.
+            if (esRegistroServicio(low)) return navegar("servicios");
+            if (esRegistroCliente(low)) return navegar("clientes");
+
+            // 2) Consultas informativas de negocio (mixtas o simples). Van antes
+            // de crear-presupuesto para que "cuantos presupuestos faltan" no abra
+            // el flujo de creación.
             const tiposNegocio = detectarConsultasNegocio(low);
             if (tiposNegocio.length > 1) return consultarNegocioMultiple(tiposNegocio);
             if (tiposNegocio.length === 1) return consultarNegocio(tiposNegocio[0]);
-            // 2) Cliente concreto por folio CL-XXXX.
-            const mCliente = t.match(/CL-\d{4}/i);
-            if (mCliente) return consultarCliente(mCliente[0].toUpperCase());
-            // 3) Pregunta de seguimiento sobre el último resultado.
-            if (esSeguimiento(low)) return mostrarDetalleContexto();
-            // 4) Navegación a una sección.
-            if (/\b(servicio)/i.test(low)) return navegar("servicios");
-            if (/\b(cliente)/i.test(low)) return navegar("clientes");
-            if (/\b(nota)/i.test(low)) return navegar("notas");
-            if (/\b(usuario)/i.test(low)) return navegar("usuarios");
-            // 5) Intención explícita de crear un presupuesto.
+
+            // 3) Intención de crear un presupuesto/cotización.
             if (esNuevoPresupuesto(low)) return empezarPresupuesto();
+
+            // 4) Navegación / consulta de una sección por sustantivos. NOTAS va
+            // antes que SERVICIOS ("ver el reporte de un servicio" = nota).
+            if (incluyeAlguna(low, KEYWORDS_NAV_NOTAS)) return navegar("notas");
+            if (incluyeAlguna(low, KEYWORDS_NAV_SERVICIOS)) return navegar("servicios");
+            if (incluyeAlguna(low, KEYWORDS_NAV_CLIENTES)) return navegar("clientes");
+            if (incluyeAlguna(low, KEYWORDS_NAV_USUARIOS)) return navegar("usuarios");
+
+            // 5) Seguimiento al último resultado (keywords genéricas como
+            // "cuáles"/"muéstrame": al final para no ganarle a algo explícito).
+            if (esSeguimiento(low)) return mostrarDetalleContexto();
+
             // 6) Sin coincidencia.
             addBotMsg(
                 "No entendí. Toca un botón o pregúntame por presupuestos, servicios, clientes o notas.",
