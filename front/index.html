@@ -9,10 +9,76 @@
     <link rel="shortcut icon" type="image/webp" href="imagenes/faviconpagina.webp">
     <link rel="apple-touch-icon" href="imagenes/faviconpagina.png">
     <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Animacion de fondo: estrellas reemplazadas por herramientas flotantes.
+           El canvas #galaxy se conserva (script.js lo necesita para el click) pero
+           se oculta. La animacion va en CSS porque la CSP del servidor prohibe JS inline. */
+        #galaxy { display: none; }
+        .tools {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            overflow: hidden;
+            pointer-events: none;
+        }
+        .tools .tool {
+            position: absolute;
+            transform-origin: center;
+            will-change: transform;
+            animation-iteration-count: infinite;
+            animation-timing-function: ease-in-out;
+        }
+        @keyframes float-a {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            50%      { transform: translate(10px, -16px) rotate(8deg); }
+        }
+        @keyframes float-b {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            50%      { transform: translate(-12px, -12px) rotate(-9deg); }
+        }
+        @keyframes float-c {
+            0%, 100% { transform: translate(0, 0) rotate(-5deg); }
+            50%      { transform: translate(8px, -20px) rotate(6deg); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .tools .tool { animation: none !important; }
+        }
+    </style>
 </head>
 <body>
     <main class="welcome" id="welcome">
         <canvas id="galaxy"></canvas>
+
+        <div class="tools" aria-hidden="true">
+            <!-- Llave inglesa -->
+            <svg class="tool" style="left:6%;top:16%;width:46px;height:46px;opacity:.18;animation-name:float-a;animation-duration:19s;animation-delay:-1s" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+            <!-- Engrane -->
+            <svg class="tool" style="left:80%;top:12%;width:40px;height:40px;opacity:.14;animation-name:float-b;animation-duration:23s;animation-delay:-7s" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <!-- Martillo -->
+            <svg class="tool" style="left:22%;top:68%;width:34px;height:34px;opacity:.20;animation-name:float-c;animation-duration:17s;animation-delay:-4s" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 12l-8.5 8.5a2.12 2.12 0 1 1-3-3L12 9"/><path d="M17.64 15 22 10.64"/><path d="m20.91 11.7-1.25-1.25c-.6-.6-.93-1.4-.93-2.25v-.86L16.01 4.6a5.56 5.56 0 0 0-3.94-1.64H9l.92.82A6.18 6.18 0 0 1 12 8.4v1.56l2 2h.86c.85 0 1.65.34 2.25.93l1.25 1.25"/></svg>
+            <!-- Cinta metrica -->
+            <svg class="tool" style="left:64%;top:74%;width:44px;height:44px;opacity:.12;animation-name:float-a;animation-duration:21s;animation-delay:-9s" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="9" width="14" height="11" rx="3"/><circle cx="9" cy="14.5" r="3"/><path d="M16 12l5-2v6l-5-2z"/></svg>
+            <!-- Desarmador -->
+            <svg class="tool" style="left:88%;top:52%;width:26px;height:26px;opacity:.22;animation-name:float-b;animation-duration:15s;animation-delay:-2s" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 3l2 2-7 7-2-2z"/><path d="M12 10 4 18l-1 3 3-1 8-8z"/></svg>
+            <!-- Llave de tubo -->
+            <svg class="tool" style="left:46%;top:24%;width:32px;height:32px;opacity:.15;animation-name:float-c;animation-duration:20s;animation-delay:-6s" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l7-7"/><path d="M11 13l2.5-2.5"/><path d="M17.5 4.5l2 2a1 1 0 0 1 0 1.4l-3.6 3.6a1 1 0 0 1-1.4 0l-2-2a1 1 0 0 1 0-1.4l3.6-3.6a1 1 0 0 1 1.4 0z"/><path d="M15 7l2 2"/></svg>
+            <!-- Llave inglesa -->
+            <svg class="tool" style="left:58%;top:48%;width:22px;height:22px;opacity:.16;animation-name:float-b;animation-duration:16s;animation-delay:-3s" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+            <!-- Engrane -->
+            <svg class="tool" style="left:12%;top:44%;width:28px;height:28px;opacity:.10;animation-name:float-a;animation-duration:22s;animation-delay:-8s" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <!-- Martillo -->
+            <svg class="tool" style="left:74%;top:34%;width:24px;height:24px;opacity:.13;animation-name:float-c;animation-duration:18s;animation-delay:-5s" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 12l-8.5 8.5a2.12 2.12 0 1 1-3-3L12 9"/><path d="M17.64 15 22 10.64"/><path d="m20.91 11.7-1.25-1.25c-.6-.6-.93-1.4-.93-2.25v-.86L16.01 4.6a5.56 5.56 0 0 0-3.94-1.64H9l.92.82A6.18 6.18 0 0 1 12 8.4v1.56l2 2h.86c.85 0 1.65.34 2.25.93l1.25 1.25"/></svg>
+            <!-- Cinta metrica -->
+            <svg class="tool" style="left:34%;top:86%;width:20px;height:20px;opacity:.20;animation-name:float-b;animation-duration:14s;animation-delay:-2s" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="9" width="14" height="11" rx="3"/><circle cx="9" cy="14.5" r="3"/><path d="M16 12l5-2v6l-5-2z"/></svg>
+            <!-- Desarmador -->
+            <svg class="tool" style="left:4%;top:80%;width:36px;height:36px;opacity:.11;animation-name:float-a;animation-duration:23s;animation-delay:-10s" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 3l2 2-7 7-2-2z"/><path d="M12 10 4 18l-1 3 3-1 8-8z"/></svg>
+            <!-- Llave de tubo -->
+            <svg class="tool" style="left:90%;top:84%;width:18px;height:18px;opacity:.24;animation-name:float-c;animation-duration:13s;animation-delay:-1s" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l7-7"/><path d="M11 13l2.5-2.5"/><path d="M17.5 4.5l2 2a1 1 0 0 1 0 1.4l-3.6 3.6a1 1 0 0 1-1.4 0l-2-2a1 1 0 0 1 0-1.4l3.6-3.6a1 1 0 0 1 1.4 0z"/><path d="M15 7l2 2"/></svg>
+            <!-- Engrane -->
+            <svg class="tool" style="left:50%;top:8%;width:30px;height:30px;opacity:.12;animation-name:float-a;animation-duration:20s;animation-delay:-4s" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <!-- Llave inglesa -->
+            <svg class="tool" style="left:38%;top:56%;width:16px;height:16px;opacity:.25;animation-name:float-b;animation-duration:19s;animation-delay:-7s" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        </div>
 
         <section class="content">
             <h1 class="title">Servicios Integrales<br>Mantenimiento Habitacional ALAS</h1>
