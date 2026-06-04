@@ -110,6 +110,7 @@
                 </div>
             </header>
             <div class="asist-msgs" id="asistMsgs" aria-live="polite"></div>
+            <div class="asist-listening" id="asistListening" hidden aria-live="assertive"><span class="asist-listening-dot"></span>Escuchando... mantén la pantalla encendida</div>
             <div class="asist-input-bar">
                 <input type="text" class="asist-input" id="asistInput" placeholder="Escribe o usa el micrófono..." autocomplete="off" />
                 <button type="button" class="asist-mic-btn" id="asistMicBtn" title="Hablar" ${SR ? "" : "hidden"}>🎤</button>
@@ -126,6 +127,9 @@
     const input = document.getElementById("asistInput");
     const sendBtn = document.getElementById("asistSendBtn");
     const micBtn = document.getElementById("asistMicBtn");
+    const listening = document.getElementById("asistListening");
+    function showListening() { if (listening) listening.hidden = false; }
+    function hideListening() { if (listening) listening.hidden = true; }
 
     /* ---------- Render mensajes ---------- */
     function scrollDown() {
@@ -1192,8 +1196,11 @@
     // la restricción aplica a todos los navegadores del dispositivo, no solo
     // Safari. Sin soporte, micBtn ya viene oculto.
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const HINT_KEY = "alas_dictado_hint";
     let recognition = null;
     let recording = false;
+    let userStopped = false; // el usuario pulsó el mic para parar (parada intencional)
+    let restarting = false;  // guard anti-bucle de reinicio
     if (SR) {
         recognition = new SR();
         recognition.lang = "es-MX";
@@ -1207,12 +1214,40 @@
             input.value = "";
         };
         recognition.onend = () => {
+            // Pausa por pantalla bloqueada / segundo plano: el navegador dispara
+            // onend al ocultarse la página. CONSERVAMOS el estado (recording sigue
+            // true, no limpiamos) para poder reanudar al volver a primer plano; el
+            // start() lo hace el handler de visibilitychange. Sin este early-return,
+            // el teardown de abajo pondría recording=false y el dictado no se
+            // reanudaría tras desbloquear la pantalla.
+            if (recording && !userStopped && document.visibilityState === "hidden") {
+                return;
+            }
+            // Auto-reinicio en primer plano: con continuous=false onend salta tras
+            // cada enunciado o corte. Si la sesión sigue activa y no fue parada
+            // intencional del usuario, reanudamos para lograr dictado continuo.
+            // restarting es guard anti-bucle.
+            if (recording && !userStopped && !restarting) {
+                restarting = true;
+                try {
+                    recognition.start();
+                    restarting = false;
+                    return;
+                } catch { restarting = false; /* cae al apagado */ }
+            }
             recording = false;
+            userStopped = false;
             micBtn.classList.remove("is-recording");
+            hideListening();
         };
         recognition.onerror = (e) => {
-            recording = false;
-            micBtn.classList.remove("is-recording");
+            // Errores fatales de permiso: marcar parada intencional para que el
+            // onend que sigue NO reintente reiniciar.
+            if (e && (e.error === "not-allowed" || e.error === "service-not-allowed")) {
+                userStopped = true;
+            }
+            // 'no-speech' / 'aborted' / 'network' son transitorios: no apagamos
+            // aquí; dejamos que onend decida el reinicio según los guards.
             // Micrófono no disponible / permiso denegado: avisar en el chat.
             if (e && (e.error === "not-allowed" || e.error === "service-not-allowed")) {
                 addBotMsg(
@@ -1224,14 +1259,42 @@
         };
         micBtn.addEventListener("click", () => {
             if (recording) {
+                // Parada intencional del usuario: marcar para que onend no reinicie.
+                userStopped = true;
                 try { recognition.stop(); } catch { /* noop */ }
+                micBtn.classList.remove("is-recording");
+                hideListening();
                 return;
             }
             try {
+                userStopped = false;
                 recognition.start();
                 recording = true;
                 micBtn.classList.add("is-recording");
+                showListening();
+                // Aviso la primera vez (persistido en localStorage).
+                if (!localStorage.getItem(HINT_KEY)) {
+                    addBotMsg("Mantén la pantalla encendida mientras dictas.");
+                    try { localStorage.setItem(HINT_KEY, "1"); } catch { /* modo privado: no persiste, no rompe */ }
+                }
             } catch { /* noop */ }
+        });
+
+        // Page Visibility API: al bloquear/minimizar la pantalla pausamos el
+        // dictado de forma controlada (recording sigue true, userStopped sigue
+        // false) para que onend NO reinicie mientras está oculto; al volver a
+        // primer plano reanudamos.
+        document.addEventListener("visibilitychange", () => {
+            if (!recognition) return;
+            if (document.visibilityState === "hidden") {
+                if (recording) {
+                    try { recognition.stop(); } catch { /* noop */ }
+                }
+            } else {
+                if (recording && !userStopped) {
+                    try { recognition.start(); } catch { /* noop */ }
+                }
+            }
         });
     }
 

@@ -257,6 +257,22 @@
     0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
     50%      { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
 }
+.asist-listening {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: #ef4444;
+    padding: 4px 12px;
+}
+.asist-listening[hidden] { display: none; }
+.asist-listening-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ef4444;
+    animation: asist-pulse 1s ease infinite;
+}
 
 /* Mobile: panel ocupa casi toda la pantalla + área de input accesible al tacto */
 @media (max-width: 480px) {
