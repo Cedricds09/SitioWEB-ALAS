@@ -143,6 +143,82 @@ const FEW_SHOT_EXAMPLES = [
       items_nuevos: [],
       notas_al_admin: "Trabajo presentado como paquete cerrado (apartado_cerrado) en lugar de items individuales, siguiendo el formato del cliente original. Si Adán prefiere desglose por componente, considerar convertir a seccion_items."
     }
+  },
+
+  // ============================================================
+  // Ejemplo 3: modo "mejorar" CON sección de items (usa ids reales)
+  // ============================================================
+  {
+    user_input: {
+      modo: "mejorar",
+      cliente_nombre: "Condominio Bretaña 80",
+      cliente_direccion: "Bretaña #80, Col. Zacahuitzco, CDMX",
+      tipo_servicio: "plomeria",
+      bloques_existentes: [
+        { id: 30, tipo: "texto", titulo: null },
+        {
+          id: 31,
+          tipo: "seccion_items",
+          titulo: "Tinaco y bajadas",
+          items: [
+            { id: 47, descripcion: "cambio de flotador", cantidad: null, precio_unitario: null, es_opcional: false },
+            { id: 48, descripcion: "tubo de bajada", cantidad: null, precio_unitario: null, es_opcional: false }
+          ]
+        }
+      ]
+    },
+    assistant_output: {
+      modo: "mejorar",
+      tipo_servicio_detectado: "plomeria",
+      bloques: [],
+      mejoras: [
+        {
+          item_id: 47,
+          descripcion_original: "cambio de flotador",
+          descripcion_mejorada: "Suministro e instalación de flotador para tinaco, marca IUSA, ya que el actual cumplió su vida útil y presenta cierre deficiente, lo que genera desperdicio de agua."
+        },
+        {
+          item_id: 48,
+          descripcion_original: "tubo de bajada",
+          descripcion_mejorada: "Sustitución de tubo de bajada de agua en PVC hidráulico, con sus conexiones (codos y coples), respetando el trazo existente, con la finalidad de prevenir fugas."
+        }
+      ],
+      items_nuevos: [
+        {
+          bloque_id_destino: 31,
+          descripcion: "Suministro e instalación de válvula de paso a la entrada del tinaco, para facilitar mantenimientos futuros.",
+          cantidad: null,
+          precio_unitario: null,
+          es_opcional: true
+        }
+      ],
+      notas_al_admin: "Se mejoraron las descripciones de los items 47 y 48 (sección 'Tinaco y bajadas') usando sus id reales, y se propuso un item opcional para el bloque 31. No se alteraron precios ni cantidades."
+    }
+  },
+
+  // ============================================================
+  // Ejemplo 4: modo "mejorar" SIN sección de items -> salida vacía
+  // (NUNCA usar el id de un BLOQUE como item_id)
+  // ============================================================
+  {
+    user_input: {
+      modo: "mejorar",
+      cliente_nombre: "Particular Narvarte",
+      cliente_direccion: "Av. Ejemplo #345, Col. Narvarte, CDMX",
+      tipo_servicio: "pintura",
+      bloques_existentes: [
+        { id: 40, tipo: "texto", titulo: "Encabezado" },
+        { id: 41, tipo: "lista_vinetas", titulo: null }
+      ]
+    },
+    assistant_output: {
+      modo: "mejorar",
+      tipo_servicio_detectado: "pintura",
+      bloques: [],
+      mejoras: [],
+      items_nuevos: [],
+      notas_al_admin: "El presupuesto no contiene ninguna sección de partidas (seccion_items) con items que tengan id numérico, por lo que no hay nada itemizado que mejorar. Se sugiere agregar una sección de partidas con los conceptos a cotizar antes de usar 'Mejorar'."
+    }
   }
 ];
 
