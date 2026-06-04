@@ -302,10 +302,14 @@ async function sugerirBloques(input, sesion) {
     throw new AppError('La IA devolvió contenido no parseable.', 500, 'AI_INVALID_JSON');
   }
 
-  // 7a) Pre-sanitización: Claude a veces inventa mejoras sin item_id o
-  // items_nuevos sin bloque_id_destino (visto: 5 de 7 mejoras con item_id
-  // null/undefined). Las descartamos en silencio antes de validar; sin un id
-  // real no se pueden aplicar a nada.
+  // 7a) Pre-sanitización: Claude a veces inventa mejoras sin item_id o sin una
+  // descripcion_mejorada usable, e items_nuevos sin bloque_id_destino o sin
+  // descripcion (visto: 5 de 7 mejoras con item_id null/undefined; y mejoras
+  // con descripcion_mejorada vacía que tumbaban TODA la respuesta en el schema,
+  // path mejoras.N.descripcion_mejorada). Descartamos en silencio las entradas
+  // incompletas antes de validar (mejor perder una sugerencia inaplicable que
+  // rechazar la generación entera) y coercemos los campos inviolables de
+  // items_nuevos (cantidad/precio null, es_opcional true) por si los desobedece.
   function _hasValidId(v) {
     if (v == null) return false;
     if (typeof v === 'number') return Number.isInteger(v) && v > 0;
@@ -317,20 +321,54 @@ async function sugerirBloques(input, sesion) {
     }
     return false;
   }
+  // Una mejora se aplica sobre un item existente: necesita item_id válido Y una
+  // descripcion_mejorada usable (string >= 3 chars, lo que exige el schema).
+  // descripcion_original es informativa: si Claude la omite, la default a '' en
+  // vez de descartar la mejora.
+  function _mejoraUsable(m) {
+    if (!m || !_hasValidId(m.item_id)) return false;
+    if (typeof m.descripcion_mejorada !== 'string') return false;
+    // El schema exige descripcion_mejorada de 3..500 chars. Claude a veces
+    // halucina una "mejora" copiando el contenido COMPLETO de un bloque (visto
+    // 934 chars en un borrador sin items reales) y reventaba el max(500),
+    // tumbando TODA la respuesta. La descartamos aquí en silencio en vez de
+    // crashear la generación. El min se mide sobre el texto sin espacios.
+    const d = m.descripcion_mejorada;
+    return d.trim().length >= 3 && d.length <= 500;
+  }
   if (raw && Array.isArray(raw.mejoras)) {
     const before = raw.mejoras.length;
-    raw.mejoras = raw.mejoras.filter((m) => m && _hasValidId(m.item_id));
+    raw.mejoras = raw.mejoras
+      .filter(_mejoraUsable)
+      .map((m) => ({
+        ...m,
+        descripcion_original: typeof m.descripcion_original === 'string' ? m.descripcion_original : '',
+      }));
     const dropped = before - raw.mejoras.length;
     if (dropped > 0) {
-      console.warn(`[AI][SANITIZE] pres=${presupuesto_id} descartadas ${dropped}/${before} mejoras sin item_id válido`);
+      console.warn(`[AI][SANITIZE] pres=${presupuesto_id} descartadas ${dropped}/${before} mejoras sin item_id o descripcion_mejorada válidos`);
     }
   }
   if (raw && Array.isArray(raw.items_nuevos)) {
     const before = raw.items_nuevos.length;
-    raw.items_nuevos = raw.items_nuevos.filter((it) => it && _hasValidId(it.bloque_id_destino));
+    raw.items_nuevos = raw.items_nuevos
+      .filter((it) =>
+        it && _hasValidId(it.bloque_id_destino)
+        && typeof it.descripcion === 'string'
+        && it.descripcion.trim().length >= 3
+        && it.descripcion.length <= 500,
+      )
+      .map((it) => ({
+        ...it,
+        // Campos inviolables (Regla #1: la IA nunca pone precios; sus items son
+        // siempre opcionales). Se fuerzan por si el modelo los desobedece.
+        cantidad: null,
+        precio_unitario: null,
+        es_opcional: true,
+      }));
     const dropped = before - raw.items_nuevos.length;
     if (dropped > 0) {
-      console.warn(`[AI][SANITIZE] pres=${presupuesto_id} descartados ${dropped}/${before} items_nuevos sin bloque_id_destino válido`);
+      console.warn(`[AI][SANITIZE] pres=${presupuesto_id} descartados ${dropped}/${before} items_nuevos sin bloque_id_destino o descripcion válidos`);
     }
   }
 
