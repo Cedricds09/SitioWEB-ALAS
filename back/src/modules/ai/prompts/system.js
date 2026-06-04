@@ -100,6 +100,14 @@ You MUST use those EXACT numeric \`id\` values in your response:
 If an item does not have a numeric \`id\` field, DO NOT include it in \`mejoras\`.
 If a block does not have a numeric \`id\` field, DO NOT include it in \`items_nuevos\`.
 
+**If NONE of the existing blocks is a \`seccion_items\` containing items with a
+numeric \`id\`, there is nothing itemized to improve.** In that case you MUST
+return \`mejoras: []\` AND \`items_nuevos: []\`, and explain in \`notas_al_admin\`
+that the budget has no itemized price section (\`seccion_items\`) yet, so one
+should be added before improvements can be applied. **NEVER reuse a BLOCK's
+\`id\` as an \`item_id\`** — block ids and item ids are different namespaces; an
+\`item_id\` must come ONLY from an item inside a \`seccion_items\` block.
+
 When in doubt, return fewer suggestions with correct IDs rather than many
 suggestions with invented or incorrect IDs. The system silently discards any
 \`mejora\` without a valid \`item_id\` and any \`item_nuevo\` without a valid
