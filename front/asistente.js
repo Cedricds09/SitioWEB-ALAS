@@ -398,7 +398,7 @@
         agenda_hoy: ["hoy", "agenda hoy", "qué tengo hoy",
                      "que tengo hoy", "servicios hoy",
                      "tengo hoy", "para hoy", "que tengo agendado",
-                     "que tengo manana", "agendado manana"],
+                     "que tengo manana", "agendado manana", "que sigue"],
         agenda_semana: ["esta semana", "semana", "agenda semana",
                         "qué tengo esta semana", "que tengo esta semana",
                         "servicios semana", "programados"],
@@ -408,7 +408,8 @@
                   "estado del negocio", "estado negocio",
                   "cómo vamos", "como vamos", "resumen",
                   "como va el negocio", "como va", "como voy",
-                  "cuanto llevo", "cuanto tengo", "este mes", "del mes"],
+                  "cuanto llevo", "cuanto tengo", "este mes", "del mes",
+                  "en puerta"],
         urgentes: ["urgentes", "más urgentes", "mas urgentes",
                    "prioridad", "más antiguos", "mas antiguos",
                    "urgente", "algo urgente", "atrasado", "atrasados",
@@ -491,8 +492,18 @@
         "hay que cotizar", "vamos a hacer un presupuesto", "vamos a sacar",
     ];
 
+    // Combinador robusto: raíz presupuest|cotiza precedida de un verbo de
+    // creación (con encliticos -me y articulos/palabras intermedias). Cubre
+    // variantes naturales no enumeradas ("crearme un presupuesto",
+    // "generame una cotizacion", "necesito armar una cotizacion para X").
+    // Trabaja sobre texto normalizado (sin acentos). NO produce falsos
+    // positivos en consultas informativas ("cuantos presupuestos faltan",
+    // "que presupuestos hay") porque esas no llevan verbo de creación delante,
+    // y ademas detectarConsultasNegocio se evalua ANTES en procesarTexto.
+    const RE_PRESU_CREAR = /(hacer|haz|haga|hagamos|crear|crea|nuev[oa]|quier|quisier|necesit|ocup|armar|arma|generar|genera|elabora|prepara|levantar|levanta|sacar|saca|ayudame|echa|ponme|abrir|abre|abri|iniciar|empezar|comenzar|registrar|registra|agregar|agrega|meter|mete|pasar|pasa|dame de alta|dar de alta|alta de)[a-z]*\s+([a-z]+\s+)?(un |una |el |la |mi |)?(presupuest|cotiza)/;
     function esNuevoPresupuesto(low) {
-        return incluyeAlguna(low, KEYWORDS_NUEVO_PRESUPUESTO);
+        return incluyeAlguna(low, KEYWORDS_NUEVO_PRESUPUESTO) ||
+            RE_PRESU_CREAR.test(normaliza(low));
     }
 
     // ---- Registro / alta de algo (servicio o cliente) ----
@@ -553,7 +564,7 @@
     // SERVICIOS: "ver el reporte de un servicio" es sobre notas, no la lista.
     const KEYWORDS_NAV_NOTAS = [
         "nota", "notas", "reporte", "reportes", "ver nota", "consultar nota",
-        "apunte", "apuntes", "observacion", "observaciones",
+        "apunte", "apuntes", "apuntaron", "observacion", "observaciones",
     ];
     const KEYWORDS_NAV_SERVICIOS = [
         "servicio", "servicios", "trabajo", "trabajos", "chamba", "chambas",
