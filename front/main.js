@@ -221,25 +221,20 @@
     let mapsReady = false;
     let mapsApiKey = "";
 
-    function attachAutocomplete(input, latEl, lngEl) {
-        if (!mapsReady || !input || input.dataset.acBound === "1" ||
-            !window.google || !window.google.maps || !window.google.maps.places) return;
-        try {
-            const ac = new window.google.maps.places.Autocomplete(input, {
-                componentRestrictions: { country: "mx" },
-                fields: ["formatted_address", "geometry", "name"],
-            });
-            ac.addListener("place_changed", () => {
-                const p = ac.getPlace();
-                const addr = p.formatted_address || p.name || input.value;
-                input.value = addr;
-                if (latEl) latEl.value = p.geometry && p.geometry.location ? p.geometry.location.lat() : "";
-                if (lngEl) lngEl.value = p.geometry && p.geometry.location ? p.geometry.location.lng() : "";
-            });
-            input.dataset.acBound = "1";
-        } catch (e) {
-            console.warn("[Maps] attach fail:", e);
-        }
+    // DEUDA TÉCNICA / pendiente de migración:
+    // El autocompletado usaba google.maps.places.Autocomplete (API legacy), que
+    // Google bloqueó para proyectos nuevos. El widget se renderizaba ROTO (íconos
+    // grises con signo de admiración) y entorpecía la captura manual de la
+    // dirección. Hasta migrar a PlaceAutocompleteElement (requiere prueba en
+    // navegador y verificar la key en Google Cloud), dejamos el campo como input
+    // de texto PLANO: siempre permite escribir la dirección a mano, sin el
+    // desplegable roto. El script de Maps se sigue cargando para los mini-mapas
+    // del panel admin (usan maps.Map, no Places).
+    function attachAutocomplete(input /* , latEl, lngEl */) {
+        if (!input || input.dataset.acBound === "1") return;
+        // Marcamos como "atendido" para no reintentar; el input queda como texto
+        // plano usable. NO instanciamos el Autocomplete legacy (roto/deprecado).
+        input.dataset.acBound = "1";
     }
 
     function initAutocomplete() {
