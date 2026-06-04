@@ -302,37 +302,50 @@ async function sugerirBloques(input, sesion) {
     throw new AppError('La IA devolvió contenido no parseable.', 500, 'AI_INVALID_JSON');
   }
 
-  // 7a) Pre-sanitización: Claude a veces inventa mejoras sin item_id o sin una
-  // descripcion_mejorada usable, e items_nuevos sin bloque_id_destino o sin
-  // descripcion (visto: 5 de 7 mejoras con item_id null/undefined; y mejoras
-  // con descripcion_mejorada vacía que tumbaban TODA la respuesta en el schema,
-  // path mejoras.N.descripcion_mejorada). Descartamos en silencio las entradas
-  // incompletas antes de validar (mejor perder una sugerencia inaplicable que
-  // rechazar la generación entera) y coercemos los campos inviolables de
-  // items_nuevos (cantidad/precio null, es_opcional true) por si los desobedece.
-  function _hasValidId(v) {
-    if (v == null) return false;
-    if (typeof v === 'number') return Number.isInteger(v) && v > 0;
+  // 7a) Pre-sanitización: descartamos en silencio las sugerencias inaplicables
+  // ANTES de validar (mejor perder una sugerencia que rechazar la respuesta
+  // entera). Motivos de descarte:
+  //  - mejoras con descripcion_mejorada fuera de 3..500 (el modelo a veces
+  //    copia un bloque entero, visto 934 chars, y reventaba el schema);
+  //  - mejoras/items cuyo id NO EXISTE entre los items/bloques reales del
+  //    presupuesto. Clave: Claude a veces halucina item_id reusando ids de
+  //    BLOQUE cuando el presupuesto no tiene seccion_items con items; esos ids
+  //    cumplen la forma (entero positivo) pero el front nunca los resuelve, así
+  //    que "mejorar" no aplicaba nada. Aquí los cruzamos contra los ids reales;
+  //  - items_nuevos sin descripcion; además forzamos sus campos inviolables.
+  function _normId(v) {
+    if (typeof v === 'number') return Number.isInteger(v) && v > 0 ? v : null;
     if (typeof v === 'string') {
       const m = v.match(/\d+/);
-      if (!m) return false;
+      if (!m) return null;
       const n = parseInt(m[0], 10);
-      return Number.isInteger(n) && n > 0;
+      return Number.isInteger(n) && n > 0 ? n : null;
     }
-    return false;
+    return null;
   }
-  // Una mejora se aplica sobre un item existente: necesita item_id válido Y una
-  // descripcion_mejorada usable (string >= 3 chars, lo que exige el schema).
-  // descripcion_original es informativa: si Claude la omite, la default a '' en
-  // vez de descartar la mejora.
+  // Ids REALES que el backend ya cargó (pres.bloques). Solo los bloques
+  // seccion_items tienen array `items` con `id`: esos son los únicos item_id
+  // válidos, y solo esos bloques admiten items_nuevos.
+  const _realItemIds = new Set();
+  const _itemBlockIds = new Set();
+  for (const _b of (pres.bloques || [])) {
+    if (Array.isArray(_b.items)) {
+      const _bid = _normId(_b.id);
+      if (_bid != null) _itemBlockIds.add(_bid);
+      for (const _it of _b.items) {
+        const _iid = _normId(_it.id);
+        if (_iid != null) _realItemIds.add(_iid);
+      }
+    }
+  }
+  // Una mejora se aplica sobre un item existente: su item_id debe EXISTIR entre
+  // los items reales, y descripcion_mejorada ser usable (3..500, lo exige el
+  // schema). descripcion_original es informativa: si falta, la default a ''.
   function _mejoraUsable(m) {
-    if (!m || !_hasValidId(m.item_id)) return false;
+    if (!m) return false;
+    const id = _normId(m.item_id);
+    if (id == null || !_realItemIds.has(id)) return false;
     if (typeof m.descripcion_mejorada !== 'string') return false;
-    // El schema exige descripcion_mejorada de 3..500 chars. Claude a veces
-    // halucina una "mejora" copiando el contenido COMPLETO de un bloque (visto
-    // 934 chars en un borrador sin items reales) y reventaba el max(500),
-    // tumbando TODA la respuesta. La descartamos aquí en silencio en vez de
-    // crashear la generación. El min se mide sobre el texto sin espacios.
     const d = m.descripcion_mejorada;
     return d.trim().length >= 3 && d.length <= 500;
   }
@@ -346,18 +359,21 @@ async function sugerirBloques(input, sesion) {
       }));
     const dropped = before - raw.mejoras.length;
     if (dropped > 0) {
-      console.warn(`[AI][SANITIZE] pres=${presupuesto_id} descartadas ${dropped}/${before} mejoras sin item_id o descripcion_mejorada válidos`);
+      console.warn(`[AI][SANITIZE] pres=${presupuesto_id} descartadas ${dropped}/${before} mejoras (item_id inexistente/inválido o descripcion_mejorada fuera de 3..500)`);
     }
   }
   if (raw && Array.isArray(raw.items_nuevos)) {
     const before = raw.items_nuevos.length;
     raw.items_nuevos = raw.items_nuevos
-      .filter((it) =>
-        it && _hasValidId(it.bloque_id_destino)
-        && typeof it.descripcion === 'string'
-        && it.descripcion.trim().length >= 3
-        && it.descripcion.length <= 500,
-      )
+      .filter((it) => {
+        if (!it) return false;
+        const bid = _normId(it.bloque_id_destino);
+        // El bloque destino debe ser un seccion_items REAL del presupuesto.
+        if (bid == null || !_itemBlockIds.has(bid)) return false;
+        return typeof it.descripcion === 'string'
+          && it.descripcion.trim().length >= 3
+          && it.descripcion.length <= 500;
+      })
       .map((it) => ({
         ...it,
         // Campos inviolables (Regla #1: la IA nunca pone precios; sus items son
@@ -368,7 +384,7 @@ async function sugerirBloques(input, sesion) {
       }));
     const dropped = before - raw.items_nuevos.length;
     if (dropped > 0) {
-      console.warn(`[AI][SANITIZE] pres=${presupuesto_id} descartados ${dropped}/${before} items_nuevos sin bloque_id_destino o descripcion válidos`);
+      console.warn(`[AI][SANITIZE] pres=${presupuesto_id} descartados ${dropped}/${before} items_nuevos (bloque_id_destino inexistente/no seccion_items o descripcion inválida)`);
     }
   }
 
