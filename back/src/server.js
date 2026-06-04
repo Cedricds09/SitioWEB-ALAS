@@ -69,6 +69,8 @@ app.use(
         'connect-src': [
           "'self'",
           'https://maps.googleapis.com',
+          // Places API (New): el PlaceAutocompleteElement hace fetch a este host.
+          'https://places.googleapis.com',
           'https://cdnjs.cloudflare.com',
           // Cloudflare Web Analytics: el beacon reporta (POST RUM) aquí.
           'https://cloudflareinsights.com',

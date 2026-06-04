@@ -214,27 +214,69 @@
     }, { passive: true });
 
     /* =====================================================
-       GOOGLE MAPS PLACES AUTOCOMPLETE (público + admin)
-       Carga dinámica de script: SOLO tras obtener la key.
+       GOOGLE MAPS — Autocompletado de direcciones (público + admin)
+       Migrado a PlaceAutocompleteElement (Places API New): Google bloqueó el
+       google.maps.places.Autocomplete legacy para proyectos nuevos. El elemento
+       nuevo es un web component; se inserta como ayuda de búsqueda ENCIMA del
+       input original, que se conserva visible y editable (la captura manual
+       nunca se pierde). Al elegir un lugar, se vuelca dirección y lat/lng al
+       input. Degradación: si el componente no carga (Places API New / referrer /
+       billing en GCP, o navegador sin soporte), el input queda como texto plano
+       usable. Los mini-mapas del admin usan la Maps Embed API por iframe.
        ===================================================== */
     const _ORIGIN = window.location.origin;
     let mapsReady = false;
     let mapsApiKey = "";
+    let _placesLib = null; // cache de la librería 'places' (importLibrary)
 
-    // DEUDA TÉCNICA / pendiente de migración:
-    // El autocompletado usaba google.maps.places.Autocomplete (API legacy), que
-    // Google bloqueó para proyectos nuevos. El widget se renderizaba ROTO (íconos
-    // grises con signo de admiración) y entorpecía la captura manual de la
-    // dirección. Hasta migrar a PlaceAutocompleteElement (requiere prueba en
-    // navegador y verificar la key en Google Cloud), dejamos el campo como input
-    // de texto PLANO: siempre permite escribir la dirección a mano, sin el
-    // desplegable roto. El script de Maps se sigue cargando para los mini-mapas
-    // del panel admin (usan maps.Map, no Places).
-    function attachAutocomplete(input /* , latEl, lngEl */) {
+    // Carga (perezosa y cacheada) de la librería 'places' del loader moderno.
+    async function _getPlacesLib() {
+        if (_placesLib) return _placesLib;
+        if (!window.google || !google.maps || typeof google.maps.importLibrary !== "function") return null;
+        try {
+            _placesLib = await google.maps.importLibrary("places");
+        } catch (e) {
+            console.warn("[Maps] importLibrary(places) falló:", e);
+            return null;
+        }
+        return _placesLib;
+    }
+
+    // Inserta un PlaceAutocompleteElement como ayuda de búsqueda sobre `input`.
+    // El input original queda visible/editable (captura manual siempre posible);
+    // al elegir un lugar se rellena con la dirección y, si hay, lat/lng.
+    async function attachAutocomplete(input, latEl, lngEl) {
         if (!input || input.dataset.acBound === "1") return;
-        // Marcamos como "atendido" para no reintentar; el input queda como texto
-        // plano usable. NO instanciamos el Autocomplete legacy (roto/deprecado).
-        input.dataset.acBound = "1";
+        input.dataset.acBound = "1"; // guard síncrono anti-reentrada
+        const lib = await _getPlacesLib();
+        const PAC = lib && lib.PlaceAutocompleteElement;
+        if (!PAC) return; // degradación: el input queda como texto plano usable
+        try {
+            const pac = new PAC({ includedRegionCodes: ["mx"] });
+            pac.style.width = "100%";
+            pac.style.display = "block";
+            pac.style.marginBottom = "6px";
+            try { pac.setAttribute("placeholder", "Buscar dirección…"); } catch (e) { /* atributo opcional */ }
+            input.parentNode.insertBefore(pac, input);
+            pac.addEventListener("gmp-select", async (ev) => {
+                try {
+                    const place = ev.placePrediction.toPlace();
+                    await place.fetchFields({ fields: ["formattedAddress", "location"] });
+                    input.value = place.formattedAddress || input.value;
+                    const loc = place.location;
+                    if (latEl) latEl.value = loc ? (typeof loc.lat === "function" ? loc.lat() : loc.lat) : "";
+                    if (lngEl) lngEl.value = loc ? (typeof loc.lng === "function" ? loc.lng() : loc.lng) : "";
+                    // Notificar al resto de la app (dirty tracking, validaciones).
+                    input.dispatchEvent(new Event("input", { bubbles: true }));
+                    input.dispatchEvent(new Event("change", { bubbles: true }));
+                } catch (e2) {
+                    console.warn("[Maps] gmp-select falló:", e2);
+                }
+            });
+        } catch (e) {
+            // El componente no se pudo crear: el input plano sigue usable.
+            console.warn("[Maps] PlaceAutocompleteElement no disponible:", e);
+        }
     }
 
     function initAutocomplete() {
@@ -269,12 +311,14 @@
         if (!apiKey || mapsReady || window.__alasMapsLoading) return;
         window.__alasMapsLoading = true;
         const script = document.createElement("script");
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places`;
+        // Loader moderno (loading=async): la librería 'places' se obtiene con
+        // google.maps.importLibrary('places') dentro de _getPlacesLib.
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&loading=async&v=weekly`;
         script.async = true;
         script.defer = true;
         script.onload = () => {
             mapsReady = true;
-            console.log("[Maps] script cargado, iniciando autocomplete");
+            console.log("[Maps] bootstrap cargado");
             initAutocomplete();
             // Re-render del dashboard admin para inyectar mini mapas
             if (document.body.classList.contains("admin-mode")) {
