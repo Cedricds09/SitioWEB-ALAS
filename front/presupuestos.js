@@ -1892,6 +1892,20 @@
                     aiSuggestApply.textContent = "Aplicar bloques";
                     return;
                 }
+                // Generar inicial REEMPLAZA todo el set de bloques en el backend
+                // (presupuestos.service: "Reemplaza todo el set de bloques"). Si
+                // el presupuesto ya tenía bloques, confirmamos para no pisarlos
+                // sin avisar.
+                if (Array.isArray(p.bloques) && p.bloques.length > 0) {
+                    const ok = window.confirm(
+                        `Esto REEMPLAZARÁ los ${p.bloques.length} bloque(s) que ya tiene este presupuesto por los ${bloques.length} bloque(s) generados por la IA. Los actuales se perderán. ¿Continuar?`,
+                    );
+                    if (!ok) {
+                        aiSuggestApply.disabled = false;
+                        aiSuggestApply.textContent = "Aplicar bloques";
+                        return;
+                    }
+                }
                 await api("/api/presupuestos/" + p.id, {
                     method: "PUT",
                     body: JSON.stringify({ bloques }),
