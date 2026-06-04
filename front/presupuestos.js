@@ -1915,10 +1915,10 @@
             const mejoras = mejorasIdx.map((i) => (data.mejoras || [])[i]).filter(Boolean);
             const itemsNuevos = itemsIdx.map((i) => (data.items_nuevos || [])[i]).filter(Boolean);
 
-            let okMejoras = 0, failMejoras = 0;
+            let okMejoras = 0, failMejoras = 0, mejorasSinItem = 0;
             for (const m of mejoras) {
                 const bloqueId = _findBloqueIdForItem(m.item_id);
-                if (!bloqueId) { failMejoras++; continue; }
+                if (!bloqueId) { failMejoras++; mejorasSinItem++; continue; }
                 try {
                     await api(`/api/presupuestos/${p.id}/bloques/${bloqueId}/items/${m.item_id}`, {
                         method: "PUT",
@@ -1959,7 +1959,13 @@
             } else {
                 aiSuggestApply.disabled = false;
                 aiSuggestApply.textContent = "Reintentar";
-                toast(`Aplicadas ${totalOk}, fallaron ${totalFail}. Revisa consola.`, "error");
+                // Caso típico: el presupuesto aún no tiene partidas con precio, así que
+                // las mejoras de la IA apuntan a items que no existen y fallan todas.
+                if (totalOk === 0 && failMejoras > 0 && mejorasSinItem === failMejoras && okItems === 0) {
+                    toast("Estas mejoras aplican sobre partidas con precio. Este presupuesto aún no tiene partidas: genera el presupuesto inicial con IA o agrega una sección de partidas, luego mejora.", "error");
+                } else {
+                    toast(`Aplicadas ${totalOk}, fallaron ${totalFail}. Revisa consola.`, "error");
+                }
                 // Si al menos una pasó, refresca silenciosamente para sincronizar estado.
                 if (totalOk > 0) await _reloadCurrentEditor();
             }
