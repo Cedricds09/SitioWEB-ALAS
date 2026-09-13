@@ -17,6 +17,7 @@ router.get(
 
 router.get(
   '/:numero_cliente/historial',
+  clienteSearchLimiter,
   validate({ params: C.numeroClienteParamSchema }),
   asyncHandler(ctrl.historial),
 );

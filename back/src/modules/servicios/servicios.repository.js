@@ -187,19 +187,26 @@ async function listarCalendario({ lunes, domingo, tecnico }) {
   return r.recordset;
 }
 
-async function listarPorCliente(numero_cliente) {
+// tecnico undefined trae todos (admin); con valor filtra por técnico asignado
+// o que atendió el servicio (evita IDOR: un técnico no ve servicios ajenos).
+async function listarPorCliente(numero_cliente, tecnico) {
   const pool = await getPool();
-  const result = await pool
+  const reqDb = pool
     .request()
-    .input('numero_cliente', sql.NVarChar(50), numero_cliente)
-    .query(`
+    .input('numero_cliente', sql.NVarChar(50), numero_cliente);
+  let whereTec = '';
+  if (tecnico !== undefined) {
+    reqDb.input('tec', sql.NVarChar(50), tecnico || '');
+    whereTec = ' AND (tecnico_asignado = @tec OR atendido_por = @tec)';
+  }
+  const result = await reqDb.query(`
       SELECT id, numero_cliente, nombre_cliente, telefono, direccion, lat, lng, conceptos,
              total, estado, fecha_inicio, fecha_fin, ajuste, tipo_servicio,
              tecnico_asignado, atendido_por, numero_nota, resolucion,
              CONVERT(varchar(10), fecha_programada, 23) AS fecha_programada,
              CONVERT(varchar(5), hora_programada, 108) AS hora_programada
       FROM dbo.servicios
-      WHERE activo = 1 AND numero_cliente = @numero_cliente
+      WHERE activo = 1 AND numero_cliente = @numero_cliente${whereTec}
       ORDER BY fecha_inicio DESC
     `);
   return result.recordset;

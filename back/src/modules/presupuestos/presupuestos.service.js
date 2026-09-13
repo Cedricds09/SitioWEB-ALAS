@@ -289,6 +289,11 @@ async function actualizar(id, campos, sesion) {
 
     const headerCampos = { ...campos };
     delete headerCampos.bloques;
+    // La reasignación tiene su propio endpoint admin (`POST /:id/reasignar`) que
+    // valida el destino con `validarAsignable`. Se elimina de este PUT genérico
+    // para que un técnico no pueda auto-reasignar (mass assignment) saltándose
+    // esa validación y el control de rol admin.
+    delete headerCampos.asignado_a;
     if (Object.keys(headerCampos).some((k) => headerCampos[k] !== undefined)) {
       await repo.actualizarHeader(id, headerCampos, tx);
     }

@@ -910,8 +910,8 @@
                         ${b.items.map((it, i) => `
                             <div class="pres-items-row" data-item-idx="${i}">
                                 <input type="text" data-field="descripcion" value="${escape(it.descripcion)}" ${ro} placeholder="Descripción">
-                                <input type="number" data-field="cantidad" value="${it.cantidad}" min="1" step="1" ${ro}>
-                                <input type="number" data-field="precio_unitario" value="${it.precio_unitario}" min="0" step="0.01" ${ro}>
+                                <input type="number" data-field="cantidad" value="${Number(it.cantidad) || 0}" min="1" step="1" ${ro}>
+                                <input type="number" data-field="precio_unitario" value="${Number(it.precio_unitario) || 0}" min="0" step="0.01" ${ro}>
                                 <label class="opt-check" title="Marcar si NO suma al total"><input type="checkbox" data-field="es_opcional" ${it.es_opcional ? "checked" : ""} ${dis}></label>
                                 <button type="button" data-act="del-item" ${dis} title="Eliminar item">🗑️</button>
                             </div>

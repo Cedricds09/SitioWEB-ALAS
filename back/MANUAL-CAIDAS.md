@@ -102,16 +102,20 @@ La máquina tiene **~7.8 GB de RAM**. Por defecto SQL Server intenta usar **memo
 Windows lo empieza a paginar a disco (eventos *"A significant part of SQL Server process memory has been paged out"*)
 y las conexiones al 1433 empiezan a fallar de forma intermitente hasta caer del todo.
 
+> **`<PASSWORD_SA>`**: sustitúyelo por la contraseña del usuario `sa`, que está en
+> `back/.env` como `DB_PASSWORD`. **Nunca** escribas la contraseña real en este archivo ni
+> en ningún archivo versionado (el repo es público).
+
 **Verifica el límite de memoria de SQL Server:**
 ```powershell
-Invoke-SqlCmd -ServerInstance "localhost" -Username "sa" -Password ")it8UmtqKxrW4@X7h+3NhSUB" `
+Invoke-SqlCmd -ServerInstance "localhost" -Username "sa" -Password "<PASSWORD_SA>" `
   -Query "SELECT value_in_use FROM sys.configurations WHERE name='max server memory (MB)'"
 ```
 - Si sale **2147483647** (o un número enorme) → **está sin límite: ESE ES EL PROBLEMA.**
 
 **Arréglalo (déjalo en 2048 MB = 2 GB):**
 ```powershell
-Invoke-SqlCmd -ServerInstance "localhost" -Username "sa" -Password ")it8UmtqKxrW4@X7h+3NhSUB" -Query @"
+Invoke-SqlCmd -ServerInstance "localhost" -Username "sa" -Password "<PASSWORD_SA>" -Query @"
 EXEC sp_configure 'show advanced options', 1; RECONFIGURE;
 EXEC sp_configure 'max server memory (MB)', 2048; RECONFIGURE;
 "@

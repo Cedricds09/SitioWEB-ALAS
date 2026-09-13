@@ -52,17 +52,29 @@ async function diagnosticarCliente(cliente) {
 }
 
 // Lista todas las notas de un cliente (para historial agregado en clientes module).
-async function listarPorCliente(numero_cliente) {
+// tecnico undefined trae todas (admin); con valor solo las notas de servicios
+// asignados/atendidos por ese técnico (evita IDOR de notas ajenas).
+async function listarPorCliente(numero_cliente, tecnico) {
   const pool = await getPool();
-  const r = await pool
+  const reqDb = pool
     .request()
-    .input('cliente', sql.NVarChar(50), numero_cliente)
-    .query(`
-      SELECT id, numero_cliente, nombre_cliente, numero_nota, validacion,
-             telefono, fecha, conceptos, total, estado
-      FROM dbo.notas
-      WHERE LTRIM(RTRIM(CAST(numero_cliente AS NVARCHAR(50)))) = @cliente
-      ORDER BY fecha DESC
+    .input('cliente', sql.NVarChar(50), numero_cliente);
+  let whereTec = '';
+  if (tecnico !== undefined) {
+    reqDb.input('tec', sql.NVarChar(50), tecnico || '');
+    whereTec = `
+      AND EXISTS (
+        SELECT 1 FROM dbo.servicios s
+        WHERE s.numero_nota = n.numero_nota
+          AND (s.tecnico_asignado = @tec OR s.atendido_por = @tec)
+      )`;
+  }
+  const r = await reqDb.query(`
+      SELECT n.id, n.numero_cliente, n.nombre_cliente, n.numero_nota, n.validacion,
+             n.telefono, n.fecha, n.conceptos, n.total, n.estado
+      FROM dbo.notas n
+      WHERE LTRIM(RTRIM(CAST(n.numero_cliente AS NVARCHAR(50)))) = @cliente${whereTec}
+      ORDER BY n.fecha DESC
     `);
   return r.recordset;
 }

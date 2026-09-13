@@ -4,6 +4,7 @@ const repo = require('./clientes.repository');
 const serviciosRepo = require('../servicios/servicios.repository');
 const notasRepo = require('../notas/notas.repository');
 const presupuestosService = require('../presupuestos/presupuestos.service');
+const ROL = require('../../shared/constants/roles');
 
 // El término de búsqueda puede ser nombre/teléfono (PII): no se loguea en
 // claro. El numero_cliente se enmascara dejando solo el prefijo (CL-****).
@@ -23,12 +24,16 @@ async function buscar({ q, limit }) {
 async function historial(numero_cliente, sesion) {
   console.log('[CLIENTES] historial cliente=', maskCliente(numero_cliente));
 
+  // Aislamiento por rol (evita IDOR): admin ve todo; un técnico solo sus
+  // servicios/notas. Presupuestos ya filtra internamente vía `sesion`.
+  const tecnico = sesion && sesion.rol === ROL.ADMIN ? undefined : (sesion && sesion.usu);
+
   // allSettled: si una fuente falla (p.ej. DB intermitente en una tabla), se
   // devuelven las demás en vez de romper TODO el historial. El camino feliz
   // (las tres OK) entrega exactamente los mismos datos que antes.
   const [rServicios, rNotas, rPresupuestos] = await Promise.allSettled([
-    serviciosRepo.listarPorCliente(numero_cliente),
-    notasRepo.listarPorCliente(numero_cliente),
+    serviciosRepo.listarPorCliente(numero_cliente, tecnico),
+    notasRepo.listarPorCliente(numero_cliente, tecnico),
     presupuestosService.listar({ numero_cliente }, sesion),
   ]);
 

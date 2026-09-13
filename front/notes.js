@@ -229,7 +229,9 @@
         if (root) root.innerHTML = '<p class="notes-count">Buscando…</p>';
 
         const url = `${API_BASE}/api/notas/${encodeURIComponent(cliente)}?validacion=${encodeURIComponent(validacion)}`;
-        console.log("[FRONT] GET", url);
+        // No se loguea la URL completa: la query 'validacion' es el teléfono del
+        // cliente (PII) y quedaría en el historial de consola del navegador.
+        console.log("[FRONT] GET /api/notas");
 
         try {
             const res = await fetch(url, { method: "GET" });

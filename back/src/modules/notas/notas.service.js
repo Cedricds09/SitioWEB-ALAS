@@ -4,20 +4,23 @@
 const repo = require('./notas.repository');
 const { NotFoundError } = require('../../shared/errors/AppError');
 
+// La validación es el teléfono del cliente (PII); no se loguea en claro. Se
+// enmascara dejando solo los últimos 2 caracteres para poder distinguir casos.
+function maskPII(v) {
+  const s = String(v || '');
+  if (!s) return '(vacío)';
+  return s.length <= 2 ? '**' : `***${s.slice(-2)}`;
+}
+
 async function buscar(cliente, validacion) {
   const clienteTrim = String(cliente).trim();
   const validacionTrim = String(validacion).trim();
 
   const rows = await repo.buscarPorClienteValidacion(clienteTrim, validacionTrim);
   if (!rows.length) {
-    console.warn(`[NOTAS] Sin coincidencia cliente=${clienteTrim} validacion=${validacionTrim}`);
+    console.warn(`[NOTAS] Sin coincidencia cliente=${clienteTrim} validacion=${maskPII(validacionTrim)}`);
     const diag = await repo.diagnosticarCliente(clienteTrim);
     console.warn(`[NOTAS][DIAG] filas con ese cliente: ${diag.length}`);
-    diag.forEach((r) => {
-      console.warn(
-        `[NOTAS][DIAG] id=${r.id} numero_cliente="${r.numero_cliente}" numero_nota="${r.numero_nota}" validacion="${r.validacion}"`,
-      );
-    });
     throw new NotFoundError('Cliente no encontrado o datos de validación incorrectos.');
   }
 
