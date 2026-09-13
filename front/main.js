@@ -8,12 +8,12 @@
     const waLink = (text) =>
         `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
 
-    const ctaWhatsApp = document.getElementById("ctaWhatsApp");
+    // El CTA principal del hero ahora lleva a la sección de cotización (#quote),
+    // no a WhatsApp. El botón flotante y el del footer sí abren WhatsApp.
     const footerWhatsApp = document.getElementById("footerWhatsApp");
     const waFloat = document.getElementById("waFloat");
     const defaultHref = waLink(DEFAULT_MESSAGE);
 
-    if (ctaWhatsApp) ctaWhatsApp.href = defaultHref;
     if (footerWhatsApp) footerWhatsApp.href = defaultHref;
     if (waFloat) waFloat.href = defaultHref;
 
@@ -769,11 +769,14 @@
                             </div>
                         </div>
                         ${r.direccion ? (() => {
-                            const hasCoords = r.lat != null && r.lng != null;
+                            // Fuerza lat/lng a número: evita inyección en el atributo href
+                            // si un valor no-numérico quedara persistido en la BD.
+                            const latNum = Number(r.lat), lngNum = Number(r.lng);
+                            const hasCoords = Number.isFinite(latNum) && Number.isFinite(lngNum);
                             const mapsHref = hasCoords
-                                ? `https://maps.google.com/?q=${r.lat},${r.lng}`
+                                ? `https://maps.google.com/?q=${latNum},${lngNum}`
                                 : `https://maps.google.com/?q=${encodeURIComponent(r.direccion)}`;
-                            return `<div class="svc-direccion"><strong>📍 Dirección</strong>${escape(r.direccion)} · <a class="svc-map-link" href="${mapsHref}" target="_blank" rel="noopener">Abrir en Maps ↗</a></div>`;
+                            return `<div class="svc-direccion"><strong>📍 Dirección</strong>${escape(r.direccion)} · <a class="svc-map-link" href="${escape(mapsHref)}" target="_blank" rel="noopener">Abrir en Maps ↗</a></div>`;
                         })() : ""}
                         ${mapsApiKey && r.direccion ? (() => {
                             const q = (r.lat != null && r.lng != null)
