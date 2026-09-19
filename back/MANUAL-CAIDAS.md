@@ -181,6 +181,70 @@ Si `/api/health` responde `ok` en local pero el dominio público no abre:
 
 ---
 
+## 5.1 El sitio da "Error 1033" de Cloudflare  ← CAÍDA REAL DEL 19/09
+
+**El 1033 casi siempre es un SÍNTOMA, no la causa.** Significa que Cloudflare no tiene a quién
+enrutar el dominio. El 19/09 pasó esto: el túnel `cloudflared` **estaba conectado** e internet OK,
+pero **el backend estaba caído** (nadie escuchaba en el 3000), así que el túnel no tenía origen → 1033.
+No te distraigas con Cloudflare: **primero confirma que el 3000 responde en local.**
+
+### 5.1.1 Confirma dónde está el problema
+```powershell
+# ¿El backend responde en local?
+Invoke-RestMethod -Uri "http://localhost:3000/api/health" | ConvertTo-Json
+# ¿Nadie escucha el 3000?
+Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue
+# ¿El túnel sí está conectado al edge de Cloudflare? (debe haber conexiones a :7844)
+Get-NetTCPConnection -OwningProcess (Get-Process cloudflared).Id |
+  Where-Object RemotePort -eq 7844 | Select-Object State,RemoteAddress
+```
+- **3000 no responde / no escucha** pero cloudflared tiene conexiones a :7844 →
+  el túnel está bien; **la causa es el backend caído**. Ve a la sección 2 (y si no arranca, a la 3).
+- **cloudflared sin conexiones a :7844** → el problema sí es el túnel (sección 5).
+
+### 5.1.2 ⭐ Trampa conocida: PM2 no responde (`connect EPERM \\.\pipe\rpc.sock`)
+Si al intentar `pm2 status` / `pm2 restart alas` sale `connect EPERM \\.\pipe\rpc.sock` o
+"Acceso denegado", es porque hay un **daemon de PM2 corriendo ELEVADO** (como Administrador) dueño
+del pipe, y/o **daemons huérfanos acumulados** (cada `pm2` fallido lanza uno nuevo). Un PowerShell
+**no-elevado no puede gestionarlo**. Diagnóstico:
+```powershell
+# ¿Cuántos daemons PM2 hay? (más de uno = problema)
+Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+  Where-Object { $_.CommandLine -like "*Daemon.js*" } | Select-Object ProcessId,CommandLine
+```
+
+**Arréglalo desde un PowerShell ABIERTO COMO ADMINISTRADOR:**
+```powershell
+pm2 kill                          # mata el daemon elevado y limpia el pipe rpc.sock
+# Si dejaste un backend suelto ocupando el 3000, libéralo primero:
+Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue |
+  ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+cd C:\Users\Axel\Documents\GitHub\SitioWEB-ALAS\back
+pm2 start ecosystem.config.js
+pm2 save
+Invoke-RestMethod http://localhost:3000/api/health | ConvertTo-Json
+```
+
+### 5.1.3 Restauración inmediata sin PM2 (parche mientras arreglas lo de arriba)
+Si necesitas que el sitio vuelva YA y no puedes con PM2, arranca el backend suelto:
+```powershell
+cd C:\Users\Axel\Documents\GitHub\SitioWEB-ALAS\back
+Start-Process node -ArgumentList "src/server.js" -WorkingDirectory (Get-Location) -WindowStyle Hidden
+Start-Sleep 8
+Invoke-RestMethod http://localhost:3000/api/health | ConvertTo-Json
+```
+> ⚠️ Es un **parche**: ese proceso NO está bajo PM2, **no se auto-reinicia** si se cae ni sobrevive
+> a un reinicio de Windows. En cuanto puedas, déjalo bien con PM2 (5.1.2) para que quede permanente.
+
+### 5.1.4 Verifica que el 1033 se fue (sitio público real)
+```powershell
+Invoke-WebRequest -Uri "https://alas-mantenimientointegral.com.mx/api/health" -UseBasicParsing |
+  Select-Object StatusCode,Content
+```
+`StatusCode 200` con `"ok":true,"db":"ok"` = 1033 resuelto.
+
+---
+
 ## 6. Ruido que NO es una caída (ignóralo)
 
 - `CORS bloqueado: http://localhost:3000` y peticiones a `/wp-login.php`, `/.env`, `/.git/config`, `/admin`:
