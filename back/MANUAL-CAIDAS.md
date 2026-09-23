@@ -245,6 +245,38 @@ Invoke-WebRequest -Uri "https://alas-mantenimientointegral.com.mx/api/health" -U
 
 ---
 
+## 5.2 Causa B del 1033: el servicio Cloudflared se DETIENE o se CUELGA  ← CAÍDAS DEL 21/09
+
+El 1033 tuvo una **segunda causa distinta** (dos veces el 21/09): el **backend estaba sano**
+(`/api/health` local `ok:true`, 3000 sirviendo) pero el **servicio de Windows `Cloudflared`** se quedó
+**colgado en "Stop Pending"** o directamente **"Stopped"** → sin conexiones a `:7844` → 1033.
+
+Ojo con la trampa: las acciones de recuperación de SCM (`sc.exe qfailure Cloudflared`) **solo se disparan
+si el proceso CRASHEA**, no cuando el servicio se detiene "limpio" o se cuelga en Stop Pending. Por eso
+no se levantaba solo.
+
+**Diagnóstico:**
+```powershell
+Get-Service Cloudflared | Select-Object Name,Status          # Stopped / Stop Pending = problema
+$cf = Get-Process cloudflared -ErrorAction SilentlyContinue
+Get-NetTCPConnection -OwningProcess $cf.Id | Where-Object RemotePort -eq 7844   # vacío = desconectado
+```
+
+**Arréglalo desde un PowerShell ABIERTO COMO ADMINISTRADOR** (un shell no-elevado da
+"No se puede abrir el servicio Cloudflared"):
+```powershell
+Restart-Service Cloudflared -Force
+# Si sigue en "Stop Pending" (colgado), mata el proceso y arráncalo:
+Stop-Process -Id (Get-Process cloudflared).Id -Force
+Start-Service Cloudflared
+```
+Verifica con la sección 5.1.4.
+
+> **Para no volver a hacer esto a mano → activa la auto-recuperación (sección 9).** Un watchdog
+> reinicia el túnel (y el backend) solo, cada 2 minutos, sin que tengas que abrir PowerShell.
+
+---
+
 ## 6. Ruido que NO es una caída (ignóralo)
 
 - `CORS bloqueado: http://localhost:3000` y peticiones a `/wp-login.php`, `/.env`, `/.git/config`, `/admin`:
@@ -282,3 +314,47 @@ Los cuatro en verde = servicio sano.
      Select-Object TimeCreated | Select-Object -First 5
    ```
    Si vuelven a aparecer seguido, la RAM se está agotando otra vez.
+
+---
+
+## 9. ⭐ Auto-recuperación (para NO volver a levantar el sitio a mano)
+
+Tras 3 caídas en pocos días por causas distintas (backend, y túnel dos veces), hay un **watchdog
+que se cura solo**. Se configura **una sola vez** y después el sistema se recupera sin que abras PowerShell.
+
+### Qué hace
+`scripts/watchdog-alas.ps1` corre cada 2 minutos (y al arrancar Windows) como Tarea Programada
+`ALAS-SelfHeal`, con privilegios elevados. En cada pasada:
+- Si `/api/health` local NO responde → `pm2 resurrect` + `pm2 restart alas` (**causa A**).
+- Si el servicio `Cloudflared` no está Running o no tiene conexiones a `:7844` → reinicia el servicio,
+  y si está colgado en "Stop Pending" lo destraba matando el proceso (**causa B**).
+- Si `cloudflared.log` supera 50 MB → lo rota (**causa C**, el log llegó a 123 MB).
+- Es idempotente: si todo está sano, no toca nada. Registra sus acciones en
+  `C:\ProgramData\alas-watchdog\watchdog.log`.
+
+### Activarlo (UNA sola vez, como Administrador)
+```powershell
+# PowerShell -> "Ejecutar como administrador"
+cd C:\Users\Axel\Documents\GitHub\SitioWEB-ALAS\back\scripts
+.\setup-selfheal.ps1
+```
+Eso registra la tarea (cada 2 min + al arranque) y refuerza las acciones de recuperación de
+Cloudflared. A partir de ahí, olvídate de arreglarlo a mano.
+
+### Comprobar que está trabajando
+```powershell
+Get-ScheduledTask ALAS-SelfHeal | Select-Object TaskName,State          # Ready/Running
+Get-Content C:\ProgramData\alas-watchdog\watchdog.log -Tail 20          # historial de curas
+```
+
+### Desactivarlo (si hiciera falta)
+```powershell
+Unregister-ScheduledTask -TaskName ALAS-SelfHeal -Confirm:$false
+```
+
+> El watchdog **cura**, pero conviene igual tener **UptimeRobot** (sección 8.3) sondeando el endpoint
+> público para que te **avise** cuando algo falló, aunque se haya auto-recuperado.
+>
+> **Solución de fondo (opcional, más robusta aún):** la máquina es un Windows casero con 7.8 GB
+> corriendo SQL + Node + túnel. Si las caídas persisten, considera mover el backend a un servicio
+> nativo de Windows (NSSM) para retirar PM2, o migrar a un VPS pequeño con más RAM.
