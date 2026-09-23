@@ -17,7 +17,10 @@
     3) .\install-backend-service.ps1
 #>
 #Requires -RunAsAdministrator
-$ErrorActionPreference = 'Stop'
+# 'Continue' (no 'Stop'): en Windows PowerShell, un comando nativo que escribe a stderr (p.ej. pm2
+# imprimiendo "[PM2][WARN] No process found") se convierte en error TERMINANTE con 'Stop' y aborta
+# el script a la mitad. Las precondiciones críticas se validan con 'throw' explícito (siempre corta).
+$ErrorActionPreference = 'Continue'
 
 $SvcName = 'alas'
 $Back    = 'C:\Users\Axel\Documents\GitHub\SitioWEB-ALAS\back'
@@ -53,17 +56,23 @@ if (-not $nssm) {
 }
 Write-Host "NSSM: $nssm" -ForegroundColor Green
 
-# --- 2) Bajar PM2 para liberar el 3000 y que no resucite 'alas' ---
+# --- 2) Bajar PM2 (retirar 'alas' + guardar dump vacío + matar daemons) para liberar el 3000 ---
 $env:PM2_HOME = 'C:\Users\Axel\.pm2'
-$pm2 = (Get-Command pm2 -ErrorAction SilentlyContinue).Source
-if (-not $pm2) { $cand = Join-Path $env:APPDATA 'npm\pm2.cmd'; if (Test-Path $cand) { $pm2 = $cand } }
+# Preferir pm2.cmd sobre el shim pm2.ps1 (que propaga el stderr de pm2 como error).
+$pm2 = $null
+$pm2cmd = Join-Path $env:APPDATA 'npm\pm2.cmd'
+if (Test-Path $pm2cmd) { $pm2 = $pm2cmd } else { $pm2 = (Get-Command pm2 -ErrorAction SilentlyContinue).Source }
 if ($pm2) {
-  Write-Host "Retirando 'alas' de PM2 y deteniendo el daemon..." -ForegroundColor Cyan
-  & $pm2 delete alas   2>$null | Out-Null
-  & $pm2 save --force   2>$null | Out-Null
-  & $pm2 kill           2>$null | Out-Null
+  Write-Host "Retirando 'alas' de PM2 (delete + save + kill)..." -ForegroundColor Cyan
+  & $pm2 delete alas  2>&1 | Out-Null   # quita alas del runtime
+  & $pm2 save --force 2>&1 | Out-Null   # persiste dump SIN alas (no resucita en boot)
+  & $pm2 kill         2>&1 | Out-Null   # baja el daemon
 }
-# Matar cualquier node suelto que aún ocupe el 3000 (p.ej. parche viejo).
+# Garantía extra: matar cualquier daemon PM2 que quede (evita que resucite 'alas').
+Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+  Where-Object { $_.CommandLine -like '*pm2*Daemon.js*' } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+# Y liberar el 3000 de cualquier node suelto (stopgap/parche) para que el servicio pueda bindear.
 Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue |
   ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
 Start-Sleep -Seconds 2
