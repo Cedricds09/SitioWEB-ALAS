@@ -25,6 +25,7 @@ $ErrorActionPreference = 'Continue'
 $env:PM2_HOME = 'C:\Users\Axel\.pm2'
 
 $LOCAL   = 'http://localhost:3000/api/health'
+$SVC_ALAS = 'alas'                             # servicio nativo (NSSM); si no existe, usa PM2
 $LOGDIR  = 'C:\ProgramData\alas-watchdog'
 $LOG     = Join-Path $LOGDIR 'watchdog.log'
 $CFLOG   = 'C:\ProgramData\cloudflared\cloudflared.log'
@@ -66,16 +67,25 @@ if (-not $nodeUp) {
   # Node no responde (proceso caído). Histéresis: actuar solo al 2º fallo consecutivo.
   if (Test-Path $BK_FLAG) {
     Remove-Item $BK_FLAG -Force -ErrorAction SilentlyContinue
-    Log 'BACKEND caido (Node no responde) confirmado x2. Remediando con PM2...'
-    $pm2 = Get-Pm2Path
-    if ($pm2) {
-      $alas = $null
-      try { $alas = (& $pm2 jlist 2>$null | ConvertFrom-Json) | Where-Object { $_.name -eq 'alas' } } catch {}
-      if ($alas) { & $pm2 restart alas *> $null } else { & $pm2 resurrect *> $null }
-      Start-Sleep -Seconds 8
-      try { Invoke-WebRequest -Uri $LOCAL -TimeoutSec 8 -UseBasicParsing | Out-Null; Log 'BACKEND tras remediar: OK' }
-      catch { Log 'BACKEND tras remediar: SIGUE CAIDO (revisar manual seccion 2/3)' }
-    } else { Log 'ERROR: no se encontro pm2 en el contexto de la tarea.' }
+    $svcAlas = Get-Service $SVC_ALAS -ErrorAction SilentlyContinue
+    if ($svcAlas) {
+      # Arquitectura nueva: backend como servicio nativo (NSSM). Sin PM2, sin pipes.
+      Log 'BACKEND caido confirmado x2. Reiniciando servicio nativo alas...'
+      try { Restart-Service $SVC_ALAS -Force -ErrorAction Stop }
+      catch { try { Start-Service $SVC_ALAS -ErrorAction Stop } catch { Log ('No se pudo arrancar el servicio alas: ' + $_.Exception.Message) } }
+    } else {
+      # Respaldo (setup viejo aún en PM2, antes de migrar a servicio).
+      Log 'BACKEND caido confirmado x2. Remediando con PM2 (servicio alas no existe)...'
+      $pm2 = Get-Pm2Path
+      if ($pm2) {
+        $alas = $null
+        try { $alas = (& $pm2 jlist 2>$null | ConvertFrom-Json) | Where-Object { $_.name -eq 'alas' } } catch {}
+        if ($alas) { & $pm2 restart alas *> $null } else { & $pm2 resurrect *> $null }
+      } else { Log 'ERROR: no hay servicio alas ni pm2 en el contexto de la tarea.' }
+    }
+    Start-Sleep -Seconds 8
+    try { Invoke-WebRequest -Uri $LOCAL -TimeoutSec 8 -UseBasicParsing | Out-Null; Log 'BACKEND tras remediar: OK' }
+    catch { Log 'BACKEND tras remediar: SIGUE CAIDO (revisar manual seccion 2/3)' }
   } else {
     New-Item $BK_FLAG -Force | Out-Null
     Log 'BACKEND fallo 1/2 (Node no responde). Espero confirmacion.'

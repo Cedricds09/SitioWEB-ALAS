@@ -9,8 +9,8 @@ Escrito el 2026-09-13 tras una caída real. Léelo de arriba hacia abajo.
 
 | Pieza | Qué es | Dónde vive |
 |---|---|---|
-| **Backend Node** | API Express que sirve el sitio | `back/src/server.js`, arrancado por **PM2** con nombre `alas` |
-| **PM2** | Gestor que mantiene Node vivo y lo reinicia | proceso `alas`, se resucita al iniciar sesión de Windows |
+| **Backend Node** | API Express que sirve el sitio | `back/src/server.js`, corre como **servicio nativo de Windows** `alas` (NSSM). Ver sección 10 |
+| ~~PM2~~ *(retirado)* | Antes gestionaba Node; migrado a servicio nativo por causar caídas (daemons/EPERM) | histórico: `ecosystem.config.js`. Fallback solo si el servicio no existe |
 | **SQL Server** | Base de datos `ALAS` | servicio Windows `MSSQLSERVER`, puerto **1433** |
 | **Cloudflare Tunnel** | Expone el sitio a internet con HTTPS | dominio `alas-mantenimientointegral.com.mx` |
 | **Anthropic API** | IA de presupuestos | key en `back/.env` (`ANTHROPIC_API_KEY`) |
@@ -362,6 +362,50 @@ Unregister-ScheduledTask -TaskName ALAS-SelfHeal -Confirm:$false
 > El watchdog **cura**, pero conviene igual tener **UptimeRobot** (sección 8.3) sondeando el endpoint
 > público para que te **avise** cuando algo falló, aunque se haya auto-recuperado.
 >
-> **Solución de fondo (opcional, más robusta aún):** la máquina es un Windows casero con 7.8 GB
-> corriendo SQL + Node + túnel. Si las caídas persisten, considera mover el backend a un servicio
-> nativo de Windows (NSSM) para retirar PM2, o migrar a un VPS pequeño con más RAM.
+> **Solución de fondo:** el backend ya se migró a servicio nativo (sección 10). Si las caídas
+> persisten por RAM, el siguiente paso es migrar a un VPS pequeño con más memoria (la máquina
+> casera de 7.8 GB para SQL + Node + túnel es el techo estructural).
+
+---
+
+## 10. ⭐ Backend como servicio nativo de Windows (NSSM) — reemplaza a PM2
+
+Tras varias caídas relacionadas con PM2 (daemons huérfanos, `EPERM \\.\pipe\rpc.sock`, mezcla de
+contextos elevado/no-elevado), el backend se **migró a un servicio nativo** llamado `alas`, gestionado
+por **NSSM**. Ventajas: arranca en el boot **sin login**, lo controla el SCM, se reinicia solo si el
+proceso muere, tiene rotación de logs propia, y **elimina de raíz todo el problema de PM2**.
+
+### Migrar (UNA sola vez, como Administrador)
+```powershell
+cd C:\Users\Axel\Documents\GitHub\SitioWEB-ALAS\back\scripts
+.\install-backend-service.ps1
+```
+El script: instala NSSM (choco/winget) si falta, **retira `alas` de PM2** y baja el daemon, crea el
+servicio `alas` (node `src/server.js`, `NODE_ENV=production`, `PORT=3000`, auto-arranque, logs con
+rotación en `C:\ProgramData\alas`), lo arranca y verifica `/api/health`. Hay ~10-20s de corte durante
+el cambio. Si algo sale mal, imprime el log de error y te recuerda el rollback.
+
+### Operación diaria (ya NO se usa `pm2`)
+```powershell
+Get-Service alas                 # estado
+Restart-Service alas             # reiniciar
+Get-Content C:\ProgramData\alas\alas-err.log -Tail 40   # errores
+Get-Content C:\ProgramData\alas\alas-out.log -Tail 40   # salida
+```
+> Las secciones 2 y 5.1.2 hablan de `pm2 restart alas`: eso quedó **obsoleto**. Ahora es
+> `Restart-Service alas`. El watchdog (sección 9) ya detecta el servicio y lo usa automáticamente;
+> solo cae a PM2 si el servicio no existiera.
+
+### Rollback (volver a PM2)
+```powershell
+cd C:\Users\Axel\Documents\GitHub\SitioWEB-ALAS\back\scripts
+.\uninstall-backend-service.ps1
+# luego, si quieres PM2 de vuelta:
+cd ..
+pm2 start ecosystem.config.js ; pm2 save
+```
+
+### Orden de activación recomendado
+1. `.\install-backend-service.ps1`  → backend como servicio (retira PM2).
+2. `.\setup-selfheal.ps1`           → watchdog cada 2 min (túnel + backend + SQL).
+Con ambos, el sistema arranca y se recupera solo, sin abrir PowerShell.
