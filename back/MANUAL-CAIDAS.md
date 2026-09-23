@@ -323,12 +323,19 @@ Tras 3 caídas en pocos días por causas distintas (backend, y túnel dos veces)
 que se cura solo**. Se configura **una sola vez** y después el sistema se recupera sin que abras PowerShell.
 
 ### Qué hace
-`scripts/watchdog-alas.ps1` corre cada 2 minutos (y al arrancar Windows) como Tarea Programada
-`ALAS-SelfHeal`, con privilegios elevados. En cada pasada:
-- Si `/api/health` local NO responde → `pm2 resurrect` + `pm2 restart alas` (**causa A**).
-- Si el servicio `Cloudflared` no está Running o no tiene conexiones a `:7844` → reinicia el servicio,
-  y si está colgado en "Stop Pending" lo destraba matando el proceso (**causa B**).
-- Si `cloudflared.log` supera 50 MB → lo rota (**causa C**, el log llegó a 123 MB).
+`scripts/watchdog-alas.ps1` corre cada 2 minutos (y 90s tras arrancar Windows) como Tarea Programada
+`ALAS-SelfHeal`, con privilegios elevados y `PM2_HOME` fijo (para hablar SIEMPRE con el daemon PM2
+correcto y no fabricar daemons huérfanos). En cada pasada:
+- **Backend Node muerto** (`/api/health` no responde nada) → consulta `pm2 jlist` y hace
+  `pm2 restart alas` si existe, o `pm2 resurrect` si no (evita duplicar la instancia en el 3000).
+- **DB caída** (`/api/health` responde pero `db!=ok`) → arranca `MSSQLSERVER` si está parado;
+  **no** reinicia `alas` (el proceso está sano; reiniciarlo no arregla SQL — ver 3.3).
+- **Túnel** (servicio `Cloudflared` no Running o sin conexiones a `:7844`) → reinicia el servicio,
+  y si está colgado en "Stop Pending" lo destraba matando el proceso.
+- **Log gigante** de cloudflared (>150 MB) → rotación real reiniciando el servicio un instante.
+  La prevención principal es `--loglevel warn`, que `setup-selfheal.ps1` deja aplicado en origen.
+- **Histéresis**: exige **2 fallos consecutivos** (con ~2 min entre pasadas) antes de reiniciar
+  backend o túnel, para no cortar usuarios en vivo por un pico transitorio.
 - Es idempotente: si todo está sano, no toca nada. Registra sus acciones en
   `C:\ProgramData\alas-watchdog\watchdog.log`.
 

@@ -28,8 +28,10 @@ $user = "$env:USERDOMAIN\$env:USERNAME"
 $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
   -Argument ('-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}"' -f $script)
 
-# Dispara al arrancar Windows + repite cada 2 min de forma indefinida.
+# Dispara al arrancar Windows (con 90s de retardo para no competir con SQL/Cloudflared/PM2
+# en el arranque) + repite cada 2 min de forma indefinida.
 $trigStart  = New-ScheduledTaskTrigger -AtStartup
+$trigStart.Delay = 'PT90S'
 $trigRepeat = New-ScheduledTaskTrigger -Once -At (Get-Date) `
   -RepetitionInterval (New-TimeSpan -Minutes 2) -RepetitionDuration (New-TimeSpan -Days 3650)
 
@@ -45,6 +47,23 @@ Register-ScheduledTask -TaskName $taskName -Action $action -Trigger @($trigStart
 # Refuerza las acciones de recuperacion del servicio Cloudflared (por si el proceso crashea).
 sc.exe failure Cloudflared reset= 86400 actions= restart/20000/restart/20000/restart/30000 | Out-Null
 sc.exe failureflag Cloudflared 1 | Out-Null
+
+# Prevencion del log gigante EN ORIGEN: baja --loglevel de info a warn.
+# Edicion puntual del ImagePath en el registro (NO reconstruye la linea: solo cambia la palabra
+# tras --loglevel), asi el token del tunel queda intacto. Aplica al reiniciar el servicio.
+try {
+  $key = 'HKLM:\SYSTEM\CurrentControlSet\Services\Cloudflared'
+  $img = (Get-ItemProperty -Path $key -Name ImagePath -ErrorAction Stop).ImagePath
+  if ($img -match '--loglevel\s+info') {
+    $new = $img -replace '(--loglevel\s+)info', '$1warn'
+    Set-ItemProperty -Path $key -Name ImagePath -Value $new
+    Write-Host "Cloudflared --loglevel -> warn (aplica al proximo reinicio del servicio)." -ForegroundColor Green
+  } else {
+    Write-Host "Cloudflared --loglevel ya no es 'info' (sin cambios)." -ForegroundColor DarkGray
+  }
+} catch {
+  Write-Host "Aviso: no se pudo ajustar el loglevel de Cloudflared: $($_.Exception.Message)" -ForegroundColor Yellow
+}
 
 Write-Host ""
 Write-Host "OK - Tarea '$taskName' registrada (cada 2 min + al arranque de Windows)." -ForegroundColor Green
