@@ -273,7 +273,51 @@ Start-Service Cloudflared
 Verifica con la sección 5.1.4.
 
 > **Para no volver a hacer esto a mano → activa la auto-recuperación (sección 9).** Un watchdog
-> reinicia el túnel (y el backend) solo, cada 2 minutos, sin que tengas que abrir PowerShell.
+> reinicia el túnel (y el backend) solo, sin que tengas que abrir PowerShell.
+
+---
+
+## 5.3 Causa C del 1033: el túnel hace FLAPPING (Running pero desconectado del edge)  ← CAÍDAS DEL 23/09
+
+La causa más insidiosa: el servicio `Cloudflared` queda **`Running`** pero **pierde las conexiones
+al edge** (`:7844`) → 1033/530 público durante 2-4 min hasta que reconecta o el watchdog lo reinicia.
+
+**Causa raíz (evidencia en `C:\ProgramData\cloudflared\cloudflared.log`):**
+- El túnel corría con **`--protocol http2`** (TCP). En una red casera con micro-cortes, la conexión
+  TCP se rompe (`connectex: A socket operation was attempted to an unreachable network`) y cloudflared
+  tiene que **re-registrar cada conexión** — ahí está la ventana de caída.
+- Casi todas las conexiones caídas eran a IPs **IPv6** del edge (`2606:4700:...`) y el resolver DNS
+  IPv6 fallaba (`wsasend: unreachable network`). **El IPv6 residencial es el eslabón inestable.**
+- El propio precheck de cloudflared decía `Environment is healthy. cloudflared will use 'quic'`:
+  QUIC (UDP) aguanta mucho mejor los micro-cortes y cambios de IP sin tirar el túnel.
+
+**El arreglo (una sola vez, como Administrador):**
+```powershell
+# PowerShell -> "Ejecutar como administrador"
+cd C:\Users\Axel\Documents\GitHub\SitioWEB-ALAS\back\scripts
+.\harden-tunnel.ps1
+```
+`harden-tunnel.ps1` edita el `ImagePath` del servicio con **regex puntual** (el token queda intacto,
+nunca se reconstruye la línea ni se imprime) para dejar:
+- `--protocol quic`  (UDP; resiste el flapping mucho mejor que http2/TCP)
+- `--edge-ip-version 4`  (fuerza IPv4 al edge; el IPv6 de esta casa flapea)
+- `--retries 8`  (más reintentos ante error de conexión; default 5)
+- `--grace-period 30s`  (drena peticiones en vuelo al reiniciar → menos cortes a usuarios)
+
+Además sube la **prioridad** del proceso a `AboveNormal` y asegura su **MinWorkingSet** para que
+Windows no lo pagine a disco bajo presión de RAM del escritorio. Es **idempotente** y trae
+**rollback**: `.\harden-tunnel.ps1 -Rollback` (vuelve a `http2` y quita los flags; el token nunca se toca).
+
+**Verifica el protocolo tras aplicar:**
+```powershell
+Select-String -Path C:\ProgramData\cloudflared\cloudflared.log -Pattern "Registered tunnel connection" |
+  Select-Object -Last 4   # debe decir  protocol":"quic"
+```
+
+> **Honestidad estructural:** el `harden-tunnel.ps1` reduce la ventana y la frecuencia de cortes,
+> pero **no elimina** la causa: la red/IPv6 residencial y la presión de RAM del escritorio. La
+> robustez real llega con un **VPS pequeño** (RAM dedicada, sin apps de escritorio, mejor red) o
+> subiendo la RAM de la máquina. Ver sección 8.
 
 ---
 
@@ -314,6 +358,45 @@ Los cuatro en verde = servicio sano.
      Select-Object TimeCreated | Select-Object -First 5
    ```
    Si vuelven a aparecer seguido, la RAM se está agotando otra vez.
+6. **Endurecimiento del túnel aplicado** (`harden-tunnel.ps1`, sección 5.3): QUIC + IPv4 al edge +
+   reintentos + prioridad de proceso. No lo quites. Si reinstalas cloudflared, vuelve a correrlo.
+
+### 8.1 ⭐ Veredicto estructural HONESTO (léelo)
+
+Las mejoras de software (watchdog cada 1 min, `harden-tunnel.ps1`, blindaje anti-paginación)
+**reducen** la frecuencia y la duración de los cortes, pero **NO los eliminan**. El techo es el hardware:
+
+- **Es un escritorio interactivo de 7.8 GB** compartido con Chrome (~615 MB), Spotify (~400 MB),
+  Edge WebView (~380 MB), Defender (~300 MB), etc. SQL y Node compiten por lo que sobra y Windows
+  los pagina a disco → la DB tarda o falla, y `cloudflared` puede quedar sin CPU/red a tiempo.
+- **La red es residencial** (Wi-Fi/IPv6 casero). El flapping del túnel es, en el fondo, la conexión
+  a internet cayéndose a ratos. Ningún flag lo arregla del todo: solo lo hace menos doloroso.
+
+**Riesgo residual tras estas mejoras:** los cortes públicos deberían pasar de varios minutos a
+**~30-60 s** (lo que tarda el watchdog de 1 min + reconexión QUIC), y bajar bastante en frecuencia,
+pero **seguirá habiéndolos** cada vez que la red parpadee o la RAM se sature. No es 99.9% de uptime.
+
+**La única robustez real (elige uno):**
+
+1. **Migrar a un VPS pequeño** (lo recomendado). Specs mínimas sobradas para este stack:
+   - **2 vCPU / 2-4 GB RAM / 40-50 GB SSD**, Linux (Ubuntu 22.04) o Windows si SQL Server lo exige.
+   - Con SQL Server: mejor **4 GB RAM** (o migrar a PostgreSQL/MySQL, que corren cómodos en 2 GB).
+   - Proveedores y coste aprox.: Hetzner CX22 (~4-5 EUR/mes, 2 vCPU/4 GB), DigitalOcean/Vultr/Linode
+     (~6-12 USD/mes, 1-2 vCPU/2 GB), Azure/AWS más caro si necesitas Windows+SQL con licencia.
+   - **Ventaja:** RAM dedicada, sin apps de escritorio robando memoria, red de datacenter estable
+     (cloudflared deja de flapear), y la máquina de casa se puede apagar sin tumbar el sitio.
+   - **Esfuerzo de migración:** bajo-medio. Instalar Node + la DB, clonar el repo, variables de
+     entorno, restaurar el backup de SQL (o migrar el esquema), y correr `cloudflared` con el
+     **mismo token** en el VPS (el túnel es portátil: apuntas el connector desde el otro host).
+     1-2 tardes de trabajo. El `harden-tunnel.ps1` deja de hacer falta (en Linux se usa el service
+     unit de cloudflared, ya estable).
+
+2. **Subir la RAM de la máquina de casa** a **16 GB** (parche, no solución de red): quita la presión
+   de paginación de SQL/Node por ~30-60 USD de RAM, pero **no arregla el flapping del túnel** (eso
+   es la conexión a internet). Solo tiene sentido si además la red de casa es fiable.
+
+**Recomendación:** VPS de 2 vCPU / 4 GB (~5 USD/mes). Es la diferencia entre "se cae a ratos y el
+watchdog lo levanta" y "está siempre arriba".
 
 ---
 
@@ -323,30 +406,37 @@ Tras 3 caídas en pocos días por causas distintas (backend, y túnel dos veces)
 que se cura solo**. Se configura **una sola vez** y después el sistema se recupera sin que abras PowerShell.
 
 ### Qué hace
-`scripts/watchdog-alas.ps1` corre cada 2 minutos (y 90s tras arrancar Windows) como Tarea Programada
+`scripts/watchdog-alas.ps1` corre **cada 1 minuto** (y 90s tras arrancar Windows) como Tarea Programada
 `ALAS-SelfHeal`, con privilegios elevados y `PM2_HOME` fijo (para hablar SIEMPRE con el daemon PM2
 correcto y no fabricar daemons huérfanos). En cada pasada:
-- **Backend Node muerto** (`/api/health` no responde nada) → consulta `pm2 jlist` y hace
-  `pm2 restart alas` si existe, o `pm2 resurrect` si no (evita duplicar la instancia en el 3000).
+- **Backend Node muerto** (`/api/health` no responde nada) → reinicia el servicio nativo `alas`
+  (NSSM); de respaldo, `pm2 restart alas`/`pm2 resurrect` si aún estás en PM2.
 - **DB caída** (`/api/health` responde pero `db!=ok`) → arranca `MSSQLSERVER` si está parado;
   **no** reinicia `alas` (el proceso está sano; reiniciarlo no arregla SQL — ver 3.3).
 - **Túnel** (servicio `Cloudflared` no Running o sin conexiones a `:7844`) → reinicia el servicio,
-  y si está colgado en "Stop Pending" lo destraba matando el proceso.
+  y si está colgado en "Stop Pending" lo destraba matando el proceso. **Esto es lo que cura el
+  flapping de la sección 5.3.**
 - **Log gigante** de cloudflared (>150 MB) → rotación real reiniciando el servicio un instante.
   La prevención principal es `--loglevel warn`, que `setup-selfheal.ps1` deja aplicado en origen.
-- **Histéresis**: exige **2 fallos consecutivos** (con ~2 min entre pasadas) antes de reiniciar
+- **Blindaje anti-paginación**: en cada pasada re-fija prioridad `AboveNormal` y `MinWorkingSet`
+  de `node` (alas) y `cloudflared` (un reinicio de servicio los resetea; esto los vuelve a proteger).
+- **Monitoreo de RAM**: si la RAM libre baja de **600 MB**, registra los mayores consumidores en el
+  log (diagnóstico; **no mata apps del usuario**). A lo sumo una anotación cada 30 min.
+- **Histéresis**: exige **2 fallos consecutivos** (con ~1 min entre pasadas) antes de reiniciar
   backend o túnel, para no cortar usuarios en vivo por un pico transitorio.
 - Es idempotente: si todo está sano, no toca nada. Registra sus acciones en
   `C:\ProgramData\alas-watchdog\watchdog.log`.
 
-### Activarlo (UNA sola vez, como Administrador)
+### Activarlo (UNA sola vez, como Administrador) — ORDEN RECOMENDADO
 ```powershell
 # PowerShell -> "Ejecutar como administrador"
 cd C:\Users\Axel\Documents\GitHub\SitioWEB-ALAS\back\scripts
-.\setup-selfheal.ps1
+.\harden-tunnel.ps1     # 1) endurece el túnel (quic + IPv4 + retries)  — sección 5.3
+.\setup-selfheal.ps1    # 2) registra/actualiza el watchdog (cada 1 min) y recuperación SCM
 ```
-Eso registra la tarea (cada 2 min + al arranque) y refuerza las acciones de recuperación de
-Cloudflared. A partir de ahí, olvídate de arreglarlo a mano.
+`harden-tunnel.ps1` puede reejecutarse sin daño (idempotente) y revertirse con `-Rollback`.
+`setup-selfheal.ps1` registra la tarea (cada 1 min + al arranque). A partir de ahí, olvídate de
+arreglarlo a mano.
 
 ### Comprobar que está trabajando
 ```powershell
@@ -407,5 +497,5 @@ pm2 start ecosystem.config.js ; pm2 save
 
 ### Orden de activación recomendado
 1. `.\install-backend-service.ps1`  → backend como servicio (retira PM2).
-2. `.\setup-selfheal.ps1`           → watchdog cada 2 min (túnel + backend + SQL).
+2. `.\setup-selfheal.ps1`           → watchdog cada 1 min (túnel + backend + SQL).
 Con ambos, el sistema arranca y se recupera solo, sin abrir PowerShell.
